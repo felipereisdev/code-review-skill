@@ -37,7 +37,7 @@ Then configure your AI assistant to load skills from the cloned directory.
 ```bash
 # Clone into your global skills
 mkdir -p ~/.claude/skills
-ln -s "$(pwd)/code-review-skill" ~/.claude/skills/code-review-skill
+ln -s "$(pwd)/code-review-skill" ~/.claude/skills/code-review
 ```
 
 ### Option 3: OpenCode/Codex
@@ -45,7 +45,7 @@ ln -s "$(pwd)/code-review-skill" ~/.claude/skills/code-review-skill
 ```bash
 # Clone into your global skills
 mkdir -p ~/.codex/skills
-ln -s "$(pwd)/code-review-skill" ~/.codex/skills/code-review-skill
+ln -s "$(pwd)/code-review-skill" ~/.codex/skills/code-review
 ```
 
 ### Option 4: Cursor
@@ -53,7 +53,7 @@ ln -s "$(pwd)/code-review-skill" ~/.codex/skills/code-review-skill
 ```bash
 # Clone into your Cursor skills directory
 mkdir -p ~/.cursor/skills
-ln -s "$(pwd)/code-review-skill" ~/.cursor/skills/code-review-skill
+ln -s "$(pwd)/code-review-skill" ~/.cursor/skills/code-review
 ```
 
 ## 🚀 Usage
@@ -63,25 +63,25 @@ Invoke the skill to review your code:
 ### Universal
 
 ```
-/code-review-skill
+/code-review
 ```
 
 ### Claude Code
 
 ```bash
-/code-review-skill
+/code-review
 ```
 
 ### OpenCode
 
 ```
-@code-review-skill
+@code-review
 ```
 
 ### Cursor
 
 ```
-/code-review-skill
+/code-review
 ```
 
 ## 📋 Review Process
