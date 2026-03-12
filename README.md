@@ -1,6 +1,6 @@
 # Code Review 🔍
 
-[![GitHub stars](https://img.shields.io/github/stars/felipereisdev/code-review?style=social)](https://github.com/felipereisdev/code-review)
+[![GitHub stars](https://img.shields.io/github/stars/felipereisdev/code-review-skill?style=social)](https://github.com/felipereisdev/code-review-skill)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-compatible-purple)](https://agentskills.io)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://claude.ai)
@@ -27,7 +27,7 @@
 Works with any AI assistant:
 
 ```bash
-git clone https://github.com/felipereisdev/code-review.git
+git clone https://github.com/felipereisdev/code-review-skill.git
 ```
 
 Then configure your AI assistant to load skills from the cloned directory.
@@ -37,7 +37,7 @@ Then configure your AI assistant to load skills from the cloned directory.
 ```bash
 # Clone into your global skills
 mkdir -p ~/.claude/skills
-ln -s "$(pwd)/code-review" ~/.claude/skills/code-review
+ln -s "$(pwd)/code-review-skill" ~/.claude/skills/code-review-skill
 ```
 
 ### Option 3: OpenCode/Codex
@@ -45,7 +45,7 @@ ln -s "$(pwd)/code-review" ~/.claude/skills/code-review
 ```bash
 # Clone into your global skills
 mkdir -p ~/.codex/skills
-ln -s "$(pwd)/code-review" ~/.codex/skills/code-review
+ln -s "$(pwd)/code-review-skill" ~/.codex/skills/code-review-skill
 ```
 
 ### Option 4: Cursor
@@ -53,7 +53,7 @@ ln -s "$(pwd)/code-review" ~/.codex/skills/code-review
 ```bash
 # Clone into your Cursor skills directory
 mkdir -p ~/.cursor/skills
-ln -s "$(pwd)/code-review" ~/.cursor/skills/code-review
+ln -s "$(pwd)/code-review-skill" ~/.cursor/skills/code-review-skill
 ```
 
 ## 🚀 Usage
@@ -63,25 +63,25 @@ Invoke the skill to review your code:
 ### Universal
 
 ```
-/code-review
+/code-review-skill
 ```
 
 ### Claude Code
 
 ```bash
-/code-review
+/code-review-skill
 ```
 
 ### OpenCode
 
 ```
-@code-review
+@code-review-skill
 ```
 
 ### Cursor
 
 ```
-/code-review
+/code-review-skill
 ```
 
 ## 📋 Review Process
@@ -192,7 +192,7 @@ Runs with automatic stack detection and loads only relevant pattern/stack rules.
 ## 📁 Project Structure
 
 ```
-code-review/
+code-review-skill/
 ├── SKILL.md              # Main skill definition
 ├── README.md             # This file
 ├── .gitignore           # Git ignore rules
