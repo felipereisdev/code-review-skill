@@ -24,7 +24,35 @@
 
 ## 📦 Installation
 
-### Option 1: Direct Clone (Universal)
+### Option 1: npx skills (Recommended)
+
+Install via the [skills CLI](https://github.com/vercel-labs/skills) — supports 45+ AI agents interactively:
+
+```bash
+npx skills add felipereisdev/code-review-skill
+```
+
+This will prompt you to select which agents to install to (Claude Code, OpenCode, Cursor, Codex, etc.).
+
+Install to all agents without prompts:
+
+```bash
+npx skills add felipereisdev/code-review-skill --all
+```
+
+Install to specific agents:
+
+```bash
+npx skills add felipereisdev/code-review-skill -a claude-code -a opencode -a cursor
+```
+
+Install globally:
+
+```bash
+npx skills add felipereisdev/code-review-skill -g --all
+```
+
+### Option 2: Direct Clone (Universal)
 
 Works with any AI assistant:
 
@@ -34,26 +62,23 @@ git clone https://github.com/felipereisdev/code-review-skill.git
 
 Then configure your AI assistant to load skills from the cloned directory.
 
-### Option 2: Claude Code
+### Option 3: Claude Code
 
 ```bash
-# Clone into your global skills
 mkdir -p ~/.claude/skills
 ln -s "$(pwd)/code-review-skill" ~/.claude/skills/code-review
 ```
 
-### Option 3: OpenCode/Codex
+### Option 4: OpenCode/Codex
 
 ```bash
-# Clone into your global skills
 mkdir -p ~/.codex/skills
 ln -s "$(pwd)/code-review-skill" ~/.codex/skills/code-review
 ```
 
-### Option 4: Cursor
+### Option 5: Cursor
 
 ```bash
-# Clone into your Cursor skills directory
 mkdir -p ~/.cursor/skills
 ln -s "$(pwd)/code-review-skill" ~/.cursor/skills/code-review
 ```
@@ -146,11 +171,6 @@ The skill will ask you to choose the review scope:
 ### Styling & Languages
 - TypeScript
 - Tailwind CSS (v3/v4 detection)
-
-### DevOps & Infrastructure
-- Docker
-- Terraform
-- Kafka
 
 ## 🏛️ Architectural Patterns
 
