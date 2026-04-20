@@ -13,7 +13,9 @@
 ## 🌟 Features
 
 - **Automatic Stack Detection** - Identifies project technology from config files
-- **Multi-Stack Support** - 17+ technology stacks covered
+- **Consistency-First Review** - Checks existing project conventions before flagging violations (Step 1.5)
+- **API Validation** - Validates library usage against live documentation to reduce false positives
+- **Multi-Stack Support** - 19 technology stacks covered
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
 - **15 Review Categories** - From Security to Privacy Compliance
@@ -116,7 +118,7 @@ The skill will ask you to choose the review scope:
 
 ### Frontend
 - React
-- Vue.js
+- Vue.js (+ Inertia.js)
 - Angular
 - Svelte
 - Nuxt
@@ -129,6 +131,9 @@ The skill will ask you to choose the review scope:
 - Java Spring
 - .NET
 
+### Testing
+- Pest PHP
+
 ### Mobile
 - React Native
 - Flutter
@@ -140,7 +145,12 @@ The skill will ask you to choose the review scope:
 
 ### Styling & Languages
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS (v3/v4 detection)
+
+### DevOps & Infrastructure
+- Docker
+- Terraform
+- Kafka
 
 ## 🏛️ Architectural Patterns
 
@@ -208,11 +218,13 @@ code-review-skill/
     ├── dotnet.md
     ├── flutter.md
     ├── go.md
+    ├── inertia.md
     ├── java-spring.md
     ├── kafka.md
     ├── laravel.md
     ├── node.md
     ├── nuxt.md
+    ├── pest.md
     ├── python.md
     ├── react-native.md
     ├── react.md
