@@ -70,6 +70,8 @@ Before reviewing anything, identify the project's stack by inspecting the follow
 
 Based on what you find, load and apply **only** the stack and pattern files that match this project. Do not evaluate or report on technologies not present.
 
+> **API Validation:** Before flagging a misuse of a library API, validate the syntax and best practice against live docs using `mcp__plugin_context7_context7__query-docs` for the version detected in `package.json` or `composer.json`. Avoids false positives from outdated training data.
+
 **Stack files to load if relevant:**
 
 Read these files using the path relative to this skill file's directory. If a file cannot be read, continue with the generic rules above.
@@ -92,6 +94,8 @@ Read these files using the path relative to this skill file's directory. If a fi
 - `./stacks/docker.md`
 - `./stacks/terraform.md`
 - `./stacks/kafka.md`
+- `./stacks/inertia.md`
+- `./stacks/pest.md`
 
 **Pattern files to load if relevant:**
 
@@ -102,6 +106,16 @@ Read these files using the path relative to this skill file's directory. If a fi
 - `./patterns/event-driven.md`
 - `./patterns/microservices.md`
 - `./patterns/cqrs.md`
+
+---
+
+## Step 1.5 — Consistency Check
+
+Before flagging any pattern violation, check what the codebase already does. Laravel, Vue, and similar frameworks offer multiple valid approaches — the best choice is the one already established in the project, even if another would be theoretically better. **Inconsistency is worse than a suboptimal pattern.**
+
+- Check sibling controllers, services, components, or tests for established conventions
+- If the project already uses a non-standard pattern consistently, follow it — report it as a **Suggestion** at most, not a blocker
+- These checklist rules are defaults for when no pattern exists yet, not overrides of working conventions
 
 ---
 
