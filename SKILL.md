@@ -1,13 +1,18 @@
 ---
 name: code-review
-description: |
-  Performs a structured, comprehensive code review of git changes.
-  Detects stack and architecture automatically, applies relevant
-  stack/pattern-specific rules, and reports findings by severity.
-  Use when: user runs /code-review, /review-pr, or asks to "review my changes".
-author: felipereis
-version: 1.0.0
-date: 2026-03-11
+description: >-
+  Performs a structured, comprehensive code review of git changes
+  (uncommitted, staged, current branch vs base, a single commit, or a
+  commit range). Detects the stack and architecture automatically, applies
+  stack- and pattern-specific rules, and reports findings by severity.
+  Use when the user runs /code-review or /review-pr, or asks to
+  "review my changes", "review PR", "review this branch", "do a code review",
+  "revisar minhas mudanças", "revisar o PR" or "fazer code review".
+license: MIT
+metadata:
+  author: felipereis
+  version: "2.0.0"
+  date: "2026-04-20"
 ---
 
 # Code Review
