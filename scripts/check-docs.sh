@@ -81,9 +81,62 @@ PY
   fi
 }
 
+check_readme_counts() {
+  local stacks patterns scopes categories listed_patterns listed_categories missing="" f rc
+  stacks=$(ls stacks/*.md | wc -l | tr -d ' ')
+  patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
+  scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
+  categories=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
+  listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
+  listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
+
+  if grep -qF "**Multi-Stack Support** - ${stacks} technology stacks covered" README.md; then
+    pass "README stack count matches stacks/ (${stacks})"
+  else
+    fail "README must say '**Multi-Stack Support** - ${stacks} technology stacks covered'"
+  fi
+  if grep -qF "**${scopes} Review Scopes**" README.md; then
+    pass "README scope count matches SKILL.md Step 0 (${scopes})"
+  else
+    fail "README must say '**${scopes} Review Scopes**'"
+  fi
+  if grep -qF "**${categories} Review Categories**" README.md; then
+    pass "README category count matches SKILL.md checklist sections (${categories})"
+  else
+    fail "README must say '**${categories} Review Categories**'"
+  fi
+  if [ "$listed_categories" = "$categories" ]; then
+    pass "README Review Categories table has ${categories} rows"
+  else
+    fail "README Review Categories table has ${listed_categories} rows, SKILL.md has ${categories} checklist sections"
+  fi
+  if [ "$listed_patterns" = "$patterns" ]; then
+    pass "README lists ${patterns} architectural patterns"
+  else
+    fail "README lists ${listed_patterns} architectural patterns, patterns/ has ${patterns}"
+  fi
+  git grep -nE '15 Review (Scopes|Categories)|19 (technology )?stacks' -- '*.md'; rc=$?
+  if [ "$rc" -eq 1 ]; then
+    pass "no stale '15 Review Scopes' / '15 Review Categories' / '19 stacks'"
+  elif [ "$rc" -eq 0 ]; then
+    fail "stale counts found (lines above)"
+  else
+    fail "git grep failed (run the script inside a git checkout)"
+  fi
+  for f in stacks/*.md patterns/*.md LICENSE example-output.md scripts/check-docs.sh; do
+    grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
+  done
+  if [ -z "$missing" ]; then
+    pass "README Project Structure lists every stack, pattern and top-level file"
+  else
+    fail "README Project Structure is missing:${missing}"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
+check_readme_counts
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"
