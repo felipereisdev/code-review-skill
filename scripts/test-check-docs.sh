@@ -381,6 +381,70 @@ make_copy "$work/nolocation"
 drop_lines "$work/nolocation/SKILL.md" 'has no Location'
 expect_fail "reporting PR-text attempts as findings fails" "$work/nolocation" "Untrusted Input is missing: has no Location"
 
+make_copy "$work/nochanged"
+drop_lines "$work/nochanged/SKILL.md" '## Changed Lines and Grouping'
+expect_fail "removing the changed-lines section fails" "$work/nochanged" "SKILL.md has no '## Changed Lines and Grouping' section"
+
+make_copy "$work/latechanged"
+move_section_to_end "$work/latechanged/SKILL.md" '## Changed Lines and Grouping'
+expect_fail "a changed-lines section after the checklist fails" "$work/latechanged" "'## Changed Lines and Grouping' must come after '## Evidence and Confidence' and before '## Do Not Report'"
+
+make_copy "$work/anyline"
+drop_lines "$work/anyline/SKILL.md" 'Report findings only on lines the change adds or modifies'
+expect_fail "allowing findings on unchanged lines fails" "$work/anyline" "Changed Lines and Grouping is missing: Report findings only on lines the change adds or modifies"
+
+make_copy "$work/longnotes"
+drop_lines "$work/longnotes/SKILL.md" 'The section is optional and short'
+expect_fail "an unbounded pre-existing section fails" "$work/longnotes" "Changed Lines and Grouping is missing: The section is optional and short"
+
+make_copy "$work/countednotes"
+drop_lines "$work/countednotes/SKILL.md" 'These lines are not findings'
+expect_fail "counting pre-existing lines fails" "$work/countednotes" "Changed Lines and Grouping is missing: These lines are not findings"
+
+make_copy "$work/nogroup"
+drop_lines "$work/nogroup/SKILL.md" 'report one finding, not one per place'
+expect_fail "reporting each repeated occurrence fails" "$work/nogroup" "Changed Lines and Grouping is missing: report one finding, not one per place"
+
+make_copy "$work/dnrnote"
+replace_first "$work/dnrnote/SKILL.md" ' You may still mention a pre-existing problem in one line under `## Pre-existing issues (not counted)` (see Changed Lines and Grouping); that line is not a finding.' ''
+expect_fail "a Do Not Report item that ignores the pre-existing note fails" "$work/dnrnote" "Do Not Report is missing: that line is not a finding"
+
+make_copy "$work/reportorder"
+replace_first "$work/reportorder/SKILL.md" ' `## Pre-existing issues (not counted)` (only when it has lines),' ''
+expect_fail "leaving the pre-existing section out of the report order fails" "$work/reportorder" "Output Format is missing: \`## Pre-existing issues (not counted)\` (only when it has lines)"
+
+make_copy "$work/summarycount"
+replace_first "$work/summarycount/SKILL.md" '; lines under `## Pre-existing issues (not counted)` are never counted' ''
+expect_fail "counting pre-existing lines in the Summary fails" "$work/summarycount" "Output Format is missing: lines under \`## Pre-existing issues (not counted)\` are never counted"
+
+make_copy "$work/noalsoformat"
+drop_lines "$work/noalsoformat/SKILL.md" '**Also at:** `path/to/file.ext:line`'
+expect_fail "removing the Also at field fails" "$work/noalsoformat" "Output Format is missing: **Also at:** \`path/to/file.ext:line\`, \`path/to/other.ext:start-end\`"
+
+make_copy "$work/nocompactalso"
+drop_lines "$work/nocompactalso/SKILL.md" '(also at path/to/other.ext:line)'
+expect_fail "removing the compact also-at suffix fails" "$work/nocompactalso" "Output Format is missing: (also at path/to/other.ext:line)"
+
+make_copy "$work/legacysize"
+drop_lines "$work/legacysize/SKILL.md" 'Never report the length of code the change only touches'
+expect_fail "reporting the size of touched legacy code fails" "$work/legacysize" "Code & File Size is missing: Never report the length of code the change only touches"
+
+make_copy "$work/sizewarning"
+replace_first "$work/sizewarning/SKILL.md" 'A length finding is always a **Suggestion**' 'A length finding is a **Warning**'
+expect_fail "a size finding above Suggestion fails" "$work/sizewarning" "Code & File Size is missing: A length finding is always a **Suggestion**"
+
+make_copy "$work/sizeconsistency"
+replace_first "$work/sizeconsistency/SKILL.md" 'if the project already lives with' 'unless the project never had'
+expect_fail "size findings that skip the consistency check fail" "$work/sizeconsistency" "Code & File Size is missing: if the project already lives with"
+
+make_copy "$work/stalerefactor"
+replace_first "$work/stalerefactor/SKILL.md" 'are candidates for refactoring' 'require refactoring'
+expect_fail "a size bullet that demands refactoring fails" "$work/stalerefactor" "Code & File Size still says: require refactoring"
+
+make_copy "$work/limitchanged"
+replace_first "$work/limitchanged/SKILL.md" '**50 lines**' '**80 lines**'
+expect_fail "changing the 50-line method limit fails" "$work/limitchanged" "Code & File Size is missing: **50 lines**"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

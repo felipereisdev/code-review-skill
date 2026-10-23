@@ -441,6 +441,81 @@ PY
   fi
 }
 
+check_skill_scope_and_noise() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Changed Lines and Grouping"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+def require(start, name, strings):
+    text = ""
+    if start is not None:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+        text = "\n".join(lines[start:end])
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+start = first(heading)
+evidence = first("## Evidence and Confidence")
+do_not_report = first("## Do Not Report")
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if evidence is None or do_not_report is None or not evidence < start < do_not_report:
+        errors.append(f"'{heading}' must come after '## Evidence and Confidence' and before '## Do Not Report'")
+    require(start, "Changed Lines and Grouping", (
+        "Report findings only on lines the change adds or modifies",
+        "`## Pre-existing issues (not counted)`", "The section is optional and short",
+        "`- path/to/file.ext:line — problem`", "These lines are not findings",
+        "is still refuted in Step 2", "report one finding, not one per place",
+        "an **Also at:** line lists the others"))
+require(do_not_report, "Do Not Report", ("that line is not a finding",))
+size = first("### Code & File Size")
+size_text = ""
+if size is None:
+    errors.append("SKILL.md has no '### Code & File Size' section")
+else:
+    end = next((i for i in range(size + 1, len(lines))
+                if lines[i].startswith("#") or lines[i] == "---"), len(lines))
+    size_text = "\n".join(lines[size:end])
+for s in ("only to code the change adds, or to growth the change causes",
+          "Never report the length of code the change only touches",
+          "A length finding is always a **Suggestion**", "if the project already lives with",
+          "**30 lines**", "**50 lines**", "**300 lines**", "**500 lines**"):
+    if s not in size_text:
+        errors.append(f"Code & File Size is missing: {s}")
+for s in ("require refactoring", "require decomposition"):
+    if s in size_text:
+        errors.append(f"Code & File Size still says: {s}")
+output_start = first("## 15. Output Format")
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+for s in ("`## Pre-existing issues (not counted)` (only when it has lines)",
+          "lines under `## Pre-existing issues (not counted)` are never counted",
+          "**Also at:** `path/to/file.ext:line`, `path/to/other.ext:start-end`",
+          "(also at path/to/other.ext:line)",
+          "any `## Pre-existing issues (not counted)` lines"):
+    if s not in output:
+        errors.append(f"Output Format is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md limits findings to changed lines, keeps pre-existing issues out of the count, groups repeats and scopes size limits to new code"
+  else
+    fail "SKILL.md changed-line scope, grouping and size limits (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -581,6 +656,7 @@ check_skill_verification
 check_skill_do_not_report
 check_skill_repo_rules
 check_skill_untrusted_input
+check_skill_scope_and_noise
 check_stack_precedents
 check_readme_counts
 check_example_output
