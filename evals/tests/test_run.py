@@ -151,6 +151,21 @@ class RunTest(unittest.TestCase):
                 self.assertIn("report not in the skill's Output Format", clean["error"])
                 self.assertEqual(data["metrics"]["errors"], 2)
 
+    def test_setup_failure_is_an_error(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        shutil.copytree(os.path.join(FIXTURES, "demo"), os.path.join(tmp, "demo"))
+        shutil.rmtree(os.path.join(tmp, "demo", "base"))
+        r = run("--cases-dir", tmp, "--cases", "demo/*", "--out-dir", self.out,
+                "--agent-cmd", "bash " + FAKE_AGENT)
+        self.assertEqual(r.returncode, 1)
+        bug, clean = self.results()["cases"]
+        self.assertEqual((bug["id"], bug["status"], bug["passed"]), ("demo/bug", "error", False))
+        self.assertTrue(bug["error"].startswith("setup failed:"), bug["error"])
+        self.assertIs(bug["detected"], False)
+        self.assertIs(clean["detected"], None)
+        self.assertIs(clean["false_positives"], None)
+
     def test_broken_pair_stops_run_before_agent(self):
         tmp = tempfile.mkdtemp()
         shutil.copytree(os.path.join(FIXTURES, "demo"), os.path.join(tmp, "demo"))

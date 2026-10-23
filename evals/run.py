@@ -168,7 +168,7 @@ def prepare_repo(pair_dir: str, patch: str) -> str:
         for args in commands:
             result = _git(repo, *args)
             if result.returncode != 0:
-                raise RuntimeError(result.stderr)
+                raise RuntimeError(result.stderr.strip() or result.stdout.strip())
     except Exception as exc:
         shutil.rmtree(repo, ignore_errors=True)
         if isinstance(exc, RuntimeError):
@@ -292,6 +292,17 @@ def run_agent(cmd: str, repo: str, prompt: str, env: dict, timeout: int) -> tupl
     return "ok", None, stdout
 
 
+def _error_result(result: dict, case: dict, error: str) -> dict:
+    """Shape an error record the same way for setup and agent failures."""
+    result["status"] = "error"
+    result["error"] = error
+    if case["kind"] == "bug":
+        result["detected"] = False
+    else:
+        result["false_positives"] = None
+    return result
+
+
 def evaluate(case: dict, args, out_dir: str) -> dict:
     """Run one case end to end and return its result record."""
     started = time.monotonic()
@@ -319,8 +330,7 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
         try:
             repo = prepare_repo(case["dir"], case["patch"])
         except RuntimeError as exc:
-            result["error"] = f"setup failed: {str(exc).strip()}"
-            return result
+            return _error_result(result, case, f"setup failed: {str(exc).strip()}")
 
         prompt = PROMPT_TEMPLATE.format(skill_dir=REPO_ROOT)
         handle, prompt_path = tempfile.mkstemp(prefix="cr-eval-prompt-", text=True)
@@ -346,23 +356,21 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
         result["error"] = error
         result["stack_mentioned"] = score.stack_mentioned(stdout, case["stack"])
 
-        if status == "ok":
-            result["findings"] = [
-                {"heading": finding["heading"], "severity": finding["severity"]}
-                for finding in score.parse_findings(stdout)
-            ]
-            if case["kind"] == "bug":
-                scored = score.score_bug(stdout, case["bug"]["patterns"], case["bug"]["min_severity"])
-                result["detected"] = scored["detected"]
-                result["matched_finding"] = scored["matched_finding"]
-                result["passed"] = bool(scored["detected"])
-            else:
-                result["false_positives"] = score.score_clean(stdout)["false_positives"]
-                result["passed"] = result["false_positives"] == 0
-        elif case["kind"] == "bug":
-            result["detected"] = False
+        if status != "ok":
+            return _error_result(result, case, error)
+
+        result["findings"] = [
+            {"heading": finding["heading"], "severity": finding["severity"]}
+            for finding in score.parse_findings(stdout)
+        ]
+        if case["kind"] == "bug":
+            scored = score.score_bug(stdout, case["bug"]["patterns"], case["bug"]["min_severity"])
+            result["detected"] = scored["detected"]
+            result["matched_finding"] = scored["matched_finding"]
+            result["passed"] = bool(scored["detected"])
         else:
-            result["false_positives"] = None
+            result["false_positives"] = score.score_clean(stdout)["false_positives"]
+            result["passed"] = result["false_positives"] == 0
 
         return result
     finally:
