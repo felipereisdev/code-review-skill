@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies README counts, LICENSE, SKILL.md frontmatter and file references, and example-output.md.
+# Verifies README counts, LICENSE, SKILL.md frontmatter, file references and output rules, and example-output.md.
 # Usage: bash scripts/check-docs.sh   (exits 1 if any check fails)
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -187,12 +187,102 @@ PY
   fi
 }
 
+check_skill_output_rules() {
+  local missing=0 s
+  for s in \
+    '## Severity Levels' \
+    'is never above **Warning**' \
+    'do work or queries that grow with data size' \
+    '## Evidence and Confidence' \
+    '**Location:** `path/to/file.ext:start-end`' \
+    '**Deletion-only exception:**' \
+    'same deletion-only exception' \
+    '**Evidence:** Trigger → effect' \
+    '**Confidence:** High' \
+    '## Needs human verification' \
+    'Low-confidence findings are never reported' \
+    '### Compact mode' \
+    '- path/to/file.ext:line: Severity: problem → fix'; do
+    if ! grep -qF -- "$s" SKILL.md; then
+      printf '  SKILL.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if grep -qF '**File:**' SKILL.md; then
+    printf '  SKILL.md still uses **File:** (use **Location:**)\n'
+    missing=$((missing + 1))
+  fi
+  if [ "$missing" -eq 0 ]; then
+    pass "SKILL.md defines severity caps, evidence, confidence and compact mode"
+  else
+    fail "SKILL.md severity, evidence and output-format rules (see messages above)"
+  fi
+}
+
+check_example_findings() {
+  if python3 - <<'PY'
+import re, sys
+sys.path.insert(0, "evals")
+from score import parse_findings
+
+text = open("example-output.md", encoding="utf-8").read()
+findings = parse_findings(text)
+full = [f for f in findings if not f["compact"]]
+compact = [f for f in findings if f["compact"]]
+main = [f for f in full if not f["needs_verification"]]
+verify = [f for f in full if f["needs_verification"]]
+errors = []
+if not main:
+    errors.append("example-output.md has no finding under ## Findings")
+if not verify:
+    errors.append("example-output.md has no finding under ## Needs human verification")
+if not compact:
+    errors.append("example-output.md has no compact-mode lines")
+for f in full:
+    if not re.search(r"^\*\*Location:\*\* `[^`\s]+:\d+(-\d+)?`$", f["text"], re.M):
+        errors.append(f"finding '{f['heading']}' needs a **Location:** `path:start-end` line")
+    for field in ("Issue", "Evidence", "Confidence", "Fix"):
+        if not re.search(r"^\*\*" + field + r":\*\* \S", f["text"], re.M):
+            errors.append(f"finding '{f['heading']}' has no **{field}:** line")
+    expected = "Medium" if f["needs_verification"] else "High"
+    if not re.search(r"^\*\*Confidence:\*\* " + expected + "$", f["text"], re.M):
+        errors.append(f"finding '{f['heading']}' must have **Confidence:** {expected}")
+if re.search(r"^\*\*File:\*\*", text, re.M):
+    errors.append("example-output.md still uses **File:** lines")
+if re.search(r"^\*\*Confidence:\*\* Low", text, re.M):
+    errors.append("example-output.md reports a Low-confidence finding")
+counts = [sum(f["severity"] == s for f in main) for s in ("Critical", "Warning", "Suggestion")]
+total = re.search(r"^\| \*\*Total\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|", text, re.M)
+if total is None:
+    errors.append("example-output.md Summary has no | **Total** | row")
+elif [int(n) for n in total.groups()] != counts:
+    errors.append(f"Summary Total row is {[int(n) for n in total.groups()]} but ## Findings has "
+                  f"Critical/Warning/Suggestion {counts}")
+def severities(items):
+    return sorted(f["severity"] for f in items)
+if severities(f for f in compact if not f["needs_verification"]) != severities(main):
+    errors.append("compact-mode lines must have the same severities as ## Findings")
+if severities(f for f in compact if f["needs_verification"]) != severities(verify):
+    errors.append("compact-mode Needs human verification lines must match the full report")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "example-output.md findings carry Location, Evidence and Confidence and match the Summary"
+  else
+    fail "example-output.md findings (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
 check_skill_references
+check_skill_output_rules
 check_readme_counts
 check_example_output
+check_example_findings
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"
