@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-23T09:18:30Z",
+  "agent": {
+    "name": "claude",
+    "model": "sonnet",
+    "command": "claude -p --safe-mode --disable-slash-commands --strict-mcp-config --no-session-persistence --permission-mode dontAsk --tools \"Read,Grep,Glob,Bash\" --allowedTools \"Read,Grep,Glob,Bash(git diff:*),Bash(git show:*),Bash(git status:*),Bash(git log:*),Bash(ls:*)\" --add-dir \"$EVAL_SKILL_DIR\" --model \"$EVAL_MODEL\" --output-format text",
+    "mcp": "disabled; API-validation step skipped"
+  },
+  "skill": {
+    "commit": "ae62bbea62653b5df422f424814cdc53162b870c",
+    "skill_md_sha256": "f326b9e15c59aaba41967d328b52c27a99805eb389b8516a0c035bda0a9273c7",
+    "dirty": false
+  },
+  "metrics": {
+    "bug_cases": 6,
+    "detected": 6,
+    "recall": 1.0,
+    "clean_cases": 6,
+    "false_positive_cases": 3,
+    "false_positive_findings": 5,
+    "errors": 0
+  },
+  "cases": [
+    {
+      "id": "n-plus-one-laravel/bug",
+      "pair": "n-plus-one-laravel",
+      "kind": "bug",
+      "topic": "n-plus-one",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "duration_s": 30.3,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Performance — Warning (N+1 queries)",
+      "false_positives": null,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Performance — Warning (N+1 queries)",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Accessibility — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/n-plus-one-laravel__bug.md"
+    },
+    {
+      "id": "n-plus-one-laravel/clean",
+      "pair": "n-plus-one-laravel",
+      "kind": "clean",
+      "topic": "n-plus-one",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "duration_s": 24.1,
+      "passed": false,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 1,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Accessibility — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Performance — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Performance — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/n-plus-one-laravel__clean.md"
+    },
+    {
+      "id": "null-node/bug",
+      "pair": "null-node",
+      "kind": "bug",
+      "topic": "null-undefined",
+      "stack": "node",
+      "status": "ok",
+      "error": null,
+      "duration_s": 19.7,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Critical",
+      "false_positives": null,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Critical",
+          "severity": "Critical"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Privacy/Compliance — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/null-node__bug.md"
+    },
+    {
+      "id": "null-node/clean",
+      "pair": "null-node",
+      "kind": "clean",
+      "topic": "null-undefined",
+      "stack": "node",
+      "status": "ok",
+      "error": null,
+      "duration_s": 18.8,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Privacy/Compliance — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/null-node__clean.md"
+    },
+    {
+      "id": "off-by-one-python/bug",
+      "pair": "off-by-one-python",
+      "kind": "bug",
+      "topic": "off-by-one",
+      "stack": "python",
+      "status": "ok",
+      "error": null,
+      "duration_s": 15.5,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Critical",
+      "false_positives": null,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Critical",
+          "severity": "Critical"
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/off-by-one-python__bug.md"
+    },
+    {
+      "id": "off-by-one-python/clean",
+      "pair": "off-by-one-python",
+      "kind": "clean",
+      "topic": "off-by-one",
+      "stack": "python",
+      "status": "ok",
+      "error": null,
+      "duration_s": 17.9,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/off-by-one-python__clean.md"
+    },
+    {
+      "id": "sqli-laravel/bug",
+      "pair": "sqli-laravel",
+      "kind": "bug",
+      "topic": "sql-injection",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "duration_s": 20.7,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Security — Critical",
+      "false_positives": null,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Security — Critical",
+          "severity": "Critical"
+        },
+        {
+          "heading": "Security — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Stack-Specific (Laravel) — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        }
+      ],
+      "report": "evals/baseline/reports/sqli-laravel__bug.md"
+    },
+    {
+      "id": "sqli-laravel/clean",
+      "pair": "sqli-laravel",
+      "kind": "clean",
+      "topic": "sql-injection",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "duration_s": 31.5,
+      "passed": false,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 2,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Security — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Potential Bugs — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Performance — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Architecture — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/sqli-laravel__clean.md"
+    },
+    {
+      "id": "swallowed-error-ts/bug",
+      "pair": "swallowed-error-ts",
+      "kind": "bug",
+      "topic": "swallowed-error",
+      "stack": "typescript",
+      "status": "ok",
+      "error": null,
+      "duration_s": 15.8,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Critical",
+      "false_positives": null,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Critical",
+          "severity": "Critical"
+        },
+        {
+          "heading": "Tests/Coverage — Critical",
+          "severity": "Critical"
+        },
+        {
+          "heading": "Observability — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Resilience — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Stack-Specific (TypeScript) — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/swallowed-error-ts__bug.md"
+    },
+    {
+      "id": "swallowed-error-ts/clean",
+      "pair": "swallowed-error-ts",
+      "kind": "clean",
+      "topic": "swallowed-error",
+      "stack": "typescript",
+      "status": "ok",
+      "error": null,
+      "duration_s": 21.4,
+      "passed": false,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 2,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs / Security — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Observability — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Resilience — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/swallowed-error-ts__clean.md"
+    },
+    {
+      "id": "xss-react/bug",
+      "pair": "xss-react",
+      "kind": "bug",
+      "topic": "xss-false-alarm",
+      "stack": "react",
+      "status": "ok",
+      "error": null,
+      "duration_s": 23.5,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Security — Critical",
+      "false_positives": null,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Security — Critical",
+          "severity": "Critical"
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning"
+        },
+        {
+          "heading": "Accessibility — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/xss-react__bug.md"
+    },
+    {
+      "id": "xss-react/clean",
+      "pair": "xss-react",
+      "kind": "clean",
+      "topic": "xss-false-alarm",
+      "stack": "react",
+      "status": "ok",
+      "error": null,
+      "duration_s": 18.4,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion"
+        },
+        {
+          "heading": "Stack-Specific (React) — Suggestion",
+          "severity": "Suggestion"
+        }
+      ],
+      "report": "evals/baseline/reports/xss-react__clean.md"
+    }
+  ]
+}

@@ -238,6 +238,8 @@ code-review-skill/
 │   ├── run.py           # Runner: temp repo per case, headless agent, scoring
 │   ├── score.py         # Report parser and scorer
 │   ├── make-patch.sh    # Builds a case patch from base/ and an edited copy
+│   ├── baseline.json    # Baseline metrics of the skill before review-behavior changes
+│   ├── baseline/        # Baseline summary.md and raw reports
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
 │   └── tests/           # Offline tests for the runner and scorer
 ├── patterns/            # Architectural pattern guidelines
