@@ -60,6 +60,22 @@ class UnrelatedFindingTest(unittest.TestCase):
 """
         self.assert_not_detected("swallowed-error-ts", report)
 
+    def test_payment_reordered_privacy_warning_is_not_a_swallowed_error(self):
+        report = """### Security — Warning
+**File:** `src/charge.ts:15-17`
+**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.
+**Fix:** Return a stable public error code and discard the raw provider message.
+"""
+        self.assert_not_detected("swallowed-error-ts", report)
+
+    def test_payment_discard_error_message_warning_is_not_a_swallowed_error(self):
+        report = """### Security — Warning
+**File:** `src/charge.ts:15-17`
+**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.
+**Fix:** Discard the error message and return a stable public error code.
+"""
+        self.assert_not_detected("swallowed-error-ts", report)
+
     def test_payment_error_classification_warning_is_not_a_swallowed_error(self):
         report = """### Potential Bugs / Security — Warning
 **File:** `src/charge.ts:15-17`
@@ -94,6 +110,28 @@ failed charge is reported as successful.
         result = score_bug(report, bug["patterns"], bug["min_severity"])
         self.assertTrue(result["detected"])
         self.assertEqual(result["matched_finding"], "Potential Bugs — Critical")
+
+    def test_failed_charge_treated_as_paid_is_detected(self):
+        report = """### Potential Bugs — Critical
+**File:** `src/charge.ts:15`
+**Issue:** A failed charge is treated as paid by chargeInvoice, even though the gateway rejected it.
+**Fix:** Return the failure result to the caller.
+"""
+        bug = load_bug("swallowed-error-ts")
+        result = score_bug(report, bug["patterns"], bug["min_severity"])
+        self.assertTrue(result["detected"])
+        self.assertEqual(result["matched_finding"], "Potential Bugs — Critical")
+
+    def test_failed_charge_reported_as_paid_is_detected(self):
+        report = """### Potential Bugs — Warning
+**File:** `src/charge.ts:15`
+**Issue:** The caller reports the failed charge as paid and marks the invoice settled.
+**Fix:** Return the failure variant instead of the paid result.
+"""
+        bug = load_bug("swallowed-error-ts")
+        result = score_bug(report, bug["patterns"], bug["min_severity"])
+        self.assertTrue(result["detected"])
+        self.assertEqual(result["matched_finding"], "Potential Bugs — Warning")
 
 
 class BaselineBugReportTest(unittest.TestCase):
