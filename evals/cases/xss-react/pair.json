@@ -1,0 +1,12 @@
+{
+  "topic": "xss-false-alarm",
+  "stack": "react",
+  "description": "Renders user comment bodies; the bug uses dangerouslySetInnerHTML, the clean diff renders {comment.body} in JSX, which React escapes (looks like XSS but is safe).",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": [
+      "xss|cross[- ]site|sanitiz|unescap|html injection|script injection|inject(?:s|ed|ing)? (?:html|markup|script)|raw html|bypass(?:es|ed)? .{0,30}(?:escap|protect)",
+      "CommentList|comment\\.body|dangerouslySetInnerHTML"
+    ]
+  }
+}

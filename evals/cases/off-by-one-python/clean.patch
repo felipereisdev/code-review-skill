@@ -1,0 +1,39 @@
+diff --git a/reports/pagination.py b/reports/pagination.py
+index b9a556e..711bf76 100644
+--- a/reports/pagination.py
++++ b/reports/pagination.py
+@@ -6,6 +6,7 @@ class Page:
+     items: list
+     number: int
+     total_pages: int
++    has_next: bool
+ 
+ 
+ def paginate(items: list, page: int, per_page: int = 10) -> Page:
+@@ -14,4 +15,9 @@ def paginate(items: list, page: int, per_page: int = 10) -> Page:
+         raise ValueError("page and per_page must be >= 1")
+     total_pages = max(1, -(-len(items) // per_page))
+     start = (page - 1) * per_page
+-    return Page(items=items[start:start + per_page], number=page, total_pages=total_pages)
++    return Page(
++        items=items[start:start + per_page],
++        number=page,
++        total_pages=total_pages,
++        has_next=page < total_pages,
++    )
+diff --git a/tests/test_pagination.py b/tests/test_pagination.py
+index 093ab8c..c83482c 100644
+--- a/tests/test_pagination.py
++++ b/tests/test_pagination.py
+@@ -5,3 +5,11 @@ def test_first_page():
+     page = paginate(list(range(25)), page=1)
+     assert page.items == list(range(10))
+     assert page.total_pages == 3
++
++
++def test_has_next_on_first_page():
++    assert paginate(list(range(25)), page=1).has_next is True
++
++
++def test_no_next_on_last_page():
++    assert paginate(list(range(25)), page=3).has_next is False

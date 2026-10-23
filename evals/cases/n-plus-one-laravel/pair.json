@@ -1,0 +1,12 @@
+{
+  "topic": "n-plus-one",
+  "stack": "laravel",
+  "description": "Orders index shows customer name and item count; the bug lazy-loads both per row, the clean diff eager-loads with with() and withCount().",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": [
+      "n\\s*\\+\\s*1|eager|with\\(|withCount|lazy[- ]?load|quer(y|ies) per|per (row|order)",
+      "customer|items|index\\.blade\\.php"
+    ]
+  }
+}

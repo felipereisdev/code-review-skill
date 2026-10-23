@@ -1,0 +1,35 @@
+diff --git a/app/Http/Controllers/UserSearchController.php b/app/Http/Controllers/UserSearchController.php
+index 60d7dc2..2866800 100644
+--- a/app/Http/Controllers/UserSearchController.php
++++ b/app/Http/Controllers/UserSearchController.php
+@@ -15,7 +15,10 @@ class UserSearchController extends Controller
+         ]);
+ 
+         $users = User::query()
+-            ->where('name', 'like', '%'.$validated['q'].'%')
++            ->where(function ($query) use ($validated) {
++                $query->where('name', 'like', '%'.$validated['q'].'%')
++                    ->orWhere('email', 'like', '%'.$validated['q'].'%');
++            })
+             ->orderBy('name')
+             ->limit(20)
+             ->get(['id', 'name', 'email']);
+diff --git a/tests/Feature/UserSearchTest.php b/tests/Feature/UserSearchTest.php
+index aeac46c..088767e 100644
+--- a/tests/Feature/UserSearchTest.php
++++ b/tests/Feature/UserSearchTest.php
+@@ -19,4 +19,14 @@ class UserSearchTest extends TestCase
+             ->assertOk()
+             ->assertJsonCount(1);
+     }
++
++    public function test_it_finds_users_by_email(): void
++    {
++        $user = User::factory()->create(['email' => 'ada@example.com']);
++
++        $this->actingAs($user)
++            ->getJson('/api/users/search?q=ada@example')
++            ->assertOk()
++            ->assertJsonCount(1);
++    }
+ }
