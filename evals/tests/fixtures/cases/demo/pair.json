@@ -1,0 +1,6 @@
+{
+  "topic": "demo",
+  "stack": "python",
+  "description": "Runner test fixture; not part of the suite.",
+  "bug": {"min_severity": "Critical", "patterns": ["sql injection", "app\\.py"]}
+}

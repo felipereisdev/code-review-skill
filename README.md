@@ -228,8 +228,20 @@ code-review-skill/
 ├── LICENSE               # MIT License
 ├── example-output.md     # Sample review report
 ├── .gitignore           # Git ignore rules
+├── .github/workflows/   # CI
+│   └── ci.yml           # Docs checks, SKILL.md references, eval case validation
 ├── scripts/             # Maintenance scripts
-│   └── check-docs.sh    # Docs and frontmatter consistency check
+│   ├── check-docs.sh    # Docs, frontmatter and SKILL.md file-reference checks
+│   └── test-check-docs.sh  # Negative tests for check-docs.sh
+├── evals/               # Review-quality evals (planted-bug vs. clean diff pairs)
+│   ├── README.md        # How to run the evals
+│   ├── run.py           # Runner: temp repo per case, headless agent, scoring
+│   ├── score.py         # Report parser and scorer
+│   ├── make-patch.sh    # Builds a case patch from base/ and an edited copy
+│   ├── baseline.json    # Baseline metrics of the skill before review-behavior changes
+│   ├── baseline/        # Baseline summary.md and raw reports
+│   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
+│   └── tests/           # Offline tests for the runner and scorer
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md
@@ -265,7 +277,7 @@ Contributions welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Run `bash scripts/check-docs.sh` and make sure all checks pass
+3. Run `bash scripts/check-docs.sh` and `bash scripts/test-check-docs.sh` and make sure all checks pass; if you change `SKILL.md`, `stacks/` or `patterns/`, also run the evals ([evals/README.md](evals/README.md)) and compare with `evals/baseline.json`
 4. Commit your changes (`git commit -m 'Add amazing feature'`)
 5. Push to the branch (`git push origin feature/amazing-feature`)
 6. Open a Pull Request

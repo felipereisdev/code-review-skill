@@ -1,0 +1,12 @@
+{
+  "topic": "null-undefined",
+  "stack": "node",
+  "description": "Gift orders look up a second customer; the bug dereferences it without checking that it exists, the clean diff guards it.",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": [
+      "null|undefined|TypeError|guard|optional chaining|crash",
+      "recipient|giftRecipientId|labels\\.js"
+    ]
+  }
+}

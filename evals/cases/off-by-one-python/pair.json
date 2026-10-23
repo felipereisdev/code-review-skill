@@ -1,0 +1,12 @@
+{
+  "topic": "off-by-one",
+  "stack": "python",
+  "description": "Adds Page.has_next; the bug compares with <= so the last page reports a next page, the clean diff uses <.",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": [
+      "off[- ]by[- ]one|<=|last page|always (be )?true|boundary|fencepost",
+      "has_next"
+    ]
+  }
+}
