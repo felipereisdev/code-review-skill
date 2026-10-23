@@ -66,7 +66,7 @@ Severity caps:
 
 Every finding needs three things before you report it:
 
-- **Location**: `path:start-end` (or `path:line` for a single line). Cite only lines inside the diff, that is, lines the change adds or modifies. When the cause is outside the diff, cite the changed lines that trigger it. For a finding about a whole file or function, cite the changed range.
+- **Location**: `path:start-end` (or `path:line` for a single line). Cite only lines inside the diff, that is, lines the change adds or modifies. When the cause is outside the diff, cite the changed lines that trigger it. For a finding about a whole file or function, cite the changed range. **Deletion-only exception:** when the finding is a regression caused only by removed code, cite the removed old-side lines (`path:line` or `path:start-end`); for a whole-file deletion, cite the deleted file's path with its removed line range. Identify the removal in Evidence.
 - **Evidence**: one concrete scenario written as trigger → effect: the input, state or call sequence that triggers the problem, and what goes wrong. Example: `customers.get(99)` returns `undefined` → `recipient.name` throws a `TypeError` and the request fails.
 - **Confidence**: how sure you are that the scenario happens with the code as written.
   - **High**: you traced the path through the diff and the code you read, and the scenario follows from it.
@@ -404,6 +404,6 @@ In compact mode, write each finding as one list item:
 - path/to/file.ext:line: Severity: problem → fix
 ```
 
-- `line` is the finding's Location: one line or a `start-end` range inside the diff. `Severity` is Critical, Warning or Suggestion.
+- `line` is the finding's Location: one line or a `start-end` range inside the diff, with the same deletion-only exception (cite the removed old-side lines, including a whole deleted file). `Severity` is Critical, Warning or Suggestion.
 - The severity, evidence and confidence rules still apply: High-confidence lines first, Medium-confidence lines under a `## Needs human verification` heading after them, Low-confidence findings never.
 - Skip What Was Done Well and the Summary table. If there are no High-confidence findings, write only **"Code review passed — no issues found."** and any `## Needs human verification` lines.

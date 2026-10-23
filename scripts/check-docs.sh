@@ -195,6 +195,8 @@ check_skill_output_rules() {
     'do work or queries that grow with data size' \
     '## Evidence and Confidence' \
     '**Location:** `path/to/file.ext:start-end`' \
+    '**Deletion-only exception:**' \
+    'same deletion-only exception' \
     '**Evidence:** Trigger → effect' \
     '**Confidence:** High' \
     '## Needs human verification' \

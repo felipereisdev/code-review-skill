@@ -62,6 +62,12 @@ expect_fail "removing the verify/ensure severity cap fails" "$work/nocap" "SKILL
 make_copy "$work/oldformat"
 drop_lines "$work/oldformat/SKILL.md" '**Location:** `path/to/file.ext:start-end`'
 expect_fail "removing the Location field fails" "$work/oldformat" "SKILL.md is missing: **Location:** \`path/to/file.ext:start-end\`"
+make_copy "$work/nodeletionrule"
+drop_lines "$work/nodeletionrule/SKILL.md" '**Deletion-only exception:**'
+expect_fail "removing the deletion-only Location exception fails" "$work/nodeletionrule" "SKILL.md is missing: **Deletion-only exception:**"
+make_copy "$work/nocompactdeletion"
+drop_lines "$work/nocompactdeletion/SKILL.md" 'same deletion-only exception'
+expect_fail "compact mode must inherit the deletion-only exception" "$work/nocompactdeletion" "SKILL.md is missing: same deletion-only exception"
 
 # replace_first <file> <old> <new>: replaces the first occurrence of <old> in <file>.
 replace_first() {
