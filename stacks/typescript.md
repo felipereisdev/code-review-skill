@@ -27,3 +27,8 @@
 ## Organisation
 - **Centralized types**: domain types defined in dedicated type files; not scattered inline across components or functions
 - **Barrel exports**: `index.ts` re-exports organized to avoid deep import paths, without creating circular dependencies
+
+## Precedents
+
+- **`import type` is erased**: `import type` and `export type` declarations are removed from the emitted JavaScript, so they never load the module at run time. Do not report them as adding a runtime dependency, a runtime import cycle or bundle size. **Exception:** imports without the `type` keyword, and inline `type` modifiers (`import { type X } from "mod"`) under `verbatimModuleSyntax`, which keep an `import {} from "mod"` that still loads the module.
+- **Exhaustive switches are checked by the compiler**: a `switch` over a union whose `default` branch assigns the value to a `never` variable fails type-checking when a member of the union has no `case`. Do not report a missing `case` for a member of that union in a project where the type checker runs over that file. **Exception:** switches without the `never` assignment (or an equivalent `satisfies never` check); code that no type checker runs over, such as transpile-only builds (Vite, esbuild or Babel without a separate `tsc` step) or Node type stripping, which execute the switch unchecked; and values that can fall outside the union at run time, such as untyped input, `as` casts, `any` or a mutable alias with a wider type, where the `default` branch needs real handling.

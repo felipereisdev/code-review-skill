@@ -56,3 +56,8 @@ Flag if wrong syntax is used for the detected version.
 - Dark mode missing on new component — inconsistent theming
 - v4 project using `@tailwind base` directives — wrong syntax for v4
 - v3 project using `@import "tailwindcss"` — wrong syntax for v3
+
+## Precedents
+
+- **Only used utilities are generated**: Tailwind generates CSS only for class names it finds in the scanned source files. Do not report added utility classes as growing the CSS bundle with unused rules. **Exception:** broad `safelist` patterns (v3) or other safelisting configuration, which generate every listed class whether it is used or not.
+- **Class order in the attribute does not decide conflicts**: when two utilities on one element set the same property, the one that comes later in the generated stylesheet wins, not the one that comes later in the `class` attribute. Do not report reordering classes as a style change. **Exception:** class strings merged with `tailwind-merge` (`twMerge`, often wrapped as `cn()`), where the later class does win, and conflicting utilities on one element (`p-2 p-4`), which are a bug in themselves.
