@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies README counts, LICENSE, SKILL.md frontmatter and example-output.md.
+# Verifies README counts, LICENSE, SKILL.md frontmatter and file references, and example-output.md.
 # Usage: bash scripts/check-docs.sh   (exits 1 if any check fails)
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -123,7 +123,7 @@ check_readme_counts() {
   else
     fail "git grep failed (run the script inside a git checkout)"
   fi
-  for f in stacks/*.md patterns/*.md LICENSE example-output.md scripts/check-docs.sh; do
+  for f in stacks/*.md patterns/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh; do
     grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
   done
   if [ -z "$missing" ]; then
@@ -152,9 +152,45 @@ check_example_output() {
   fi
 }
 
+check_skill_references() {
+  if python3 - <<'PY'
+import glob, os, re, sys
+
+text = open("SKILL.md", encoding="utf-8").read()
+refs = []
+for token in re.findall(r"`([^`\s]+)`", text):
+    if (token.startswith("./") or token.endswith(".md")) and "://" not in token \
+            and not any(c in token for c in "*<>{}$"):
+        refs.append(token)
+for target in re.findall(r"\]\(([^)\s]+)\)", text):
+    target = target.split("#", 1)[0]
+    if target and "://" not in target and not target.startswith("mailto:"):
+        refs.append(target)
+cited = sorted({os.path.normpath(r) for r in refs})
+errors = []
+if not cited:
+    errors.append("no file references found in SKILL.md (extraction is broken)")
+for path in cited:
+    if not os.path.isfile(path):
+        errors.append(f"SKILL.md cites missing file: {path}")
+for path in sorted(glob.glob("stacks/*.md") + glob.glob("patterns/*.md")):
+    if path not in cited:
+        errors.append(f"{path} is not cited in SKILL.md")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md cited files exist and every stacks/ and patterns/ file is cited"
+  else
+    fail "SKILL.md file references (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
+check_skill_references
 check_readme_counts
 check_example_output
 

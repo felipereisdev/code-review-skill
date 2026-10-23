@@ -229,7 +229,8 @@ code-review-skill/
 ├── example-output.md     # Sample review report
 ├── .gitignore           # Git ignore rules
 ├── scripts/             # Maintenance scripts
-│   └── check-docs.sh    # Docs and frontmatter consistency check
+│   ├── check-docs.sh    # Docs, frontmatter and SKILL.md file-reference checks
+│   └── test-check-docs.sh  # Negative tests for check-docs.sh
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md
