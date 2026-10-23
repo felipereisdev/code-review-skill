@@ -203,6 +203,38 @@ make_copy "$work/nostep2filter"
 drop_lines "$work/nostep2filter/SKILL.md" '**Do Not Report and stack precedents**'
 expect_fail "not refuting matches in Step 2 fails" "$work/nostep2filter" "Step 2 — Verify Findings is missing: **Do Not Report and stack precedents**"
 
+# drop_from <file> <line>: removes the line equal to <line> and everything after it.
+drop_from() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+path, line = sys.argv[1:]
+lines = open(path, encoding="utf-8").read().splitlines()
+open(path, "w", encoding="utf-8").write("\n".join(lines[:lines.index(line)]) + "\n")
+PY
+}
+
+make_copy "$work/noprecedents"
+drop_from "$work/noprecedents/stacks/go.md" '## Precedents'
+expect_fail "a stack without Precedents fails" "$work/noprecedents" "stacks/go.md has no '## Precedents' section"
+
+make_copy "$work/oneprecedent"
+drop_lines "$work/oneprecedent/stacks/docker.md" '**Earlier build stages do not ship**'
+expect_fail "a stack with one precedent fails" "$work/oneprecedent" "stacks/docker.md: '## Precedents' has 1 item(s), need 2 to 5"
+
+make_copy "$work/toomany"
+for i in 1 2 3 4; do
+  printf -- '- **Extra %s**: Docker does this. Do not report that. **Exception:** never.\n' "$i" >> "$work/toomany/stacks/docker.md"
+done
+expect_fail "a stack with six precedents fails" "$work/toomany" "stacks/docker.md: '## Precedents' has 6 item(s), need 2 to 5"
+
+make_copy "$work/noexception"
+replace_first "$work/noexception/stacks/react.md" '**Exception:**' 'Except'
+expect_fail "a precedent without its exception fails" "$work/noexception" "stacks/react.md: Precedents item does not match"
+
+make_copy "$work/notlast"
+printf '\n## Notes\n\n- note\n' >> "$work/notlast/stacks/kafka.md"
+expect_fail "a section after Precedents fails" "$work/notlast" "stacks/kafka.md: '## Precedents' must be the last '## ' section"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

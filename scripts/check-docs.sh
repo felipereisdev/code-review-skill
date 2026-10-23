@@ -324,6 +324,40 @@ PY
   fi
 }
 
+check_stack_precedents() {
+  if python3 - <<'PY'
+import glob, re, sys
+
+item = re.compile(r"^- \*\*[^*]+\*\*: .+\. Do not report .+\. \*\*Exception:\*\* .+\.$")
+errors = []
+for path in sorted(glob.glob("stacks/*.md")):
+    lines = open(path, encoding="utf-8").read().splitlines()
+    heads = [i for i, line in enumerate(lines) if line.startswith("## ")]
+    starts = [i for i in heads if lines[i] == "## Precedents"]
+    if not starts:
+        errors.append(f"{path} has no '## Precedents' section")
+        continue
+    if len(starts) > 1 or starts[0] != heads[-1]:
+        errors.append(f"{path}: '## Precedents' must be the last '## ' section")
+        continue
+    body = [line for line in lines[starts[0] + 1:] if line.strip()]
+    for line in body:
+        if not item.match(line):
+            errors.append(f"{path}: Precedents item does not match "
+                          f"'- **Name**: ... Do not report ... **Exception:** ...': {line[:60]}")
+    if not 2 <= len(body) <= 5:
+        errors.append(f"{path}: '## Precedents' has {len(body)} item(s), need 2 to 5")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "every stacks/*.md ends with 2 to 5 precedents, each with an exception"
+  else
+    fail "stack precedents (see messages above)"
+  fi
+}
+
 check_example_findings() {
   if python3 - <<'PY'
 import re, sys
@@ -407,6 +441,7 @@ check_skill_references
 check_skill_output_rules
 check_skill_verification
 check_skill_do_not_report
+check_stack_precedents
 check_readme_counts
 check_example_output
 check_example_findings
