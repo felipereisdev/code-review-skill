@@ -156,9 +156,14 @@ check_skill_references() {
   if python3 - <<'PY'
 import glob, os, re, sys
 
+# Rules files the skill reads in the reviewed repository, not files of this repository.
+RULE_FILES = {"CLAUDE.md", "AGENTS.md", ".github/copilot-instructions.md"}
+
 text = open("SKILL.md", encoding="utf-8").read()
 refs = []
 for token in re.findall(r"`([^`\s]+)`", text):
+    if token in RULE_FILES:
+        continue
     if (token.startswith("./") or token.endswith(".md")) and "://" not in token \
             and not any(c in token for c in "*<>{}$"):
         refs.append(token)

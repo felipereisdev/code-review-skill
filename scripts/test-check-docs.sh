@@ -29,6 +29,16 @@ expect_fail() {
   fi
 }
 
+# expect_pass <test name> <copy dir>: check-docs must exit 0 on the copy.
+expect_pass() {
+  if bash "$2/scripts/check-docs.sh" > /dev/null 2>&1; then
+    printf 'PASS %s\n' "$1"
+  else
+    printf 'FAIL %s (check-docs should pass)\n' "$1"
+    failures=$((failures + 1))
+  fi
+}
+
 make_copy "$work/unmodified"
 if bash "$work/unmodified/scripts/check-docs.sh" > /dev/null 2>&1; then
   printf 'PASS unmodified copy passes check-docs\n'
@@ -48,6 +58,18 @@ expect_fail "deleting a cited stack file fails" "$work/deleted" "SKILL.md cites 
 make_copy "$work/orphan"
 printf '# Elixir\n' > "$work/orphan/stacks/elixir.md"
 expect_fail "an uncited stack file fails" "$work/orphan" "stacks/elixir.md is not cited in SKILL.md"
+
+make_copy "$work/rulenames"
+printf -- '- `CLAUDE.md`, `AGENTS.md` and `.github/copilot-instructions.md`\n' >> "$work/rulenames/SKILL.md"
+expect_pass "citing the generic rules-file names passes" "$work/rulenames"
+
+make_copy "$work/nestedrule"
+printf -- '- `stacks/CLAUDE.md`\n' >> "$work/nestedrule/SKILL.md"
+expect_fail "a rules-file name under another path is still checked" "$work/nestedrule" "SKILL.md cites missing file: stacks/CLAUDE.md"
+
+make_copy "$work/dotrule"
+printf -- '- `./AGENTS.md`\n' >> "$work/dotrule/SKILL.md"
+expect_fail "a ./-prefixed rules-file name is still checked" "$work/dotrule" "SKILL.md cites missing file: AGENTS.md"
 
 # drop_lines <file> <fixed text>: removes every line of <file> that contains <fixed text>.
 drop_lines() {
