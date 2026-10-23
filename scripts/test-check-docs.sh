@@ -63,6 +63,28 @@ make_copy "$work/oldformat"
 drop_lines "$work/oldformat/SKILL.md" '**Location:** `path/to/file.ext:start-end`'
 expect_fail "removing the Location field fails" "$work/oldformat" "SKILL.md is missing: **Location:** \`path/to/file.ext:start-end\`"
 
+# replace_first <file> <old> <new>: replaces the first occurrence of <old> in <file>.
+replace_first() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import sys
+path, old, new = sys.argv[1:]
+text = open(path, encoding="utf-8").read()
+open(path, "w", encoding="utf-8").write(text.replace(old, new, 1))
+PY
+}
+
+make_copy "$work/noevidence"
+drop_lines "$work/noevidence/example-output.md" '**Evidence:**'
+expect_fail "an example finding without Evidence fails" "$work/noevidence" "has no **Evidence:** line"
+
+make_copy "$work/lowconf"
+replace_first "$work/lowconf/example-output.md" '**Confidence:** High' '**Confidence:** Low'
+expect_fail "a Low-confidence example finding fails" "$work/lowconf" "example-output.md reports a Low-confidence finding"
+
+make_copy "$work/badtotal"
+replace_first "$work/badtotal/example-output.md" '| **Total** | **2** |' '| **Total** | **3** |'
+expect_fail "a Summary total that does not match the findings fails" "$work/badtotal" "Summary Total row is [3, 1, 5]"
+
 make_copy "$work/slowpath"
 drop_lines "$work/slowpath/SKILL.md" 'do work or queries that grow with data size'
 expect_fail "removing the hot-path performance severity rule fails" "$work/slowpath" "SKILL.md is missing: do work or queries that grow with data size"
