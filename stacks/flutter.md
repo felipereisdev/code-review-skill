@@ -8,5 +8,5 @@
 
 ## Precedents
 
-- **Sound null safety rules out null**: a variable with a non-nullable type cannot hold `null`. Do not report a missing null check on it. **Exception:** the `!` operator, `late` variables read before assignment, and values from `dynamic`, JSON decoding or platform channels cast with `as`.
+- **Sound null safety rules out null**: a variable with a non-nullable type cannot hold `null`. Do not report a missing null check on it. **Exception:** the `!` operator, `late` variables read before assignment, values from `dynamic`, JSON decoding or platform channels cast with `as`, and code that runs without sound null safety, such as files with a `// @dart=2.9` or older language-version comment, projects whose SDK lower bound is below 2.12, and builds run with `--no-sound-null-safety`.
 - **`Text` widgets render strings literally**: `Text`, `RichText` and `TextField` do not parse HTML or run scripts. Do not report XSS for user strings shown in them. **Exception:** HTML loaded into a WebView (`loadHtmlString`, `runJavaScript`) or rendered by an HTML widget package, and user-controlled URLs opened with `url_launcher`.
