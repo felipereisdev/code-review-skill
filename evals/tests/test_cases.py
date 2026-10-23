@@ -6,9 +6,10 @@ the affected file or API must not earn credit, while the committed baseline
 bug reports must still be detected.
 
 The payment table holds every probe sentence used by the final review rounds
-(waves 1, 2 and 3) plus plural, passive and reordered variants of each
-concept, so a future pattern edit cannot reopen a closed false positive or
-lose a genuine allegation.
+(waves 1 to 5) plus plural, passive and reordered variants of each concept, so
+a future pattern edit cannot reopen a closed false positive or lose a genuine
+allegation. Wave 5 pins the other direction of the test-context guard: a test
+mention must only veto a coverage request, never a genuine false-success claim.
 """
 
 import json
@@ -307,6 +308,61 @@ failed charge is reported as successful.
 **File:** `src/charge.ts:15`
 **Issue:** chargeInvoice treats a failed charge as paid.
 **Fix:** Return the failure variant and add a regression test.
+""",
+    ),
+    # --- w5 R3: a test mention must not veto a genuine false-success claim ---
+    (
+        "w5r3_test_suite_passes_failed_charge_as_paid",
+        "Potential Bugs — Critical",
+        """### Potential Bugs — Critical
+**File:** `src/charge.ts:15`
+**Issue:** The test suite currently passes even though chargeInvoice treats a failed charge as paid.
+**Fix:** Return the failure variant to the caller.
+""",
+    ),
+    (
+        "w5r3_tests_show_treated_as_paid",
+        "Potential Bugs — Critical",
+        """### Potential Bugs — Critical
+**File:** `src/charge.ts:15`
+**Issue:** Tests show that a failed charge is treated as paid by chargeInvoice, even though the gateway rejected it.
+**Fix:** Return the failure variant to the caller.
+""",
+    ),
+    (
+        "w5_test_mention_contrast_declined_payment",
+        "Potential Bugs — Warning",
+        """### Potential Bugs — Warning
+**File:** `src/charge.ts:15`
+**Issue:** Although the test suite passes, chargeInvoice records a declined payment as successful.
+**Fix:** Record the decline instead.
+""",
+    ),
+    (
+        "w5_test_recommendation_after_allegation",
+        "Potential Bugs — Critical",
+        """### Potential Bugs — Critical
+**File:** `src/charge.ts:15`
+**Issue:** chargeInvoice reports a failed charge as paid; add a regression test for it.
+**Fix:** Return the failure variant.
+""",
+    ),
+    (
+        "w5_no_test_for_failed_charge_branch",
+        None,
+        """### Tests/Coverage — Warning
+**File:** `src/charge.ts:15`
+**Issue:** No test covers chargeInvoice treating a failed charge as paid.
+**Fix:** Add a case for the failure branch.
+""",
+    ),
+    (
+        "w5_cover_success_path_before_allegation",
+        None,
+        """### Tests/Coverage — Warning
+**File:** `src/charge.ts:15`
+**Issue:** Cover the success path where chargeInvoice treats a failed charge as paid.
+**Fix:** Assert the paid result.
 """,
     ),
 ]
