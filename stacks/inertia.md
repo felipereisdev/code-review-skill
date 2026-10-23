@@ -62,3 +62,8 @@
 - `<Form>` component used in projects with Inertia v1 — component does not exist in v1
 - `fetch()` / `axios` calls in page components — bypasses Inertia's request lifecycle, breaks shared middleware logic
 - Missing `preserveState` on visit when scroll position matters
+
+## Precedents
+
+- **Laravel validation errors reach the page**: with the Laravel adapter's `HandleInertiaRequests` middleware, a `ValidationException` redirects back and the errors arrive in the `errors` prop (`form.errors` with `useForm`). Do not report missing manual handling of validation failures on Inertia form submissions. **Exception:** non-validation failures such as 403, 404 or 500 responses, which need their own handling, and requests sent with `fetch` or `axios` outside Inertia.
+- **Redirects after `PUT`, `PATCH` and `DELETE` become 303**: the Laravel adapter's middleware turns a `302` redirect into a `303` for these methods, so the browser follows it with `GET`. Do not report a redirect after an Inertia `put`, `patch` or `delete` visit as repeating the original method. **Exception:** back ends whose Inertia adapter does not make this conversion (check the adapter's middleware), and routes outside the Inertia middleware.
