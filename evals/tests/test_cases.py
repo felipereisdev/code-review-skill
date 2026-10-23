@@ -44,6 +44,22 @@ class UnrelatedFindingTest(unittest.TestCase):
 """
         self.assert_not_detected("swallowed-error-ts", report)
 
+    def test_payment_success_charge_wording_is_not_a_swallowed_error(self):
+        report = """### Tests/Coverage — Warning
+**File:** `src/charge.ts:12`
+**Issue:** Add a success-path test proving the caller reports a successful charge with the returned chargeId.
+**Fix:** Assert the returned chargeId is included in the caller response.
+"""
+        self.assert_not_detected("swallowed-error-ts", report)
+
+    def test_payment_privacy_discard_warning_is_not_a_swallowed_error(self):
+        report = """### Security — Warning
+**File:** `src/charge.ts:15-17`
+**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.
+**Fix:** Discard the raw provider message and return a stable public error code.
+"""
+        self.assert_not_detected("swallowed-error-ts", report)
+
     def test_payment_error_classification_warning_is_not_a_swallowed_error(self):
         report = """### Potential Bugs / Security — Warning
 **File:** `src/charge.ts:15-17`
@@ -62,6 +78,22 @@ every render; memoize it for long comment bodies.
 **Fix:** Cache the transformed string.
 """
         self.assert_not_detected("xss-react", report)
+
+
+class ErrorSuppressionFindingTest(unittest.TestCase):
+    """A real error-suppression allegation must still be detected."""
+
+    def test_swallowed_error_reported_as_success_is_detected(self):
+        report = """### Potential Bugs — Critical
+**File:** `src/charge.ts:15`
+**Issue:** The catch swallows the gateway error and returns `{ ok: true }`, so a
+failed charge is reported as successful.
+**Fix:** Return the `{ ok: false, error }` variant.
+"""
+        bug = load_bug("swallowed-error-ts")
+        result = score_bug(report, bug["patterns"], bug["min_severity"])
+        self.assertTrue(result["detected"])
+        self.assertEqual(result["matched_finding"], "Potential Bugs — Critical")
 
 
 class BaselineBugReportTest(unittest.TestCase):

@@ -5,7 +5,7 @@
   "bug": {
     "min_severity": "Warning",
     "patterns": [
-      "swallow|silently (?:ignored|discarded)|ignor(?:e|ed|es|ing) (?:the )?(?:error|exception|failure)|discard|mask|hid(?:e|es|den|ing)|lost|ok\\s*:\\s*true|reports? .{0,40}(?:as )?success|treat(?:s|ed)? .{0,40}as (?:paid|successful)",
+      "swallow(?:s|ed|ing)?|(?:error|exception|failure|failed (?:charge|payment|request))[^.\\n]{0,60}(?:swallow(?:s|ed|ing)?|ignor(?:e|ed|es|ing)|discard(?:s|ed|ing)?|lost|los(?:e|es|ing)|mask(?:s|ed|ing)?|hid(?:e|es|den|ing)|suppress(?:es|ed|ing)?|dropp(?:ed|ing|s))|(?:swallow(?:s|ed|ing)?|ignor(?:e|ed|es|ing)|discard(?:s|ed|ing)?|lost|los(?:e|es|ing)|mask(?:s|ed|ing)?|hid(?:e|es|den|ing)|suppress(?:es|ed|ing)?|dropp(?:ed|ing|s)) (?:the )?(?:error|exception|failure|failed (?:charge|payment|request))|(?:reports?|returns?|treats?|marks?|records?|describes?)[^.\\n]{0,40}(?:failed|declined)[^.\\n]{0,40}(?:success(?:ful)?|paid)",
       "catch|charge\\.ts|chargeInvoice"
     ]
   }
