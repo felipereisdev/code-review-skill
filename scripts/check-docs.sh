@@ -219,6 +219,53 @@ check_skill_output_rules() {
   fi
 }
 
+check_skill_verification() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Step 2 — Verify Findings"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+start = first(heading)
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    section = "\n".join(lines[start:end])
+    last_check, report = first("## 13. "), first("## 14. What Was Done Well")
+    if last_check is None or report is None or not last_check < start < report:
+        errors.append(f"'{heading}' must come after '## 13.' and before '## 14. What Was Done Well'")
+    for s in ("refute", "**CONFIRMED**", "**DOWNGRADED**", "**REFUTED**", "Suggestions skip this step",
+              "**Confidence:** Medium", "name it in the Evidence", "**With subagents**", "**Without subagents**"):
+        if s not in section:
+            errors.append(f"Step 2 — Verify Findings is missing: {s}")
+    for s in ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot"):
+        if s in section:
+            errors.append(f"Step 2 — Verify Findings names an agent-specific tool: {s}")
+output_start = first("## 15. Output Format")
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+for s in ("**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.",
+          "Do not list refuted findings unless the user asks for them.",
+          "but end with the verification line"):
+    if s not in output:
+        errors.append(f"Output Format is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Step 2 verifies Critical/Warning findings before the report"
+  else
+    fail "SKILL.md verification step (see messages above)"
+  fi
+}
+
 check_example_findings() {
   if python3 - <<'PY'
 import re, sys
@@ -280,6 +327,7 @@ check_license
 check_frontmatter
 check_skill_references
 check_skill_output_rules
+check_skill_verification
 check_readme_counts
 check_example_output
 check_example_findings

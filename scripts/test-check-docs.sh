@@ -95,6 +95,42 @@ make_copy "$work/slowpath"
 drop_lines "$work/slowpath/SKILL.md" 'do work or queries that grow with data size'
 expect_fail "removing the hot-path performance severity rule fails" "$work/slowpath" "SKILL.md is missing: do work or queries that grow with data size"
 
+# move_section_to_end <file> <heading>: moves the section that starts at the line <heading> to the end of <file>.
+move_section_to_end() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+path, heading = sys.argv[1:]
+lines = open(path, encoding="utf-8").read().splitlines()
+start = lines.index(heading)
+end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("## "))
+open(path, "w", encoding="utf-8").write("\n".join(lines[:start] + lines[end:] + [""] + lines[start:end]) + "\n")
+PY
+}
+
+make_copy "$work/noverify"
+drop_lines "$work/noverify/SKILL.md" '## Step 2 — Verify Findings'
+expect_fail "removing the verification step fails" "$work/noverify" "SKILL.md has no '## Step 2 — Verify Findings' section"
+
+make_copy "$work/lateverify"
+move_section_to_end "$work/lateverify/SKILL.md" '## Step 2 — Verify Findings'
+expect_fail "verifying after the report sections fails" "$work/lateverify" "'## Step 2 — Verify Findings' must come after '## 13.' and before '## 14. What Was Done Well'"
+
+make_copy "$work/norefuted"
+drop_lines "$work/norefuted/SKILL.md" '**REFUTED**'
+expect_fail "removing the REFUTED result fails" "$work/norefuted" "Step 2 — Verify Findings is missing: **REFUTED**"
+
+make_copy "$work/verifysuggestions"
+drop_lines "$work/verifysuggestions/SKILL.md" 'Suggestions skip this step'
+expect_fail "dropping the Suggestion exemption fails" "$work/verifysuggestions" "Step 2 — Verify Findings is missing: Suggestions skip this step"
+
+make_copy "$work/toolname"
+replace_first "$work/toolname/SKILL.md" '**With subagents** (' '**With subagents** (use the Task tool; '
+expect_fail "naming an agent-specific tool in the verification step fails" "$work/toolname" "Step 2 — Verify Findings names an agent-specific tool: Task tool"
+
+make_copy "$work/nocount"
+drop_lines "$work/nocount/SKILL.md" '**Verification:** <checked>'
+expect_fail "removing the refuted-count line from Output Format fails" "$work/nocount" "Output Format is missing: **Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted."
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

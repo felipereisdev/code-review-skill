@@ -196,6 +196,7 @@ Each finding carries a severity, a location inside the diff, a concrete trigger 
 
 - **Severity** has fixed definitions: Critical = crash, data loss or security hole; Warning = wrong result in some scenario, or a hot path doing work or queries that grow with data size (N+1 queries, unbounded queries or loads, O(n^2) work per request), because that causes timeouts or outages at scale; Suggestion = correct but suboptimal. Advice that only says "verify" or "ensure" is never above Warning.
 - **Confidence**: High findings are listed; Medium findings go to a separate "Needs human verification" section; Low findings are not reported.
+- **Verification**: before the report, every Critical and Warning finding is checked against the real code (guards, callers, types, tests, framework configuration) and comes out CONFIRMED, DOWNGRADED or REFUTED. Refuted findings are dropped and the report states how many there were. Suggestions skip this step.
 - **Compact mode**: ask for `/code-review compact` to get one line per finding (`path:line: Severity: problem → fix`).
 
 Plus a summary table that counts the High-confidence findings:
