@@ -559,9 +559,9 @@ from score import parse_findings
 text = open("example-output.md", encoding="utf-8").read()
 findings = parse_findings(text)
 full = [f for f in findings if not f["compact"]]
-compact = [f for f in findings if f["compact"]]
-main = [f for f in full if not f["needs_verification"]]
-verify = [f for f in full if f["needs_verification"]]
+compact = [f for f in findings if f["compact"] and not f["pre_existing"]]
+main = [f for f in full if not f["needs_verification"] and not f["pre_existing"]]
+verify = [f for f in full if f["needs_verification"] and not f["pre_existing"]]
 errors = []
 if not main:
     errors.append("example-output.md has no finding under ## Findings")
@@ -636,12 +636,58 @@ if not rules:
 for cite in rules:
     if not any(c["text"].endswith(f"(Rule: {cite})") for c in compact):
         errors.append(f"no compact-mode line ends with (Rule: {cite})")
+if any(f["pre_existing"] for f in findings):
+    errors.append("example-output.md has a finding with a severity under ## Pre-existing issues (not counted)")
+PRE = "## Pre-existing issues (not counted)"
+NOTE = re.compile(r"^- [^\s`]+:\d+(?:-\d+)? — \S")
+lines = text.splitlines()
+pre_starts = [i for i, line in enumerate(lines) if line == PRE]
+if len(pre_starts) != 2:
+    errors.append(f"example-output.md must have 2 '{PRE}' sections (full report and compact mode), "
+                  f"found {len(pre_starts)}")
+findings_at = next((i for i, line in enumerate(lines) if line == "## Findings"), None)
+summary_at = next((i for i, line in enumerate(lines) if line == "## Summary"), None)
+if pre_starts and (findings_at is None or summary_at is None or not findings_at < pre_starts[0] < summary_at):
+    errors.append(f"the first '{PRE}' section must come after ## Findings and before ## Summary")
+for start in pre_starts:
+    end = next((i for i in range(start + 1, len(lines))
+                if lines[i].startswith("#") or lines[i] == "---" or lines[i].startswith("**Verification:**")),
+               len(lines))
+    notes = [line for line in lines[start + 1:end] if line.strip()]
+    if not notes:
+        errors.append(f"the '{PRE}' section at line {start + 1} has no notes")
+    for line in notes:
+        if not NOTE.match(line):
+            errors.append(f"pre-existing note is not '- path:line — problem': {line[:60]}")
+        elif re.search(r"\b(?:Critical|Warning|Suggestion)\b", line):
+            errors.append(f"pre-existing note carries a severity: {line[:60]}")
+ALSO = re.compile(r"^\*\*Also at:\*\* `[^`\s]+:\d+(?:-\d+)?`(?:, `[^`\s]+:\d+(?:-\d+)?`)*$")
+grouped = 0
+for f in full:
+    body = f["text"].splitlines()
+    marks = {p: next((i for i, line in enumerate(body) if line.startswith(p)), None)
+             for p in ("**Location:**", "**Rule:**", "**Also at:**")}
+    also = marks["**Also at:**"]
+    if also is None:
+        continue
+    grouped += 1
+    if not ALSO.match(body[also]):
+        errors.append(f"finding '{f['heading']}' has an **Also at:** line that is not `path:line`, `path:start-end`")
+        continue
+    if marks["**Location:**"] is None or any(
+            marks[p] is not None and marks[p] > also for p in ("**Location:**", "**Rule:**")):
+        errors.append(f"finding '{f['heading']}' must put **Also at:** after **Location:** and **Rule:**")
+    want = "(also at " + ", ".join(re.findall(r"`([^`]+)`", body[also])) + ")"
+    if not any(want in c["text"] for c in compact):
+        errors.append(f"no compact-mode line contains {want}")
+if not grouped:
+    errors.append("example-output.md has no finding with an **Also at:** line")
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "example-output.md findings carry Location, Evidence, Confidence and a cited Rule and match the Summary and the Verification line"
+    pass "example-output.md findings carry Location, Evidence, Confidence, a cited Rule and a grouped Also at, keep pre-existing notes out of the count, and match the Summary and the Verification line"
   else
     fail "example-output.md findings (see messages above)"
   fi

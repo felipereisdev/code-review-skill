@@ -445,6 +445,48 @@ make_copy "$work/limitchanged"
 replace_first "$work/limitchanged/SKILL.md" '**50 lines**' '**80 lines**'
 expect_fail "changing the 50-line method limit fails" "$work/limitchanged" "Code & File Size is missing: **50 lines**"
 
+make_copy "$work/nopreexample"
+drop_lines "$work/nopreexample/example-output.md" '## Pre-existing issues (not counted)'
+expect_fail "an example without the pre-existing section fails" "$work/nopreexample" "example-output.md must have 2 '## Pre-existing issues (not counted)' sections (full report and compact mode), found 0"
+
+make_copy "$work/prelate"
+replace_first "$work/prelate/example-output.md" '## Pre-existing issues (not counted)' '## Pre-existing issues'
+printf '\n## Pre-existing issues (not counted)\n\n- src/app.ts:5 — late note\n' >> "$work/prelate/example-output.md"
+expect_fail "a pre-existing section after the Summary fails" "$work/prelate" "the first '## Pre-existing issues (not counted)' section must come after ## Findings and before ## Summary"
+
+make_copy "$work/preseverity"
+replace_first "$work/preseverity/example-output.md" '- src/app.ts:5 — ' '- src/app.ts:5 — Warning: '
+expect_fail "a pre-existing note with a severity fails" "$work/preseverity" "pre-existing note carries a severity"
+
+make_copy "$work/prefinding"
+replace_first "$work/prefinding/example-output.md" '- src/app.ts:5 — ' '- src/app.ts:5: Warning: '
+expect_fail "a scorable finding under the pre-existing heading fails" "$work/prefinding" "example-output.md has a finding with a severity under ## Pre-existing issues (not counted)"
+
+make_copy "$work/noalso"
+drop_lines "$work/noalso/example-output.md" '**Also at:**'
+expect_fail "an example without a grouped finding fails" "$work/noalso" "example-output.md has no finding with an **Also at:** line"
+
+make_copy "$work/alsoformat"
+replace_first "$work/alsoformat/example-output.md" '**Also at:** `src/services/auth.service.ts:124`' '**Also at:** src/services/auth.service.ts:124'
+expect_fail "an Also at line without backticked locations fails" "$work/alsoformat" "has an **Also at:** line that is not \`path:line\`, \`path:start-end\`"
+
+make_copy "$work/alsocompact"
+replace_first "$work/alsocompact/example-output.md" ' (also at src/services/auth.service.ts:124)' ''
+expect_fail "a compact line without the also-at list fails" "$work/alsocompact" "no compact-mode line contains (also at src/services/auth.service.ts:124)"
+
+make_copy "$work/alsoorder"
+python3 - "$work/alsoorder/example-output.md" <<'PY'
+import sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8").read().splitlines()
+also = "**Also at:** `src/services/auth.service.ts:124`"
+lines.pop(lines.index(also))
+lines.insert(lines.index("**Location:** `src/services/auth.service.ts:112`"), also)
+open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+PY
+expect_fail "an Also at line before Location fails" "$work/alsoorder" "finding 'Observability — Suggestion' must put **Also at:** after **Location:** and **Rule:**"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
