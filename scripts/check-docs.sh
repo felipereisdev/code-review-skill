@@ -192,6 +192,7 @@ check_skill_output_rules() {
   for s in \
     '## Severity Levels' \
     'is never above **Warning**' \
+    'do work or queries that grow with data size' \
     '## Evidence and Confidence' \
     '**Location:** `path/to/file.ext:start-end`' \
     '**Evidence:** Trigger → effect' \

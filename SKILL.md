@@ -52,8 +52,8 @@ Once the user answers, run the appropriate git command to obtain the diff, then 
 Give each finding the highest level whose definition it meets, and no higher:
 
 - **Critical**: the change, as written, crashes, loses or corrupts data, or opens a security hole (for example injection, broken access control or an exposed secret). Blocks the merge; must be fixed before merging.
-- **Warning**: the change gives a wrong result or wrong behavior in at least one concrete scenario, without a crash, data loss or security hole. Should be fixed shortly after merging; not a blocker.
-- **Suggestion**: the code is correct but suboptimal (readability, structure, naming, performance without a wrong result, missing tests for code that works). Optional; does not block merge.
+- **Warning**: the change gives a wrong result or wrong behavior in at least one concrete scenario, without a crash, data loss or security hole; or it makes a hot path (code that runs per request or per job) do work or queries that grow with data size (N+1 queries, unbounded queries or loads, O(n^2) work per request), because that causes timeouts or outages at scale. Should be fixed shortly after merging; not a blocker.
+- **Suggestion**: the code is correct but suboptimal (readability, structure, naming, performance improvements that do not grow with data size, missing tests for code that works). Optional; does not block merge.
 
 Severity caps:
 

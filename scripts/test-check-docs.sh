@@ -63,6 +63,10 @@ make_copy "$work/oldformat"
 drop_lines "$work/oldformat/SKILL.md" '**Location:** `path/to/file.ext:start-end`'
 expect_fail "removing the Location field fails" "$work/oldformat" "SKILL.md is missing: **Location:** \`path/to/file.ext:start-end\`"
 
+make_copy "$work/slowpath"
+drop_lines "$work/slowpath/SKILL.md" 'do work or queries that grow with data size'
+expect_fail "removing the hot-path performance severity rule fails" "$work/slowpath" "SKILL.md is missing: do work or queries that grow with data size"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
