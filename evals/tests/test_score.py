@@ -187,6 +187,48 @@ class CompactFormatTest(unittest.TestCase):
         self.assertTrue(looks_like_report(COMPACT_FORMAT))
 
 
+class MarkdownFenceTest(unittest.TestCase):
+    """Compact-shaped examples inside ordinary Markdown code fences are not findings."""
+
+    EXAMPLE = ("- app/Http/Controllers/UserSearchController.php:18: Critical: "
+               "SQL injection → bind parameters")
+    PATTERNS = ["SQL injection", "UserSearchController"]
+
+    def assert_example_ignored(self, report):
+        self.assertEqual(parse_findings(report), [])
+        self.assertFalse(looks_like_report(report))
+        self.assertEqual(score_bug(report, self.PATTERNS, "Critical"),
+                         {"detected": False, "matched_finding": None})
+        self.assertEqual(score_clean(report), {"false_positives": 0})
+
+    def test_tilde_fenced_compact_example_is_ignored(self):
+        self.assert_example_ignored("Example syntax only:\n~~~text\n" + self.EXAMPLE + "\n~~~\n")
+
+    def test_indented_backtick_fenced_compact_example_is_ignored(self):
+        self.assert_example_ignored("Example syntax only:\n  ```text\n" + self.EXAMPLE + "\n  ```\n")
+
+    def test_tilde_fenced_heading_is_ignored(self):
+        report = "~~~\n### Security — Critical\n\n**Location:** `a.php:1`\n**Issue:** x\n~~~\n"
+        self.assertEqual(parse_findings(report), [])
+
+    def test_passed_line_inside_tilde_fence_is_not_a_report(self):
+        self.assertFalse(looks_like_report("~~~\nCode review passed — no issues found.\n~~~\n"))
+
+    def test_fence_does_not_hide_findings_after_it_closes(self):
+        report = ("~~~\n" + self.EXAMPLE + "\n~~~\n"
+                  "- src/a.js:9: Warning: real finding → fix it\n")
+        self.assertEqual([f["heading"] for f in parse_findings(report)],
+                         ["src/a.js:9: Warning: real finding → fix it"])
+
+    def test_a_longer_closing_fence_closes_the_block(self):
+        report = "~~~~\n" + self.EXAMPLE + "\n~~~~~\n"
+        self.assertEqual(parse_findings(report), [])
+
+    def test_a_different_fence_character_does_not_close_the_block(self):
+        report = "~~~\n~~~not a close\n" + self.EXAMPLE + "\n~~~\n"
+        self.assertEqual(parse_findings(report), [])
+
+
 class ScoreBugTest(unittest.TestCase):
     PATTERNS = ["sql[ -]?injection|injection", "UserSearchController"]
 

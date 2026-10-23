@@ -11,6 +11,7 @@ _HEADING_SEVERITY_RE = re.compile(r"\b(critical|warning|suggestion)s?\b", re.I)
 _BODY_SEVERITY_RE = re.compile(r"\bseverity\b\W*(critical|warning|suggestion)", re.I)
 _DETAIL_RE = re.compile(r"^\W*(?:file|issue|location)s?\W*:", re.I)
 _VERIFICATION_HEADING_RE = re.compile(r"\bneeds\s+human\s+verification\b", re.I)
+_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _COMPACT_RE = re.compile(
     r"^\s*(?:[-*]\s+)?"
     r"(?P<item>(?:`(?=[^`]*[A-Za-z])[^`]+:\d+(?:-\d+)?`"
@@ -36,6 +37,24 @@ def _normalize_severity(match: re.Match | None) -> str | None:
     return _NORMALIZED_SEVERITY[match.group(1).lower()]
 
 
+def _active_fence(line: str, fence: str | None) -> str | None:
+    """Return the Markdown code fence active after ``line``.
+
+    Recognizes backtick and tilde fences indented by up to three spaces and
+    tracks the opening delimiter, so a fence only ends at the matching
+    character with at least the same length and no info string.
+    """
+    match = _FENCE_RE.match(line)
+    if match is None:
+        return fence
+    marker = match.group(1)
+    if fence is None:
+        return marker
+    if marker[0] != fence[0] or len(marker) < len(fence) or line[match.end():].strip():
+        return fence
+    return None
+
+
 def parse_findings(report: str) -> list[dict]:
     """Return the findings in ``report`` order as heading/severity/text dicts.
 
@@ -46,15 +65,16 @@ def parse_findings(report: str) -> list[dict]:
     blocks = []
     # Lines before the first heading belong to a level-0 block that only holds compact findings.
     current = {"line": "", "heading": "", "level": 0, "body": [], "compact": [], "preamble": True}
-    in_fence = False
+    fence = None
 
     for line in report.splitlines():
-        if line.startswith("```"):
-            in_fence = not in_fence
+        in_fence = fence is not None
+        fence = _active_fence(line, fence)
+        if in_fence or fence is not None:
             current["body"].append(line)
             continue
 
-        match = None if in_fence else _HEADING_RE.match(line)
+        match = _HEADING_RE.match(line)
         if match is not None:
             blocks.append(current)
             current = {
@@ -68,7 +88,7 @@ def parse_findings(report: str) -> list[dict]:
         else:
             current["body"].append(line)
 
-        compact_match = None if in_fence else _COMPACT_RE.match(line)
+        compact_match = _COMPACT_RE.match(line)
         if compact_match is not None:
             current["compact"].append(compact_match)
 
@@ -148,12 +168,11 @@ def looks_like_report(report: str) -> bool:
     if parse_findings(report):
         return True
 
-    in_fence = False
+    fence = None
     for line in report.splitlines():
-        if line.startswith("```"):
-            in_fence = not in_fence
-            continue
-        if not in_fence and PASSED_LINE.match(line):
+        in_fence = fence is not None
+        fence = _active_fence(line, fence)
+        if not in_fence and fence is None and PASSED_LINE.match(line):
             return True
     return False
 
