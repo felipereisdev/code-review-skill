@@ -19,6 +19,7 @@
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
 - **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
+- **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **13 Review Categories** - From Security to Privacy Compliance
 - **5 Review Scopes** - Uncommitted changes, staged, branch comparison, specific commits
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
@@ -198,6 +199,7 @@ Each finding carries a severity, a location inside the diff, a concrete trigger 
 - **Severity** has fixed definitions: Critical = crash, data loss or security hole; Warning = wrong result in some scenario, or a hot path doing work or queries that grow with data size (N+1 queries, unbounded queries or loads, O(n^2) work per request), because that causes timeouts or outages at scale; Suggestion = correct but suboptimal. Advice that only says "verify" or "ensure" is never above Warning.
 - **Confidence**: High findings are listed; Medium findings go to a separate "Needs human verification" section; Low findings are not reported.
 - **Verification**: before the report, every Critical and Warning finding is checked against the real code (guards, callers, types, tests, framework configuration) and comes out CONFIRMED, DOWNGRADED or REFUTED. Refuted findings are dropped and the report states how many there were. Suggestions skip this step.
+- **Repository rules**: a finding that breaks a rule from `CLAUDE.md`, `AGENTS.md` or another rules file adds a **Rule:** line that cites the rules file and its lines, for example `src/services/AGENTS.md:L4-L5`; in compact mode the line ends with `(Rule: src/services/AGENTS.md:L4-L5)`. Without a citation that can be checked, it is not a rule finding.
 - **Compact mode**: ask for `/code-review compact` to get one line per finding (`path:line: Severity: problem → fix`).
 
 Plus a summary table that counts the High-confidence findings:

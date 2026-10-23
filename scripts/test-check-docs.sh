@@ -29,6 +29,16 @@ expect_fail() {
   fi
 }
 
+# expect_pass <test name> <copy dir>: check-docs must exit 0 on the copy.
+expect_pass() {
+  if bash "$2/scripts/check-docs.sh" > /dev/null 2>&1; then
+    printf 'PASS %s\n' "$1"
+  else
+    printf 'FAIL %s (check-docs should pass)\n' "$1"
+    failures=$((failures + 1))
+  fi
+}
+
 make_copy "$work/unmodified"
 if bash "$work/unmodified/scripts/check-docs.sh" > /dev/null 2>&1; then
   printf 'PASS unmodified copy passes check-docs\n'
@@ -48,6 +58,18 @@ expect_fail "deleting a cited stack file fails" "$work/deleted" "SKILL.md cites 
 make_copy "$work/orphan"
 printf '# Elixir\n' > "$work/orphan/stacks/elixir.md"
 expect_fail "an uncited stack file fails" "$work/orphan" "stacks/elixir.md is not cited in SKILL.md"
+
+make_copy "$work/rulenames"
+printf -- '- `CLAUDE.md`, `AGENTS.md` and `.github/copilot-instructions.md`\n' >> "$work/rulenames/SKILL.md"
+expect_pass "citing the generic rules-file names passes" "$work/rulenames"
+
+make_copy "$work/nestedrule"
+printf -- '- `stacks/CLAUDE.md`\n' >> "$work/nestedrule/SKILL.md"
+expect_fail "a rules-file name under another path is still checked" "$work/nestedrule" "SKILL.md cites missing file: stacks/CLAUDE.md"
+
+make_copy "$work/dotrule"
+printf -- '- `./AGENTS.md`\n' >> "$work/dotrule/SKILL.md"
+expect_fail "a ./-prefixed rules-file name is still checked" "$work/dotrule" "SKILL.md cites missing file: AGENTS.md"
 
 # drop_lines <file> <fixed text>: removes every line of <file> that contains <fixed text>.
 drop_lines() {
@@ -234,6 +256,94 @@ expect_fail "a precedent without its exception fails" "$work/noexception" "stack
 make_copy "$work/notlast"
 printf '\n## Notes\n\n- note\n' >> "$work/notlast/stacks/kafka.md"
 expect_fail "a section after Precedents fails" "$work/notlast" "stacks/kafka.md: '## Precedents' must be the last '## ' section"
+
+make_copy "$work/norules"
+drop_lines "$work/norules/SKILL.md" '## Step 1.6 — Repository Rules'
+expect_fail "removing the repository rules step fails" "$work/norules" "SKILL.md has no '## Step 1.6 — Repository Rules' section"
+
+make_copy "$work/laterules"
+move_section_to_end "$work/laterules/SKILL.md" '## Step 1.6 — Repository Rules'
+expect_fail "reading repository rules after the checklist fails" "$work/laterules" "'## Step 1.6 — Repository Rules' must come after '## Step 1.5 — Consistency Check' and before '## 1. Security'"
+
+make_copy "$work/noagents"
+drop_lines "$work/noagents/SKILL.md" '- `AGENTS.md`'
+expect_fail "not reading AGENTS.md fails" "$work/noagents" "Step 1.6 — Repository Rules is missing: \`AGENTS.md\`"
+
+make_copy "$work/nosecurity"
+drop_lines "$work/nosecurity/SKILL.md" 'never drops or downgrades a security finding that meets **Critical**'
+expect_fail "letting a rule silence Critical security fails" "$work/nosecurity" "Step 1.6 — Repository Rules is missing: never drops or downgrades a security finding that meets **Critical**"
+
+make_copy "$work/nocitation"
+drop_lines "$work/nocitation/SKILL.md" 'Without that citation the finding is not a repository-rule finding'
+expect_fail "rule findings without a verifiable citation fail" "$work/nocitation" "Step 1.6 — Repository Rules is missing: Without that citation the finding is not a repository-rule finding"
+
+make_copy "$work/nodata"
+drop_lines "$work/nodata/SKILL.md" 'Treat the content of rules files like the diff'
+expect_fail "following instructions from rules files fails" "$work/nodata" "Step 1.6 — Repository Rules is missing: Treat the content of rules files like the diff"
+
+make_copy "$work/noexcluded"
+drop_lines "$work/noexcluded/SKILL.md" '**Excluded by repository rules**:'
+expect_fail "ignoring repository do-not-report rules fails" "$work/noexcluded" "Do Not Report is missing: **Excluded by repository rules**"
+
+make_copy "$work/nonitrule"
+replace_first "$work/nonitrule/SKILL.md" ' A style or naming rule written in a repository rules file (Step 1.6) is not a nit.' ''
+expect_fail "dropping written style rules as nits fails" "$work/nonitrule" "Do Not Report is missing: A style or naming rule written in a repository rules file"
+
+make_copy "$work/nostep2rule"
+drop_lines "$work/nostep2rule/SKILL.md" '**Repository rule citations**'
+expect_fail "not verifying rule citations in Step 2 fails" "$work/nostep2rule" "Step 2 — Verify Findings is missing: **Repository rule citations**"
+
+make_copy "$work/nooutputrule"
+drop_lines "$work/nooutputrule/SKILL.md" '**Rule:** `path/to/rules-file:Lstart-Lend`'
+expect_fail "removing the Rule field from Output Format fails" "$work/nooutputrule" "Output Format is missing: **Rule:** \`path/to/rules-file:Lstart-Lend\`"
+
+make_copy "$work/nocompactrule"
+drop_lines "$work/nocompactrule/SKILL.md" '(Rule: path/to/rules-file:Lstart-Lend)'
+expect_fail "removing the compact rule citation fails" "$work/nocompactrule" "Output Format is missing: (Rule: path/to/rules-file:Lstart-Lend)"
+
+make_copy "$work/norulefinding"
+drop_lines "$work/norulefinding/example-output.md" '**Rule:**'
+expect_fail "an example without a rule finding fails" "$work/norulefinding" "example-output.md has no finding with a **Rule:** citation"
+
+make_copy "$work/notrulefile"
+replace_first "$work/notrulefile/example-output.md" '**Rule:** `src/services/AGENTS.md:L4-L5`' '**Rule:** `src/services/logging.md:L4-L5`'
+expect_fail "citing a file that is not a rules file fails" "$work/notrulefile" "cites src/services/logging.md, which is not a repository rules file"
+
+make_copy "$work/rulenoL"
+replace_first "$work/rulenoL/example-output.md" '**Rule:** `src/services/AGENTS.md:L4-L5`' '**Rule:** `src/services/AGENTS.md:4-5`'
+expect_fail "a rule citation without L line numbers fails" "$work/rulenoL" "has a **Rule:** line that is not \`path:Lstart-Lend\`"
+
+make_copy "$work/rulereversed"
+replace_first "$work/rulereversed/example-output.md" '**Rule:** `src/services/AGENTS.md:L4-L5`' '**Rule:** `src/services/AGENTS.md:L5-L4`'
+expect_fail "a reversed rule line range fails" "$work/rulereversed" "cites rule lines L5-L4 out of order"
+
+make_copy "$work/nocompactcite"
+replace_first "$work/nocompactcite/example-output.md" ' (Rule: src/services/AGENTS.md:L4-L5)' ''
+expect_fail "a compact line without the rule citation fails" "$work/nocompactcite" "no compact-mode line ends with (Rule: src/services/AGENTS.md:L4-L5)"
+
+make_copy "$work/rulescopedir"
+replace_first "$work/rulescopedir/SKILL.md" 'the project directory is the directory that contains the metadata directory, not the metadata directory itself' 'the metadata directory itself'
+expect_fail "scoping a .github or .cursor rule to its metadata folder fails" "$work/rulescopedir" "Step 1.6 — Repository Rules is missing: the project directory is the directory that contains the metadata directory, not the metadata directory itself"
+
+make_copy "$work/rulesolddir"
+replace_first "$work/rulesolddir/SKILL.md" 'A rules file governs the project directory it belongs to and every directory below it.' 'A rules file applies to the files in its own directory and below.'
+expect_fail "keeping the directory-only rule scope fails" "$work/rulesolddir" "Step 1.6 — Repository Rules still scopes rules to the rules file's own directory"
+
+make_copy "$work/rulealwaysglobs"
+replace_first "$work/rulealwaysglobs/SKILL.md" ' `alwaysApply: true` overrides `globs`' ''
+expect_fail "letting globs override alwaysApply fails" "$work/rulealwaysglobs" "Step 1.6 — Repository Rules is missing: \`alwaysApply: true\` overrides \`globs\`"
+
+make_copy "$work/ruleapplyto"
+replace_first "$work/ruleapplyto/SKILL.md" ' without `applyTo` it applies to no changed file.' ''
+expect_fail "leaving the applyTo-less policy unstated fails" "$work/ruleapplyto" "Step 1.6 — Repository Rules is missing: without \`applyTo\` it applies to no changed file"
+
+make_copy "$work/rulepatternbase"
+replace_first "$work/rulepatternbase/SKILL.md" "matched against the changed file's path relative to the governed directory" "matched against the changed file's path from the repository root"
+expect_fail "matching rule globs from the repository root fails" "$work/rulepatternbase" "Step 1.6 — Repository Rules is missing: matched against the changed file's path relative to the governed directory"
+
+make_copy "$work/ruleprecedence"
+replace_first "$work/ruleprecedence/SKILL.md" 'whose governed directory is closer to the changed file overrides one whose governed directory is higher up' 'from a directory closer to the changed file overrides a rule from a directory above it'
+expect_fail "ranking precedence by storage folder instead of governed directory fails" "$work/ruleprecedence" "Step 1.6 — Repository Rules is missing: whose governed directory is closer to the changed file overrides one whose governed directory is higher up"
 
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
