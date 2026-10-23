@@ -57,6 +57,19 @@ NEW_FORMAT = """\
 """
 
 
+COMPACT_FORMAT = """\
+- app/Http/Controllers/UserSearchController.php:18: Critical: SQL injection: the search term is interpolated into raw SQL → use query bindings
+- tests/Feature/UserSearchTest.php:30-34: Suggestion: no test with quotes in the search term → add one
+
+## Needs human verification
+
+- routes/api.php:12: Warning: the search route has no rate limit → add throttle middleware
+"""
+
+SQLI_LINE = ("app/Http/Controllers/UserSearchController.php:18: Critical: SQL injection: "
+             "the search term is interpolated into raw SQL → use query bindings")
+
+
 class ParseFindingsTest(unittest.TestCase):
     def test_skill_output_format(self):
         findings = parse_findings(SKILL_FORMAT)
@@ -119,6 +132,59 @@ class ParseFindingsTest(unittest.TestCase):
 
     def test_old_file_format_is_never_flagged(self):
         self.assertEqual([f["needs_verification"] for f in parse_findings(SKILL_FORMAT)], [False, False])
+
+
+class CompactFormatTest(unittest.TestCase):
+    def test_compact_lines_are_findings(self):
+        findings = parse_findings(COMPACT_FORMAT)
+        self.assertEqual([(f["severity"], f["needs_verification"], f["compact"]) for f in findings],
+                         [("Critical", False, True), ("Suggestion", False, True), ("Warning", True, True)])
+        self.assertEqual(findings[0]["heading"], SQLI_LINE)
+        self.assertEqual(findings[0]["text"], SQLI_LINE)
+
+    def test_compact_line_decorations(self):
+        report = ("* `src/a.js:9-12`: **Warning**: x is never reset → reset it\n"
+                  "src/b.py:3: critical: y crashes on empty input → guard it\n")
+        self.assertEqual([(f["heading"], f["severity"]) for f in parse_findings(report)],
+                         [("`src/a.js:9-12`: **Warning**: x is never reset → reset it", "Warning"),
+                          ("src/b.py:3: critical: y crashes on empty input → guard it", "Critical")])
+
+    def test_compact_paths_with_brackets_parentheses_and_spaces(self):
+        lines = ["src/app/users/[id]/page.tsx:9: Warning: empty data loses the selected user → guard it",
+                 "src/app/(auth)/login/page.tsx:9: Critical: missing guard crashes → reject it",
+                 "`src/my file.py:9`: Warning: empty input returns the wrong result → guard it"]
+        report = "".join("- " + line + "\n" for line in lines)
+        self.assertEqual([(f["heading"], f["severity"]) for f in parse_findings(report)],
+                         [(lines[0], "Warning"), (lines[1], "Critical"), (lines[2], "Warning")])
+
+    def test_compact_only_report_with_unusual_path_is_scored(self):
+        report = "- src/app/(auth)/login/page.tsx:9: Critical: missing guard crashes → reject it\n"
+        self.assertTrue(looks_like_report(report))
+        self.assertEqual(score_bug(report, ["missing guard", r"\(auth\)"], "Critical"),
+                         {"detected": True,
+                          "matched_finding": "src/app/(auth)/login/page.tsx:9: Critical: missing guard crashes → reject it"})
+        self.assertEqual(score_clean(report), {"false_positives": 1})
+
+    def test_lines_that_only_look_compact_are_ignored(self):
+        fence = "`" * 3
+        report = ("Meeting at 10:30: Warning: deploy freeze\n"
+                  "src/a.js: Warning: no line number\n"
+                  "Warning: src/a.js:9 is wrong\n"
+                  "| src/a.js:9 | Warning | x |\n"
+                  + fence + "\nsrc/a.js:9: Critical: inside a fence\n" + fence + "\n")
+        self.assertEqual(parse_findings(report), [])
+
+    def test_full_format_findings_are_not_compact(self):
+        self.assertEqual([f["compact"] for f in parse_findings(SKILL_FORMAT + NEW_FORMAT)], [False] * 4)
+
+    def test_compact_scoring(self):
+        self.assertEqual(score_bug(COMPACT_FORMAT, ScoreBugTest.PATTERNS, "Critical"),
+                         {"detected": True, "matched_finding": SQLI_LINE})
+        self.assertFalse(score_bug(COMPACT_FORMAT, ["rate limit"], "Suggestion")["detected"])
+        self.assertEqual(score_clean(COMPACT_FORMAT), {"false_positives": 1})
+        self.assertEqual(score_clean("## Needs human verification\n\n- src/a.js:9: Warning: x → y\n"),
+                         {"false_positives": 0})
+        self.assertTrue(looks_like_report(COMPACT_FORMAT))
 
 
 class ScoreBugTest(unittest.TestCase):
