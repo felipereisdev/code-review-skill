@@ -94,11 +94,25 @@ If you cannot write the Evidence scenario, the finding is Low: drop it.
 
 ---
 
+## Changed Lines and Grouping
+
+**Changed lines only.** Report findings only on lines the change adds or modifies, or on removed lines under the deletion-only exception (see Evidence and Confidence). A problem in code the change does not add, modify or trigger is pre-existing, and it is never a finding (see Do Not Report). When a changed line triggers a problem in old code, it is a finding on that changed line.
+
+**Pre-existing issues.** You may list relevant pre-existing problems in a separate `## Pre-existing issues (not counted)` section. The section is optional and short:
+
+- List only problems that would be **Critical** or **Warning** if the change had introduced them, and only ones you saw while reading code for this review.
+- Write one line per problem, with no severity, Evidence or Fix: `- path/to/file.ext:line — problem`.
+- These lines are not findings. They never appear under `## Findings` or `## Needs human verification`, are not counted in the Summary table, and do not change the verdict. A **Critical** or **Warning** candidate that turns out to be pre-existing is still refuted in Step 2 (see Do Not Report).
+
+**One finding per problem.** When the same problem occurs at several places in the change (the same missing check, the same unsafe call, the same broken rule), report one finding, not one per place. Group only occurrences with the same severity and the same fix. The finding's **Location:** is the first occurrence, an **Also at:** line lists the others (see Output Format), and the finding counts once in the Summary table.
+
+---
+
 ## Do Not Report
 
 Drop any candidate finding, of any severity, that matches an item below. Each item says why.
 
-- **Pre-existing problems**: the problem is in code the change does not add or modify, and the change does not trigger it. Why: the review judges this change; older problems belong in their own ticket. When a changed line triggers a problem in old code, report it and cite the changed line (see Evidence and Confidence).
+- **Pre-existing problems**: the problem is in code the change does not add or modify, and the change does not trigger it. Why: the review judges this change; older problems belong in their own ticket. When a changed line triggers a problem in old code, report it and cite the changed line (see Evidence and Confidence). You may still mention a pre-existing problem in one line under `## Pre-existing issues (not counted)` (see Changed Lines and Grouping); that line is not a finding.
 - **What tooling already catches**: a linter, formatter or type checker configured in the repository (for example ESLint, Prettier, PHPStan, mypy or `tsc`) reports or fixes the problem. Why: that tool already enforces it, and repeating it buries the findings only a reviewer can make.
 - **Silenced rules**: the code or the tool's configuration explicitly silences the rule (for example `eslint-disable`, `# noqa` or `@phpstan-ignore`), and the change gives no new reason the silence is now wrong, such as user input now reaching the silenced line. Why: someone already made that decision on purpose.
 - **Style and naming nits**: formatting, ordering or naming preferences that change neither behavior nor how easily the code is understood, such as a clear name you would have chosen differently. Why: they are taste, not defects. A misleading name, one that says something different from what the code does, is not a nit. A style or naming rule written in a repository rules file (Step 1.6) is not a nit.
@@ -291,8 +305,11 @@ Before the checklist pass, read the rules the repository writes down for its own
 - **Pure functions**: side effects isolated and explicit; core logic written as pure functions where possible
 
 ### Code & File Size
-- **Method/function length**: methods exceeding **30 lines** should be justified; methods exceeding **50 lines** require refactoring — they are doing too much (Clean Code / Rule of 30)
-- **Class length**: classes exceeding **200 lines** should be reviewed for single-responsibility violations; classes exceeding **500 lines** require decomposition
+
+Apply the length limits below (method, class, file and component) only to code the change adds, or to growth the change causes: a method, class, component or file that crosses a limit because of lines the change adds. Never report the length of code the change only touches, such as one edited line in a large legacy file. A length finding is always a **Suggestion**, and the consistency check (Step 1.5) comes first: if the project already lives with methods, classes, components or files of that size, do not report it. Report each oversized method, class, component or file once, with the changed range as its Location.
+
+- **Method/function length**: methods exceeding **30 lines** should be justified; methods exceeding **50 lines** are candidates for refactoring — they are doing too much (Clean Code / Rule of 30)
+- **Class length**: classes exceeding **200 lines** should be reviewed for single-responsibility violations; classes exceeding **500 lines** are candidates for decomposition
 - **File length**: source files exceeding **300 lines** are a signal of multiple responsibilities; files exceeding **500 lines** should be investigated and split
 - **Component length** *(Vue/React)*: SFCs or components exceeding **300 total lines** should be decomposed; `<template>` and `<script>` blocks each kept under **150 lines** where possible
 - **Binary files in git**: images, PDFs, videos, database dumps, and compiled binaries not committed to the repository; `.gitignore` covers them; Git LFS used for large assets that must be versioned
@@ -448,7 +465,7 @@ Before listing issues, acknowledge what was done well in this change. Point out 
 
 ## 15. Output Format
 
-Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Summary`, then the verification line.
+Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Pre-existing issues (not counted)` (only when it has lines), `## Summary`, then the verification line.
 
 Use this block for each finding:
 
@@ -466,8 +483,9 @@ Use this block for each finding:
 - Under `## Needs human verification`, list Medium-confidence findings in the same block with `**Confidence:** Medium`, and say in the Evidence what a person must check.
 - Never report Low-confidence findings.
 - For a finding that breaks a repository rule (Step 1.6), add one line right after **Location:** in this form: **Rule:** `path/to/rules-file:Lstart-Lend`. Use `:Lline` for a single line. Without a citation you have checked, it is not a repository-rule finding.
+- For a finding that groups repeated occurrences (Changed Lines and Grouping), add one line after **Location:**, and after **Rule:** when there is one, in this form: **Also at:** `path/to/file.ext:line`, `path/to/other.ext:start-end`.
 
-At the end, provide a summary table covering all evaluated categories (use N/A for categories that do not apply to this change). Count only the findings under `## Findings`:
+At the end, provide a summary table covering all evaluated categories (use N/A for categories that do not apply to this change). Count only the findings under `## Findings`, each grouped finding once; lines under `## Pre-existing issues (not counted)` are never counted:
 
 ```
 ## Summary
@@ -501,7 +519,7 @@ Right after the Summary table, write one verification line with the counts from 
 
 Write the line even when both counts are 0. Do not list refuted findings unless the user asks for them.
 
-If there are no High-confidence findings, state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification`, and end with the verification line.
+If there are no High-confidence findings, state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification` and any `## Pre-existing issues (not counted)` lines, and end with the verification line.
 
 ### Compact mode
 
@@ -515,5 +533,7 @@ In compact mode, write each finding as one list item:
 
 - `line` is the finding's Location: one line or a `start-end` range inside the diff, with the same deletion-only exception (cite the removed old-side lines, including a whole deleted file). `Severity` is Critical, Warning or Suggestion.
 - A finding that breaks a repository rule ends with its citation in parentheses: `path/to/file.ext:line: Severity: problem → fix (Rule: path/to/rules-file:Lstart-Lend)`.
+- A grouped finding lists the other places after the fix: `path/to/file.ext:line: Severity: problem → fix (also at path/to/other.ext:line)`. A repository-rule citation, when there is one, comes last.
+- Write pre-existing lines under a `## Pre-existing issues (not counted)` heading after the `## Needs human verification` lines, in the same `- path/to/file.ext:line — problem` form.
 - The severity, evidence and confidence rules still apply: High-confidence lines first, Medium-confidence lines under a `## Needs human verification` heading after them, Low-confidence findings never.
-- Skip What Was Done Well and the Summary table, but end with the verification line. If there are no High-confidence findings, write only **"Code review passed — no issues found."**, any `## Needs human verification` lines and the verification line.
+- Skip What Was Done Well and the Summary table, but end with the verification line. If there are no High-confidence findings, write only **"Code review passed — no issues found."**, any `## Needs human verification` lines, any `## Pre-existing issues (not counted)` lines and the verification line.
