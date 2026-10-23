@@ -339,5 +339,80 @@ class ReportShapeTest(unittest.TestCase):
         self.assertFalse(stack_mentioned("A Python project", "laravel"))
 
 
+PRE_EXISTING_REPORT = """\
+## Findings
+
+### Potential Bugs — Warning
+
+**Location:** `src/labels.js:13-14`
+**Issue:** The gift recipient lookup can return undefined.
+**Evidence:** The pre-existing null guard was removed: `giftRecipientId: 99` is not in the map → `recipient.name` throws a TypeError.
+**Confidence:** High
+**Fix:** Restore the guard.
+
+## Pre-existing issues (not counted)
+
+- src/db.js:40 — the legacy export builds SQL from the request query string.
+
+### Security — Critical
+
+**Location:** `src/db.js:40`
+**Issue:** SQL injection in the legacy export.
+**Evidence:** `?sort=name;DROP TABLE users` reaches the raw query → the table is dropped.
+**Confidence:** High
+**Fix:** Bind parameters.
+
+- src/db.js:52: Critical: SQL injection in the legacy report → bind parameters
+
+## Summary
+
+| Category | Critical | Warning | Suggestion | N/A |
+|----------|----------|---------|------------|-----|
+| Potential Bugs | 0 | 1 | 0 |  |
+"""
+
+
+class PreExistingTest(unittest.TestCase):
+    def test_pre_existing_findings_are_flagged(self):
+        self.assertEqual([(f["severity"], f["compact"], f["pre_existing"])
+                          for f in parse_findings(PRE_EXISTING_REPORT)],
+                         [("Warning", False, False), ("Critical", False, True), ("Critical", True, True)])
+
+    def test_pre_existing_findings_do_not_count_for_recall(self):
+        self.assertEqual(score_bug(PRE_EXISTING_REPORT, ["SQL injection"], "Suggestion"),
+                         {"detected": False, "matched_finding": None})
+
+    def test_body_mention_of_pre_existing_still_counts(self):
+        self.assertEqual(score_bug(PRE_EXISTING_REPORT, ["pre-existing null guard", "TypeError"], "Warning"),
+                         {"detected": True, "matched_finding": "Potential Bugs — Warning"})
+
+    def test_pre_existing_findings_are_not_false_positives(self):
+        self.assertEqual(score_clean(PRE_EXISTING_REPORT), {"false_positives": 1})
+
+    def test_pre_existing_heading_variants_are_recognized(self):
+        for heading in ("## Pre-existing issues (not counted)", "### Pre-existing Issues — not counted",
+                        "## Preexisting problems", "## Pre existing issue"):
+            with self.subTest(heading=heading):
+                report = heading + "\n\n#### Security — Critical\n**Location:** `a.js:1`\n**Issue:** x\n"
+                self.assertEqual([f["pre_existing"] for f in parse_findings(report)], [True])
+
+    def test_pre_existing_flag_resets_at_sibling_section(self):
+        report = ("## Pre-existing issues (not counted)\n\n### A — Warning\n**Location:** `a.js:1`\n**Issue:** x\n\n"
+                  "## Findings\n\n### B — Warning\n**Location:** `b.js:1`\n**Issue:** y\n")
+        self.assertEqual([(f["heading"], f["pre_existing"]) for f in parse_findings(report)],
+                         [("A — Warning", True), ("B — Warning", False)])
+
+    def test_other_sections_are_not_pre_existing(self):
+        self.assertEqual([f["pre_existing"] for f in parse_findings(NEW_FORMAT)], [False, False])
+        self.assertEqual([f["pre_existing"] for f in parse_findings(COMPACT_FORMAT)], [False, False, False])
+
+    def test_notes_only_report_is_a_clean_report(self):
+        report = ("**Code review passed — no issues found.**\n\n## Pre-existing issues (not counted)\n\n"
+                  "- src/a.js:9 — the legacy parser crashes on empty input.\n\n" + VERIFICATION_LINE)
+        self.assertEqual(parse_findings(report), [])
+        self.assertTrue(looks_like_report(report))
+        self.assertEqual(score_clean(report), {"false_positives": 0})
+
+
 if __name__ == "__main__":
     unittest.main()
