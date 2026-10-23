@@ -311,12 +311,32 @@ if severities(f for f in compact if not f["needs_verification"]) != severities(m
     errors.append("compact-mode lines must have the same severities as ## Findings")
 if severities(f for f in compact if f["needs_verification"]) != severities(verify):
     errors.append("compact-mode Needs human verification lines must match the full report")
+verify_lines = list(re.finditer(
+    r"^\*\*Verification:\*\* (\d+) Critical/Warning candidates checked, (\d+) refuted\.$", text, re.M))
+if len(verify_lines) != 2:
+    errors.append("example-output.md must have 2 **Verification:** lines (full report and compact mode), "
+                  f"found {len(verify_lines)}")
+else:
+    full_line, compact_line = verify_lines
+    checked, refuted = int(full_line.group(1)), int(full_line.group(2))
+    if full_line.groups() != compact_line.groups():
+        errors.append("the full-report and compact-mode **Verification:** lines must match")
+    if total is not None and full_line.start() < total.start():
+        errors.append("the full-report **Verification:** line must come after the Summary table")
+    if refuted < 1:
+        errors.append("the example **Verification:** line must show at least 1 refuted candidate")
+    kept = sum(f["severity"] in ("Critical", "Warning") for f in full)
+    if checked - refuted < kept:
+        errors.append(f"**Verification:** leaves {checked - refuted} unrefuted candidates but the full report "
+                      f"has {kept} Critical/Warning findings")
+if not any("Verification checked" in f["text"] for f in full):
+    errors.append("no example finding's Evidence names what verification checked ('Verification checked ...')")
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "example-output.md findings carry Location, Evidence and Confidence and match the Summary"
+    pass "example-output.md findings carry Location, Evidence and Confidence and match the Summary and the Verification line"
   else
     fail "example-output.md findings (see messages above)"
   fi
