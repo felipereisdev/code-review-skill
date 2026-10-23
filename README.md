@@ -18,6 +18,7 @@
 - **Multi-Stack Support** - 20 technology stacks covered
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
+- **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
 - **13 Review Categories** - From Security to Privacy Compliance
 - **5 Review Scopes** - Uncommitted changes, staged, branch comparison, specific commits
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills

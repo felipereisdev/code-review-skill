@@ -266,6 +266,64 @@ PY
   fi
 }
 
+check_skill_do_not_report() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Do Not Report"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+def section(start):
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return lines[start:end]
+
+
+start = first(heading)
+evidence = first("## Evidence and Confidence")
+step1 = first("## Step 1 — Codebase Investigation")
+step2 = first("## Step 2 — Verify Findings")
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if evidence is None or step1 is None or not evidence < start < step1:
+        errors.append(f"'{heading}' must come after '## Evidence and Confidence' and before "
+                      "'## Step 1 — Codebase Investigation'")
+    body = section(start)
+    text = "\n".join(body)
+    for s in ("**Pre-existing problems**", "**What tooling already catches**", "**Silenced rules**",
+              "**Style and naming nits**", "**Theoretical denial of service**",
+              '**"Verify" or "ensure" without a scenario**', "**Generic hardening**",
+              "When a changed line triggers a problem in old code, report it",
+              "counts as refuted on the verification line", "dropped without being counted",
+              "Do not move a matching finding to `## Needs human verification`", "`## Precedents`"):
+        if s not in text:
+            errors.append(f"Do Not Report is missing: {s}")
+    for line in body:
+        if line.startswith("- **") and " Why: " not in line:
+            errors.append("Do Not Report item has no 'Why:': " + line.split("**")[1])
+s = "unless that precedent's **Exception:** applies"
+if step1 is not None and s not in "\n".join(section(step1)):
+    errors.append(f"Step 1 — Codebase Investigation is missing: {s}")
+s = "**Do Not Report and stack precedents**"
+if step2 is not None and s not in "\n".join(section(step2)):
+    errors.append(f"Step 2 — Verify Findings is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Do Not Report list is complete and applied in Step 1 and Step 2"
+  else
+    fail "SKILL.md Do Not Report list (see messages above)"
+  fi
+}
+
 check_example_findings() {
   if python3 - <<'PY'
 import re, sys
@@ -348,6 +406,7 @@ check_frontmatter
 check_skill_references
 check_skill_output_rules
 check_skill_verification
+check_skill_do_not_report
 check_readme_counts
 check_example_output
 check_example_findings

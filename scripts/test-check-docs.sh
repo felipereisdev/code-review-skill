@@ -167,6 +167,42 @@ replace_first "$work/noverifyevidence/example-output.md" 'Verification checked' 
 replace_first "$work/noverifyevidence/example-output.md" 'Verification checked' 'It checked'
 expect_fail "an example whose Evidence never cites verification fails" "$work/noverifyevidence" "no example finding's Evidence names what verification checked"
 
+make_copy "$work/nodonotreport"
+drop_lines "$work/nodonotreport/SKILL.md" '## Do Not Report'
+expect_fail "removing the Do Not Report section fails" "$work/nodonotreport" "SKILL.md has no '## Do Not Report' section"
+
+make_copy "$work/latedonotreport"
+move_section_to_end "$work/latedonotreport/SKILL.md" '## Do Not Report'
+expect_fail "a Do Not Report section after the checklist fails" "$work/latedonotreport" "'## Do Not Report' must come after '## Evidence and Confidence' and before '## Step 1 — Codebase Investigation'"
+
+make_copy "$work/nosilenced"
+drop_lines "$work/nosilenced/SKILL.md" '**Silenced rules**'
+expect_fail "removing a Do Not Report item fails" "$work/nosilenced" "Do Not Report is missing: **Silenced rules**"
+
+make_copy "$work/nowhy"
+replace_first "$work/nowhy/SKILL.md" ' Why: ' ' Because: '
+expect_fail "a Do Not Report item without Why fails" "$work/nowhy" "Do Not Report item has no 'Why:': Pre-existing problems"
+
+make_copy "$work/nocarveout"
+drop_lines "$work/nocarveout/SKILL.md" 'When a changed line triggers a problem in old code, report it'
+expect_fail "dropping the changed-line carve-out fails" "$work/nocarveout" "Do Not Report is missing: When a changed line triggers a problem in old code, report it"
+
+make_copy "$work/nocountrule"
+drop_lines "$work/nocountrule/SKILL.md" 'counts as refuted on the verification line'
+expect_fail "dropping the refuted-count rule fails" "$work/nocountrule" "Do Not Report is missing: counts as refuted on the verification line"
+
+make_copy "$work/parked"
+drop_lines "$work/parked/SKILL.md" 'Do not move a matching finding to'
+expect_fail "allowing matches in Needs human verification fails" "$work/parked" "Do Not Report is missing: Do not move a matching finding to \`## Needs human verification\`"
+
+make_copy "$work/noprecedentload"
+drop_lines "$work/noprecedentload/SKILL.md" "unless that precedent's **Exception:** applies"
+expect_fail "not applying stack precedents in Step 1 fails" "$work/noprecedentload" "Step 1 — Codebase Investigation is missing: unless that precedent's **Exception:** applies"
+
+make_copy "$work/nostep2filter"
+drop_lines "$work/nostep2filter/SKILL.md" '**Do Not Report and stack precedents**'
+expect_fail "not refuting matches in Step 2 fails" "$work/nostep2filter" "Step 2 — Verify Findings is missing: **Do Not Report and stack precedents**"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
