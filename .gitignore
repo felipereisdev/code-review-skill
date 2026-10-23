@@ -46,3 +46,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Eval runs (the baseline is committed under evals/baseline/)
+evals/results/
