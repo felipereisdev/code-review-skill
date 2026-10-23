@@ -49,6 +49,20 @@ make_copy "$work/orphan"
 printf '# Elixir\n' > "$work/orphan/stacks/elixir.md"
 expect_fail "an uncited stack file fails" "$work/orphan" "stacks/elixir.md is not cited in SKILL.md"
 
+# drop_lines <file> <fixed text>: removes every line of <file> that contains <fixed text>.
+drop_lines() {
+  grep -vF -- "$2" "$1" > "$1.tmp"
+  mv "$1.tmp" "$1"
+}
+
+make_copy "$work/nocap"
+drop_lines "$work/nocap/SKILL.md" 'is never above **Warning**'
+expect_fail "removing the verify/ensure severity cap fails" "$work/nocap" "SKILL.md is missing: is never above **Warning**"
+
+make_copy "$work/oldformat"
+drop_lines "$work/oldformat/SKILL.md" '**Location:** `path/to/file.ext:start-end`'
+expect_fail "removing the Location field fails" "$work/oldformat" "SKILL.md is missing: **Location:** \`path/to/file.ext:start-end\`"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

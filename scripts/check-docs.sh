@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies README counts, LICENSE, SKILL.md frontmatter and file references, and example-output.md.
+# Verifies README counts, LICENSE, SKILL.md frontmatter, file references and output rules, and example-output.md.
 # Usage: bash scripts/check-docs.sh   (exits 1 if any check fails)
 set -u
 cd "$(dirname "$0")/.." || exit 1
@@ -187,10 +187,40 @@ PY
   fi
 }
 
+check_skill_output_rules() {
+  local missing=0 s
+  for s in \
+    '## Severity Levels' \
+    'is never above **Warning**' \
+    '## Evidence and Confidence' \
+    '**Location:** `path/to/file.ext:start-end`' \
+    '**Evidence:** Trigger → effect' \
+    '**Confidence:** High' \
+    '## Needs human verification' \
+    'Low-confidence findings are never reported' \
+    '### Compact mode' \
+    '- path/to/file.ext:line: Severity: problem → fix'; do
+    if ! grep -qF -- "$s" SKILL.md; then
+      printf '  SKILL.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if grep -qF '**File:**' SKILL.md; then
+    printf '  SKILL.md still uses **File:** (use **Location:**)\n'
+    missing=$((missing + 1))
+  fi
+  if [ "$missing" -eq 0 ]; then
+    pass "SKILL.md defines severity caps, evidence, confidence and compact mode"
+  else
+    fail "SKILL.md severity, evidence and output-format rules (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
 check_skill_references
+check_skill_output_rules
 check_readme_counts
 check_example_output
 
