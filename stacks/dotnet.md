@@ -6,3 +6,8 @@
 - **Dependency injection**: services registered with correct lifetime (`Transient`, `Scoped`, `Singleton`); no captive dependency issues
 - **LINQ**: LINQ queries deferred correctly; `ToList()`/`ToArray()` called only when materialization is needed
 - **Entity Framework**: no N+1 queries; `Include`/`ThenInclude` used for related data; migrations reviewed
+
+## Precedents
+
+- **Razor encodes output**: Razor `@expression` and Blazor `@value` output of ordinary untrusted string values is HTML-encoded by default, which makes them safe in HTML text and in quoted, non-executable attribute values. Do not report XSS for such string values rendered that way. **Exception:** `@Html.Raw(...)`, any `IHtmlContent` implementation, including `HtmlString`, custom or helper-produced content and `HtmlContentBuilder.AppendHtml(...)`, which Razor writes through its own `WriteTo` without encoding, so its producer must establish its safety, Blazor `MarkupString` values, other values that render their own markup, user-controlled URLs in `href`, `src` or `action`, where encoding does not stop a `javascript:` URL, unquoted attribute values, and values written into `<script>` blocks or event-handler attributes, where HTML encoding is not JavaScript encoding (use `JavaScriptEncoder` or JSON serialization there).
+- **EF Core parameterizes queries**: LINQ queries and the interpolated methods `FromSql`, `FromSqlInterpolated` and `ExecuteSqlInterpolated` turn values into parameters. Do not report SQL injection for them. **Exception:** `FromSqlRaw`, `ExecuteSqlRaw` and `SqlQueryRaw` with SQL built by concatenation or string interpolation.
