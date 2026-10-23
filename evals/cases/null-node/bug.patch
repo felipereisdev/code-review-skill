@@ -1,0 +1,29 @@
+diff --git a/src/labels.js b/src/labels.js
+index d75eb4d..6b6769d 100644
+--- a/src/labels.js
++++ b/src/labels.js
+@@ -10,7 +10,8 @@ function shippingLabel(order) {
+   if (!customer) {
+     return null;
+   }
+-  return [customer.name, customer.address.street, customer.address.city].join('\n');
++  const recipient = order.giftRecipientId ? customers.get(order.giftRecipientId) : customer;
++  return [recipient.name, recipient.address.street, recipient.address.city].join('\n');
+ }
+ 
+ module.exports = { shippingLabel, customers };
+diff --git a/test/labels.test.js b/test/labels.test.js
+index 0524556..724c63d 100644
+--- a/test/labels.test.js
++++ b/test/labels.test.js
+@@ -11,3 +11,10 @@ test('returns null for an unknown customer', () => {
+ test('formats the label', () => {
+   assert.strictEqual(shippingLabel({ customerId: 1 }), 'Ada Lovelace\n12 St James Sq\nLondon');
+ });
++
++test('ships gifts to the recipient', () => {
++  assert.strictEqual(
++    shippingLabel({ customerId: 1, giftRecipientId: 2 }),
++    'Alan Turing\n78 High St\nWilmslow',
++  );
++});

@@ -1,0 +1,47 @@
+diff --git a/app/Http/Controllers/UserSearchController.php b/app/Http/Controllers/UserSearchController.php
+index 60d7dc2..7b4ca53 100644
+--- a/app/Http/Controllers/UserSearchController.php
++++ b/app/Http/Controllers/UserSearchController.php
+@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
+ use App\Models\User;
+ use Illuminate\Http\JsonResponse;
+ use Illuminate\Http\Request;
++use Illuminate\Support\Facades\DB;
+ 
+ class UserSearchController extends Controller
+ {
+@@ -14,11 +15,10 @@ class UserSearchController extends Controller
+             'q' => ['required', 'string', 'max:100'],
+         ]);
+ 
+-        $users = User::query()
+-            ->where('name', 'like', '%'.$validated['q'].'%')
+-            ->orderBy('name')
+-            ->limit(20)
+-            ->get(['id', 'name', 'email']);
++        $term = $validated['q'];
++        $users = DB::select(
++            "SELECT id, name, email FROM users WHERE name LIKE '%{$term}%' OR email LIKE '%{$term}%' ORDER BY name LIMIT 20"
++        );
+ 
+         return response()->json($users);
+     }
+diff --git a/tests/Feature/UserSearchTest.php b/tests/Feature/UserSearchTest.php
+index aeac46c..088767e 100644
+--- a/tests/Feature/UserSearchTest.php
++++ b/tests/Feature/UserSearchTest.php
+@@ -19,4 +19,14 @@ class UserSearchTest extends TestCase
+             ->assertOk()
+             ->assertJsonCount(1);
+     }
++
++    public function test_it_finds_users_by_email(): void
++    {
++        $user = User::factory()->create(['email' => 'ada@example.com']);
++
++        $this->actingAs($user)
++            ->getJson('/api/users/search?q=ada@example')
++            ->assertOk()
++            ->assertJsonCount(1);
++    }
+ }

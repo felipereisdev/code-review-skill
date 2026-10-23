@@ -1,0 +1,12 @@
+{
+  "topic": "sql-injection",
+  "stack": "laravel",
+  "description": "Search by name or email; the bug interpolates the term into raw SQL, the clean diff keeps Eloquent bindings (string concatenation inside a bound value looks risky but is safe).",
+  "bug": {
+    "min_severity": "Critical",
+    "patterns": [
+      "sql[ -]?injection|injection|parameteri[sz]|bindings?|interpolat|raw (sql|query)",
+      "UserSearchController|DB::select|search"
+    ]
+  }
+}
