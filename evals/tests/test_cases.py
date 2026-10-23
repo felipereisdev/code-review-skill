@@ -10,6 +10,12 @@ The payment table holds every probe sentence used by the final review rounds
 a future pattern edit cannot reopen a closed false positive or lose a genuine
 allegation. Wave 5 pins the other direction of the test-context guard: a test
 mention must only veto a coverage request, never a genuine false-success claim.
+
+Wave 6 replaces probe archaeology with the frozen acceptance corpus: 100 rows
+(52 DETECT, 48 IGNORE) copied verbatim from the review artifact into
+``fixtures/payment_probes.json`` and scored through the real ``score.py`` and
+``pair.json``. Those rows are the merge gate for this finding; new linguistic
+variants do not expand it.
 """
 
 import json
@@ -368,8 +374,38 @@ failed charge is reported as successful.
 ]
 
 
+PAYMENT_CORPUS_PATH = os.path.join(TESTS_DIR, "fixtures", "payment_probes.json")
+PAYMENT_CORPUS_HEADER = "### Potential Bugs — Warning\n**File:** `src/charge.ts:15`\n"
+
+
+def load_payment_corpus():
+    with open(PAYMENT_CORPUS_PATH, encoding="utf-8") as corpus_file:
+        return json.load(corpus_file)
+
+
 class PaymentExpectationTest(unittest.TestCase):
     """Table of every review probe; concepts must match, phrasings must not."""
+
+    def test_every_frozen_corpus_row_matches_its_label(self):
+        bug = load_bug("swallowed-error-ts")
+        corpus = load_payment_corpus()
+        self.assertEqual(len(corpus), 100)
+        self.assertEqual(sum(row["label"] == "DETECT" for row in corpus), 52)
+        self.assertEqual(sum(row["label"] == "IGNORE" for row in corpus), 48)
+
+        failures = []
+        for row in corpus:
+            report = PAYMENT_CORPUS_HEADER + row["detail"] + "\n"
+            detected = score_bug(report, bug["patterns"], bug["min_severity"])["detected"]
+            expected = row["label"] == "DETECT"
+            if detected != expected:
+                failures.append("%s expected %s, got detected=%s"
+                                % (row["id"], row["label"], detected))
+            with self.subTest(row=row["id"]):
+                self.assertEqual(detected, expected,
+                                 "%s must match %s" % (row["id"], row["label"]))
+        self.assertEqual(failures, [], "%d/%d corpus rows failed:\n%s"
+                         % (len(failures), len(corpus), "\n".join(failures)))
 
     def test_every_payment_probe_matches_its_expected_result(self):
         bug = load_bug("swallowed-error-ts")

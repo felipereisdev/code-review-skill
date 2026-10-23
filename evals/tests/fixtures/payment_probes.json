@@ -1,0 +1,502 @@
+[
+  {
+    "id": "P001 w1_success_path_amount",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add a success-path test asserting the amount sent to the gateway.\n**Fix:** Assert the fake gateway receives 500 cents."
+  },
+  {
+    "id": "P002 w1_successful_charge_wording",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add a success-path test proving the caller reports a successful charge with the returned chargeId.\n**Fix:** Assert the returned chargeId is included in the caller response."
+  },
+  {
+    "id": "P003 w1_privacy_discard_message",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.\n**Fix:** Discard the raw provider message and return a stable public error code."
+  },
+  {
+    "id": "P004 w1_error_classification",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch block turns every exception into `{ ok: false, error: message }`.\nCallers cannot tell a decline from a transient outage, and the raw gateway message\nis passed on as `error`.\n**Fix:** Return a stable error code and rethrow unexpected errors."
+  },
+  {
+    "id": "P005 w2_reordered_privacy",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.\n**Fix:** Return a stable public error code and discard the raw provider message."
+  },
+  {
+    "id": "P006 w2_discard_error_message",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.\n**Fix:** Discard the error message and return a stable public error code."
+  },
+  {
+    "id": "P007 w3_negated_error_success_path",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add a success-path test proving chargeInvoice treats a charge without an error as successful.\n**Fix:** Assert the returned chargeId is included in the caller response."
+  },
+  {
+    "id": "P008 new_test_context_failed_charge_as_paid",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add a test proving chargeInvoice treats a failed charge as paid.\n**Fix:** Assert the paid status is returned."
+  },
+  {
+    "id": "P009 new_success_path_context_declined_charge",
+    "label": "IGNORE",
+    "detail": "**Issue:** Cover the success path where a declined charge is reported as successful.\n**Fix:** Assert the returned result."
+  },
+  {
+    "id": "P010 new_happy_path_context_failed_charge",
+    "label": "IGNORE",
+    "detail": "**Issue:** The happy path test asserts a failed charge is reported as paid.\n**Fix:** Assert the paid result instead of only the chargeId."
+  },
+  {
+    "id": "P011 new_plural_errors_without_failure",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add tests proving chargeInvoice reports a successful charge for a card without errors.\n**Fix:** Cover the success path in `test/charge.test.ts`."
+  },
+  {
+    "id": "P012 new_no_errors_success_path",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add a success-path test asserting that chargeInvoice returns success when there are no errors.\n**Fix:** Assert the chargeId is present."
+  },
+  {
+    "id": "P013 new_without_any_errors_success_path",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add a test proving a charge without any errors returns successfully.\n**Fix:** Assert the returned chargeId."
+  },
+  {
+    "id": "P014 new_reordered_privacy_plural",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch returns the raw gateway message to clients, exposing gateway internals.\n**Fix:** Return a stable public error code and discard the raw provider messages."
+  },
+  {
+    "id": "P015 w1_swallowed_error_reported_as_success",
+    "label": "DETECT",
+    "detail": "**Issue:** The catch swallows the gateway error and returns `{ ok: true }`, so a\nfailed charge is reported as successful.\n**Fix:** Return the `{ ok: false, error }` variant."
+  },
+  {
+    "id": "P016 w2_failed_charge_treated_as_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** A failed charge is treated as paid by chargeInvoice, even though the gateway rejected it.\n**Fix:** Return the failure result to the caller."
+  },
+  {
+    "id": "P017 w2_failed_charge_reported_as_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** The caller reports the failed charge as paid and marks the invoice settled.\n**Fix:** Return the failure variant instead of the paid result."
+  },
+  {
+    "id": "P018 w3_swallows_gateway_errors",
+    "label": "DETECT",
+    "detail": "**Issue:** The catch swallows gateway errors and returns a successful charge result.\n**Fix:** Return the failure variant to the caller."
+  },
+  {
+    "id": "P019 w3_swallows_exceptions",
+    "label": "DETECT",
+    "detail": "**Issue:** The catch swallows exceptions and returns success.\n**Fix:** Return the failure variant to the caller."
+  },
+  {
+    "id": "P020 new_failure_plural_errors_passive",
+    "label": "DETECT",
+    "detail": "**Issue:** Gateway errors are silently swallowed by the catch, so a successful charge is returned to the caller.\n**Fix:** Propagate the error."
+  },
+  {
+    "id": "P021 new_failure_plural_charge_failures",
+    "label": "DETECT",
+    "detail": "**Issue:** Charge failures are reported as successful payments to the caller.\n**Fix:** Return the failure result."
+  },
+  {
+    "id": "P022 new_failure_plural_payment_failures_passive",
+    "label": "DETECT",
+    "detail": "**Issue:** All payment failures are discarded by chargeInvoice and reported as success.\n**Fix:** Surface the failure instead of a success result."
+  },
+  {
+    "id": "P023 new_failure_reordered_suppression",
+    "label": "DETECT",
+    "detail": "**Issue:** The failed charge is discarded and the invoice is marked as paid.\n**Fix:** Record the failure instead."
+  },
+  {
+    "id": "P024 new_suppression_reordered_declined_payment",
+    "label": "DETECT",
+    "detail": "**Issue:** Because the exception is swallowed, a declined payment is returned as successful.\n**Fix:** Rethrow the exception."
+  },
+  {
+    "id": "P025 new_suppression_reordered_after_failure",
+    "label": "DETECT",
+    "detail": "**Issue:** The payment is declined by the gateway, yet chargeInvoice records it as successful.\n**Fix:** Return the failure result."
+  },
+  {
+    "id": "P026 new_suppression_passive_plural",
+    "label": "DETECT",
+    "detail": "**Issue:** All gateway errors are ignored and reported as a successful charge.\n**Fix:** Return the error to the caller."
+  },
+  {
+    "id": "P027 new_suppression_plural_dropped_errors",
+    "label": "DETECT",
+    "detail": "**Issue:** Errors from the gateway are dropped by the catch; the invoice is marked paid.\n**Fix:** Propagate them to the caller."
+  },
+  {
+    "id": "P028 new_suppression_treated_as_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice treats every declined charge as paid, even though no money was collected.\n**Fix:** Return the `{ ok: false }` variant."
+  },
+  {
+    "id": "P029 new_real_allegation_with_test_in_fix",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice treats a failed charge as paid.\n**Fix:** Return the failure variant and add a regression test."
+  },
+  {
+    "id": "P030 w5r3_test_suite_passes_failed_charge_as_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** The test suite currently passes even though chargeInvoice treats a failed charge as paid.\n**Fix:** Return the failure variant to the caller."
+  },
+  {
+    "id": "P031 w5r3_tests_show_treated_as_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** Tests show that a failed charge is treated as paid by chargeInvoice, even though the gateway rejected it.\n**Fix:** Return the failure variant to the caller."
+  },
+  {
+    "id": "P032 w5_test_mention_contrast_declined_payment",
+    "label": "DETECT",
+    "detail": "**Issue:** Although the test suite passes, chargeInvoice records a declined payment as successful.\n**Fix:** Record the decline instead."
+  },
+  {
+    "id": "P033 w5_test_recommendation_after_allegation",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice reports a failed charge as paid; add a regression test for it.\n**Fix:** Return the failure variant."
+  },
+  {
+    "id": "P034 w5_no_test_for_failed_charge_branch",
+    "label": "IGNORE",
+    "detail": "**Issue:** No test covers chargeInvoice treating a failed charge as paid.\n**Fix:** Add a case for the failure branch."
+  },
+  {
+    "id": "P035 w5_cover_success_path_before_allegation",
+    "label": "IGNORE",
+    "detail": "**Issue:** Cover the success path where chargeInvoice treats a failed charge as paid.\n**Fix:** Assert the paid result."
+  },
+  {
+    "id": "P036 w5_tests_prove_treated_as_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** Tests prove that a failed charge is treated as paid by chargeInvoice, even though the gateway rejected it.\n**Fix:** Return the failure variant to the caller."
+  },
+  {
+    "id": "P037 w5_regression_tests_are_missing",
+    "label": "IGNORE",
+    "detail": "**Issue:** Regression tests are missing for chargeInvoice treating a failed charge as paid.\n**Fix:** Add a case for the failure branch."
+  },
+  {
+    "id": "P038 w5_introduce_regression_test",
+    "label": "IGNORE",
+    "detail": "**Issue:** Introduce a regression test proving chargeInvoice treats a failed charge as paid.\n**Fix:** Assert the returned paid status."
+  },
+  {
+    "id": "P039 swallow_active_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** The catch swallows the gateway error, so the caller never learns that the charge failed."
+  },
+  {
+    "id": "P040 swallow_passive_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** The gateway exception is swallowed by the catch, leaving the caller unaware of the payment failure."
+  },
+  {
+    "id": "P041 suppress_active_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice suppresses the payment failure and returns { ok: true }."
+  },
+  {
+    "id": "P042 suppress_passive_plural",
+    "label": "DETECT",
+    "detail": "**Issue:** Payment failures are suppressed by the catch and callers receive { ok: true }."
+  },
+  {
+    "id": "P043 ignore_active_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** The handler ignores the gateway error and continues as if the invoice were paid."
+  },
+  {
+    "id": "P044 ignore_passive_plural",
+    "label": "DETECT",
+    "detail": "**Issue:** Gateway exceptions are ignored by chargeInvoice and the failed payments appear successful to callers."
+  },
+  {
+    "id": "P045 discard_active_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice discards the exception from a rejected payment and returns success."
+  },
+  {
+    "id": "P046 discard_passive_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** The payment failure is discarded by the catch and the caller receives a successful result."
+  },
+  {
+    "id": "P047 catch_continue_active",
+    "label": "DETECT",
+    "detail": "**Issue:** The gateway rejects the charge, but the catch continues execution into the paid-result branch."
+  },
+  {
+    "id": "P048 catch_continue_passive_plural",
+    "label": "DETECT",
+    "detail": "**Issue:** After declined payments are caught, execution continues and their invoices are marked paid."
+  },
+  {
+    "id": "P049 mask_active_singular",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice masks the failed payment with a successful result."
+  },
+  {
+    "id": "P050 mask_passive_errored",
+    "label": "DETECT",
+    "detail": "**Issue:** An errored transaction is masked as ok by the handler."
+  },
+  {
+    "id": "P051 report_result_before_failure",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice reports as paid a charge that the gateway rejected."
+  },
+  {
+    "id": "P052 report_passive_success_before_decline",
+    "label": "DETECT",
+    "detail": "**Issue:** The charge is reported as successful despite the payment processor declining it."
+  },
+  {
+    "id": "P053 treat_active_plural_rejected",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice treats rejected charges as successful."
+  },
+  {
+    "id": "P054 treat_passive_declined_ok",
+    "label": "DETECT",
+    "detail": "**Issue:** A declined payment is treated as ok by chargeInvoice."
+  },
+  {
+    "id": "P055 return_success_before_errored",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice returns a successful result for an errored transaction."
+  },
+  {
+    "id": "P056 return_passive_plural_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** Rejected payments are returned as paid by chargeInvoice."
+  },
+  {
+    "id": "P057 mark_active_declined_paid",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice marks a declined invoice as paid."
+  },
+  {
+    "id": "P058 mark_passive_plural_successful",
+    "label": "DETECT",
+    "detail": "**Issue:** Failed charges are marked as successful by the catch."
+  },
+  {
+    "id": "P059 ok_true_before_rejection",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice returns { ok: true } even when the gateway rejects the charge."
+  },
+  {
+    "id": "P060 timeout_then_ok",
+    "label": "DETECT",
+    "detail": "**Issue:** The gateway times out, yet the handler returns HTTP 200 with { ok: true } for the charge."
+  },
+  {
+    "id": "P061 success_then_suppression_next_sentence",
+    "label": "DETECT",
+    "detail": "**Issue:** The caller receives paid status for the charge. The gateway error has been suppressed by the catch."
+  },
+  {
+    "id": "P062 tests_confirm_observation",
+    "label": "DETECT",
+    "detail": "**Issue:** Tests confirm that a rejected payment is reported as successful by chargeInvoice."
+  },
+  {
+    "id": "P063 regression_test_reproduces",
+    "label": "DETECT",
+    "detail": "**Issue:** The regression test reproduces chargeInvoice returning a successful result for a failed charge."
+  },
+  {
+    "id": "P064 coverage_gap_and_direct_allegation",
+    "label": "DETECT",
+    "detail": "**Issue:** Coverage omits the failure assertion, and chargeInvoice currently ignores gateway exceptions so the caller sees success."
+  },
+  {
+    "id": "P065 success_path_context_and_direct_allegation",
+    "label": "DETECT",
+    "detail": "**Issue:** Success-path tests pass, yet failed transactions are marked as ok in chargeInvoice."
+  },
+  {
+    "id": "P066 test_request_because_direct_allegation",
+    "label": "DETECT",
+    "detail": "**Issue:** Add regression coverage because chargeInvoice currently returns { ok: true } after a gateway rejection."
+  },
+  {
+    "id": "P067 negated_propagation_then_success",
+    "label": "DETECT",
+    "detail": "**Issue:** chargeInvoice does not return the gateway error; it returns { ok: true } for the rejected charge."
+  },
+  {
+    "id": "P068 no_longer_propagates",
+    "label": "DETECT",
+    "detail": "**Issue:** The catch no longer propagates payment exceptions and instead marks rejected payments as paid."
+  },
+  {
+    "id": "P069 denial_of_correct_failure_reporting",
+    "label": "DETECT",
+    "detail": "**Issue:** It is not true that chargeInvoice reports failures: a declined payment is actually returned as successful."
+  },
+  {
+    "id": "P070 negated_gateway_acceptance",
+    "label": "DETECT",
+    "detail": "**Issue:** The gateway did not accept the payment, yet chargeInvoice returns success."
+  },
+  {
+    "id": "P071 negated_active_swallow",
+    "label": "IGNORE",
+    "detail": "**Issue:** chargeInvoice does not swallow gateway errors; it returns the failure to the caller."
+  },
+  {
+    "id": "P072 negated_passive_swallow",
+    "label": "IGNORE",
+    "detail": "**Issue:** Payment exceptions are not swallowed by the catch and are propagated to the caller."
+  },
+  {
+    "id": "P073 negated_report_success",
+    "label": "IGNORE",
+    "detail": "**Issue:** A failed charge is never reported as successful by chargeInvoice."
+  },
+  {
+    "id": "P074 negated_mark_paid",
+    "label": "IGNORE",
+    "detail": "**Issue:** chargeInvoice never marks rejected payments as paid."
+  },
+  {
+    "id": "P075 negated_treat_ok",
+    "label": "IGNORE",
+    "detail": "**Issue:** Failed payments are not treated as ok; the caller receives a failure result."
+  },
+  {
+    "id": "P076 success_only_without_failure",
+    "label": "IGNORE",
+    "detail": "**Issue:** chargeInvoice returns success only if the payment did not fail."
+  },
+  {
+    "id": "P077 rejection_correctly_returned",
+    "label": "IGNORE",
+    "detail": "**Issue:** The gateway rejects the charge and chargeInvoice returns { ok: false, error } to the caller."
+  },
+  {
+    "id": "P078 quoted_allegation_denied",
+    "label": "IGNORE",
+    "detail": "**Issue:** Although tests mention \"a failed charge is treated as paid\", chargeInvoice actually returns the failure correctly."
+  },
+  {
+    "id": "P079 coverage_request_negated_bug",
+    "label": "IGNORE",
+    "detail": "**Issue:** Add regression coverage proving that a failed payment is never treated as paid."
+  },
+  {
+    "id": "P080 missing_coverage_for_suppression",
+    "label": "IGNORE",
+    "detail": "**Issue:** Coverage is missing for the case where the catch discards gateway errors."
+  },
+  {
+    "id": "P081 test_whether_suppression",
+    "label": "IGNORE",
+    "detail": "**Issue:** Please test whether the catch ignores failed payments."
+  },
+  {
+    "id": "P082 introduce_assertion_only",
+    "label": "IGNORE",
+    "detail": "**Issue:** Introduce a test checking that rejected charges are returned as paid."
+  },
+  {
+    "id": "P083 success_test_without_error",
+    "label": "IGNORE",
+    "detail": "**Issue:** The success-path test expects a paid result for a charge without an error."
+  },
+  {
+    "id": "P084 correct_success_no_error",
+    "label": "IGNORE",
+    "detail": "**Issue:** There is no gateway error: the charge succeeded and chargeInvoice returns success."
+  },
+  {
+    "id": "P085 discard_logged_messages",
+    "label": "IGNORE",
+    "detail": "**Issue:** Discard error messages from payment logs to avoid leaking provider internals; keep returning the failure result."
+  },
+  {
+    "id": "P086 suppress_response_error_text",
+    "label": "IGNORE",
+    "detail": "**Issue:** Suppress gateway error text in public responses and continue returning { ok: false } for declined charges."
+  },
+  {
+    "id": "P087 ignore_provider_error_code",
+    "label": "IGNORE",
+    "detail": "**Issue:** Ignore the provider error code when choosing public wording; still return the rejected payment as a failure."
+  },
+  {
+    "id": "P088 mask_card_data",
+    "label": "IGNORE",
+    "detail": "**Issue:** Mask card details in declined-payment logs; chargeInvoice already returns the failure."
+  },
+  {
+    "id": "P089 logging_before_failure_return",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch should log the gateway exception before returning the error to the caller."
+  },
+  {
+    "id": "P090 failed_charge_logging_only",
+    "label": "IGNORE",
+    "detail": "**Issue:** Record failed charges in logs for debugging; the current failure result is correct."
+  },
+  {
+    "id": "P091 public_error_code_only",
+    "label": "IGNORE",
+    "detail": "**Issue:** Return a stable public error code instead of the raw provider message when a charge fails."
+  },
+  {
+    "id": "P092 rename_catch_variable",
+    "label": "IGNORE",
+    "detail": "**Issue:** Rename the catch variable to gatewayError for clarity when handling a rejected charge."
+  },
+  {
+    "id": "P093 extract_catch_helper",
+    "label": "IGNORE",
+    "detail": "**Issue:** Extract the catch block into a helper for readability; preserve its existing failure return."
+  },
+  {
+    "id": "P094 successful_charge_id_advice",
+    "label": "IGNORE",
+    "detail": "**Issue:** A successful payment is reported as successful; include the returned chargeId in the response."
+  },
+  {
+    "id": "P095 telemetry_swallow_only",
+    "label": "IGNORE",
+    "detail": "**Issue:** Gateway errors are swallowed only by the optional telemetry logger, while chargeInvoice returns the payment failure correctly."
+  },
+  {
+    "id": "P096 retry_then_propagate",
+    "label": "IGNORE",
+    "detail": "**Issue:** The first gateway exception is ignored during a retry; if charging still fails, chargeInvoice returns the error."
+  },
+  {
+    "id": "P097 discard_local_after_return",
+    "label": "IGNORE",
+    "detail": "**Issue:** The catch discards its local error object after returning the payment failure to the caller."
+  },
+  {
+    "id": "P098 preventative_suppression_advice",
+    "label": "IGNORE",
+    "detail": "**Issue:** Do not suppress payment errors; keep the current propagation to the caller."
+  },
+  {
+    "id": "P099 notification_failure_only",
+    "label": "IGNORE",
+    "detail": "**Issue:** A failed email notification is ignored after the gateway confirms payment; the successful charge result is correct."
+  },
+  {
+    "id": "P100 w1_sibling_xss_performance_warning",
+    "label": "IGNORE",
+    "detail": "**Issue:** The newline replacement before dangerouslySetInnerHTML is repeated on\nevery render; memoize it for long comment bodies.\n**Fix:** Cache the transformed string."
+  }
+]
