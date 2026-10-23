@@ -10,6 +10,7 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 _HEADING_SEVERITY_RE = re.compile(r"\b(critical|warning|suggestion)s?\b", re.I)
 _BODY_SEVERITY_RE = re.compile(r"\bseverity\b\W*(critical|warning|suggestion)", re.I)
 _DETAIL_RE = re.compile(r"^\W*(?:file|issue|location)s?\W*:", re.I)
+_VERIFICATION_HEADING_RE = re.compile(r"\bneeds\s+human\s+verification\b", re.I)
 PASSED_LINE = re.compile(
     r"^[\s*_\"'>]*code review passed\s*[—–-]{1,2}\s*no issues found\.?[\s*_\"']*$",
     re.I,
@@ -29,7 +30,11 @@ def _normalize_severity(match: re.Match | None) -> str | None:
 
 
 def parse_findings(report: str) -> list[dict]:
-    """Return the findings in ``report`` order as heading/severity/text dicts."""
+    """Return the findings in ``report`` order as heading/severity/text dicts.
+
+    ``needs_verification`` is True for findings nested under a "Needs human
+    verification" heading (Medium confidence); scoring ignores them.
+    """
     blocks = []
     current = None
     in_fence = False
@@ -65,7 +70,10 @@ def parse_findings(report: str) -> list[dict]:
 
         while stack and stack[-1][0] >= block["level"]:
             stack.pop()
-        stack.append((block["level"], own_severity))
+        needs_verification = bool(_VERIFICATION_HEADING_RE.search(block["heading"])) or (
+            bool(stack) and stack[-1][2]
+        )
+        stack.append((block["level"], own_severity, needs_verification))
 
         severity = own_severity
         if severity is None:
@@ -75,7 +83,7 @@ def parse_findings(report: str) -> list[dict]:
                     severity = _NORMALIZED_SEVERITY[body_match.group(1).lower()]
                     break
         if severity is None:
-            for _level, inherited in reversed(stack[:-1]):
+            for _level, inherited, _verify in reversed(stack[:-1]):
                 if inherited is not None:
                     severity = inherited
                     break
@@ -85,6 +93,7 @@ def parse_findings(report: str) -> list[dict]:
             findings.append({
                 "heading": block["heading"],
                 "severity": severity,
+                "needs_verification": needs_verification,
                 "text": block["line"] + "\n" + "\n".join(block["body"]),
             })
 
@@ -92,9 +101,11 @@ def parse_findings(report: str) -> list[dict]:
 
 
 def score_bug(report: str, patterns: list[str], min_severity: str) -> dict:
-    """Report whether one finding at ``min_severity`` or above matches every pattern."""
+    """Report whether one main-list finding at ``min_severity`` or above matches every pattern."""
     minimum = SEVERITIES.index(min_severity)
     for finding in parse_findings(report):
+        if finding["needs_verification"]:
+            continue
         if SEVERITIES.index(finding["severity"]) < minimum:
             continue
         if all(re.search(pattern, finding["text"], re.I) for pattern in patterns):
@@ -103,10 +114,10 @@ def score_bug(report: str, patterns: list[str], min_severity: str) -> dict:
 
 
 def score_clean(report: str) -> dict:
-    """Count findings severe enough to be false positives on a clean diff."""
+    """Count main-list findings severe enough to be false positives on a clean diff."""
     false_positives = sum(
         1 for finding in parse_findings(report)
-        if finding["severity"] in ("Warning", "Critical")
+        if not finding["needs_verification"] and finding["severity"] in ("Warning", "Critical")
     )
     return {"false_positives": false_positives}
 
