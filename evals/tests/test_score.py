@@ -406,6 +406,20 @@ class PreExistingTest(unittest.TestCase):
         self.assertEqual([f["pre_existing"] for f in parse_findings(NEW_FORMAT)], [False, False])
         self.assertEqual([f["pre_existing"] for f in parse_findings(COMPACT_FORMAT)], [False, False, False])
 
+    def test_finding_titles_that_mention_pre_existing_are_not_the_section(self):
+        heading_severity = ("## Findings\n\n### Potential Bugs — Warning: reintroduces a pre-existing issue\n\n"
+                            "**Location:** `src/a.py:12`\n**Issue:** Removed guard lets an empty ID reach the lookup.\n"
+                            "**Evidence:** Removing the guard exposes a pre-existing issue: empty ID returns the wrong user.\n")
+        body_severity = ("## Findings\n\n### Pre-existing issue now exposed by the new caller\n\n"
+                         "**Severity:** Critical\n**Location:** `src/b.py:4`\n**Issue:** Empty ID now reaches the lookup.\n")
+        for name, report, severity in (("heading severity", heading_severity, "Warning"),
+                                       ("body severity", body_severity, "Critical")):
+            with self.subTest(name):
+                self.assertEqual([f["pre_existing"] for f in parse_findings(report)], [False])
+                self.assertEqual(score_bug(report, ["empty ID"], severity),
+                                 {"detected": True, "matched_finding": parse_findings(report)[0]["heading"]})
+                self.assertEqual(score_clean(report), {"false_positives": 1})
+
     def test_notes_only_report_is_a_clean_report(self):
         report = ("**Code review passed — no issues found.**\n\n## Pre-existing issues (not counted)\n\n"
                   "- src/a.js:9 — the legacy parser crashes on empty input.\n\n" + VERIFICATION_LINE)
