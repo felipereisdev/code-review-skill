@@ -15,11 +15,11 @@
 - **Automatic Stack Detection** - Identifies project technology from config files
 - **Consistency-First Review** - Checks existing project conventions before flagging violations (Step 1.5)
 - **API Validation** - Validates library usage against live documentation to reduce false positives
-- **Multi-Stack Support** - 19 technology stacks covered
+- **Multi-Stack Support** - 20 technology stacks covered
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
-- **15 Review Categories** - From Security to Privacy Compliance
-- **15 Review Scopes** - Uncommitted changes, staged, branch comparison, specific commits
+- **13 Review Categories** - From Security to Privacy Compliance
+- **5 Review Scopes** - Uncommitted changes, staged, branch comparison, specific commits
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
 
 ## 📦 Installation
@@ -225,7 +225,11 @@ Runs with automatic stack detection and loads only relevant pattern/stack rules.
 code-review-skill/
 ├── SKILL.md              # Main skill definition
 ├── README.md             # This file
+├── LICENSE               # MIT License
+├── example-output.md     # Sample review report
 ├── .gitignore           # Git ignore rules
+├── scripts/             # Maintenance scripts
+│   └── check-docs.sh    # Docs and frontmatter consistency check
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md
@@ -261,9 +265,10 @@ Contributions welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Run `bash scripts/check-docs.sh` and make sure all checks pass
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ## 📜 License
 
