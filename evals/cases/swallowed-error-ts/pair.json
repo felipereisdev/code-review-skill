@@ -5,7 +5,7 @@
   "bug": {
     "min_severity": "Warning",
     "patterns": [
-      "swallow|silent|ignor|success|ok: true|mask|hid(e|es|ing)|lost",
+      "swallow|silently (?:ignored|discarded)|ignor(?:e|ed|es|ing) (?:the )?(?:error|exception|failure)|discard|mask|hid(?:e|es|den|ing)|lost|ok\\s*:\\s*true|reports? .{0,40}(?:as )?success|treat(?:s|ed)? .{0,40}as (?:paid|successful)",
       "catch|charge\\.ts|chargeInvoice"
     ]
   }

@@ -5,7 +5,7 @@
   "bug": {
     "min_severity": "Warning",
     "patterns": [
-      "xss|cross[- ]site|dangerouslySetInnerHTML|sanitiz|inject",
+      "xss|cross[- ]site|sanitiz|unescap|html injection|script injection|inject(?:s|ed|ing)? (?:html|markup|script)|raw html|bypass(?:es|ed)? .{0,30}(?:escap|protect)",
       "CommentList|comment\\.body|dangerouslySetInnerHTML"
     ]
   }
