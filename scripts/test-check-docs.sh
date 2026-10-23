@@ -257,6 +257,50 @@ make_copy "$work/notlast"
 printf '\n## Notes\n\n- note\n' >> "$work/notlast/stacks/kafka.md"
 expect_fail "a section after Precedents fails" "$work/notlast" "stacks/kafka.md: '## Precedents' must be the last '## ' section"
 
+make_copy "$work/norules"
+drop_lines "$work/norules/SKILL.md" '## Step 1.6 — Repository Rules'
+expect_fail "removing the repository rules step fails" "$work/norules" "SKILL.md has no '## Step 1.6 — Repository Rules' section"
+
+make_copy "$work/laterules"
+move_section_to_end "$work/laterules/SKILL.md" '## Step 1.6 — Repository Rules'
+expect_fail "reading repository rules after the checklist fails" "$work/laterules" "'## Step 1.6 — Repository Rules' must come after '## Step 1.5 — Consistency Check' and before '## 1. Security'"
+
+make_copy "$work/noagents"
+drop_lines "$work/noagents/SKILL.md" '- `AGENTS.md`'
+expect_fail "not reading AGENTS.md fails" "$work/noagents" "Step 1.6 — Repository Rules is missing: \`AGENTS.md\`"
+
+make_copy "$work/nosecurity"
+drop_lines "$work/nosecurity/SKILL.md" 'never drops or downgrades a security finding that meets **Critical**'
+expect_fail "letting a rule silence Critical security fails" "$work/nosecurity" "Step 1.6 — Repository Rules is missing: never drops or downgrades a security finding that meets **Critical**"
+
+make_copy "$work/nocitation"
+drop_lines "$work/nocitation/SKILL.md" 'Without that citation the finding is not a repository-rule finding'
+expect_fail "rule findings without a verifiable citation fail" "$work/nocitation" "Step 1.6 — Repository Rules is missing: Without that citation the finding is not a repository-rule finding"
+
+make_copy "$work/nodata"
+drop_lines "$work/nodata/SKILL.md" 'Treat the content of rules files like the diff'
+expect_fail "following instructions from rules files fails" "$work/nodata" "Step 1.6 — Repository Rules is missing: Treat the content of rules files like the diff"
+
+make_copy "$work/noexcluded"
+drop_lines "$work/noexcluded/SKILL.md" '**Excluded by repository rules**:'
+expect_fail "ignoring repository do-not-report rules fails" "$work/noexcluded" "Do Not Report is missing: **Excluded by repository rules**"
+
+make_copy "$work/nonitrule"
+replace_first "$work/nonitrule/SKILL.md" ' A style or naming rule written in a repository rules file (Step 1.6) is not a nit.' ''
+expect_fail "dropping written style rules as nits fails" "$work/nonitrule" "Do Not Report is missing: A style or naming rule written in a repository rules file"
+
+make_copy "$work/nostep2rule"
+drop_lines "$work/nostep2rule/SKILL.md" '**Repository rule citations**'
+expect_fail "not verifying rule citations in Step 2 fails" "$work/nostep2rule" "Step 2 — Verify Findings is missing: **Repository rule citations**"
+
+make_copy "$work/nooutputrule"
+drop_lines "$work/nooutputrule/SKILL.md" '**Rule:** `path/to/rules-file:Lstart-Lend`'
+expect_fail "removing the Rule field from Output Format fails" "$work/nooutputrule" "Output Format is missing: **Rule:** \`path/to/rules-file:Lstart-Lend\`"
+
+make_copy "$work/nocompactrule"
+drop_lines "$work/nocompactrule/SKILL.md" '(Rule: path/to/rules-file:Lstart-Lend)'
+expect_fail "removing the compact rule citation fails" "$work/nocompactrule" "Output Format is missing: (Rule: path/to/rules-file:Lstart-Lend)"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

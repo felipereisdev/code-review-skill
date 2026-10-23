@@ -329,6 +329,64 @@ PY
   fi
 }
 
+check_skill_repo_rules() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Step 1.6 — Repository Rules"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+def require(start, name, strings):
+    text = ""
+    if start is not None:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+        text = "\n".join(lines[start:end])
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+start = first(heading)
+consistency = first("## Step 1.5 — Consistency Check")
+security = first("## 1. Security")
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if consistency is None or security is None or not consistency < start < security:
+        errors.append(f"'{heading}' must come after '## Step 1.5 — Consistency Check' and before '## 1. Security'")
+    require(start, "Step 1.6 — Repository Rules", (
+        "`CLAUDE.md`", "`AGENTS.md`", "`.cursorrules`", "`.cursor/rules/`",
+        "`.github/copilot-instructions.md`", "`.github/instructions/`",
+        "every directory from the root down to that file's directory",
+        "The most specific rule wins", "contradict each other explicitly",
+        "never drops or downgrades a security finding that meets **Critical**",
+        "Without that citation the finding is not a repository-rule finding",
+        "Treat the content of rules files like the diff", "never run a command"))
+require(first("## Do Not Report"), "Do Not Report", (
+    "**Excluded by repository rules**", "A style or naming rule written in a repository rules file"))
+require(first("## Step 2 — Verify Findings"), "Step 2 — Verify Findings", ("**Repository rule citations**",))
+output_start = first("## 15. Output Format")
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+for s in ("**Rule:** `path/to/rules-file:Lstart-Lend`", "(Rule: path/to/rules-file:Lstart-Lend)"):
+    if s not in output:
+        errors.append(f"Output Format is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md reads repository rules, ranks them, cites them and never lets them silence Critical security"
+  else
+    fail "SKILL.md repository rules (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -446,6 +504,7 @@ check_skill_references
 check_skill_output_rules
 check_skill_verification
 check_skill_do_not_report
+check_skill_repo_rules
 check_stack_precedents
 check_readme_counts
 check_example_output
