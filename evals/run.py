@@ -360,7 +360,8 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
             return _error_result(result, case, error)
 
         result["findings"] = [
-            {"heading": finding["heading"], "severity": finding["severity"]}
+            {"heading": finding["heading"], "severity": finding["severity"],
+             "needs_verification": finding["needs_verification"]}
             for finding in score.parse_findings(stdout)
         ]
         if case["kind"] == "bug":

@@ -47,11 +47,39 @@ Once the user answers, run the appropriate git command to obtain the diff, then 
 
 ---
 
-Findings should be reported with severity levels:
+## Severity Levels
 
-- **Critical**: blocks the merge; must be fixed before merging
-- **Warning**: should be fixed shortly after merging; not a blocker
-- **Suggestion**: optional improvement; does not block merge
+Give each finding the highest level whose definition it meets, and no higher:
+
+- **Critical**: the change, as written, crashes, loses or corrupts data, or opens a security hole (for example injection, broken access control or an exposed secret). Blocks the merge; must be fixed before merging.
+- **Warning**: the change gives a wrong result or wrong behavior in at least one concrete scenario, without a crash, data loss or security hole; or it makes a hot path (code that runs per request or per job) do work or queries that grow with data size (N+1 queries, unbounded queries or loads, O(n^2) work per request), because that causes timeouts or outages at scale. Should be fixed shortly after merging; not a blocker.
+- **Suggestion**: the code is correct but suboptimal (readability, structure, naming, performance improvements that do not grow with data size, missing tests for code that works). Optional; does not block merge.
+
+Severity caps:
+
+- A finding whose only advice is to "verify", "ensure", "confirm" or "check" something is never above **Warning**.
+- If you cannot name the scenario that crashes, loses data or opens the hole, the finding is not **Critical**.
+
+---
+
+## Evidence and Confidence
+
+Every finding needs three things before you report it:
+
+- **Location**: `path:start-end` (or `path:line` for a single line). Cite only lines inside the diff, that is, lines the change adds or modifies. When the cause is outside the diff, cite the changed lines that trigger it. For a finding about a whole file or function, cite the changed range. **Deletion-only exception:** when the finding is a regression caused only by removed code, cite the removed old-side lines (`path:line` or `path:start-end`); for a whole-file deletion, cite the deleted file's path with its removed line range. Identify the removal in Evidence.
+- **Evidence**: one concrete scenario written as trigger → effect: the input, state or call sequence that triggers the problem, and what goes wrong. Example: `customers.get(99)` returns `undefined` → `recipient.name` throws a `TypeError` and the request fails.
+- **Confidence**: how sure you are that the scenario happens with the code as written.
+  - **High**: you traced the path through the diff and the code you read, and the scenario follows from it.
+  - **Medium**: the scenario is plausible but depends on something you could not see (a caller, configuration, data or runtime behavior).
+  - **Low**: a guess without a traceable path.
+
+Where each confidence level goes:
+
+- **High**: the `## Findings` list.
+- **Medium**: the `## Needs human verification` section, never the Findings list or the Summary table.
+- **Low**: nowhere. Low-confidence findings are never reported.
+
+If you cannot write the Evidence scenario, the finding is Low: drop it.
 
 ---
 
@@ -320,17 +348,25 @@ Before listing issues, acknowledge what was done well in this change. Point out 
 
 ## 15. Output Format
 
-For each finding, report:
+Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Summary`.
+
+Use this block for each finding:
 
 ```
 ### [Category] — [Severity]
 
-**File:** `path/to/file.ext:line`
+**Location:** `path/to/file.ext:start-end`
 **Issue:** Brief description of the problem.
+**Evidence:** Trigger → effect: the concrete scenario in which it goes wrong.
+**Confidence:** High
 **Fix:** Suggested correction or approach.
 ```
 
-At the end, provide a summary table covering all evaluated categories (use N/A for categories that do not apply to this change):
+- Under `## Findings`, list only High-confidence findings.
+- Under `## Needs human verification`, list Medium-confidence findings in the same block with `**Confidence:** Medium`, and say in the Evidence what a person must check.
+- Never report Low-confidence findings.
+
+At the end, provide a summary table covering all evaluated categories (use N/A for categories that do not apply to this change). Count only the findings under `## Findings`:
 
 ```
 ## Summary
@@ -356,4 +392,18 @@ At the end, provide a summary table covering all evaluated categories (use N/A f
 | **Total**             | **0**    | **0**   | **0**      |     |
 ```
 
-If no issues are found, state: **"Code review passed — no issues found."**
+If there are no High-confidence findings, state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification`.
+
+### Compact mode
+
+Use compact mode only when the user asks for it, for example `/code-review compact`, "compact review" or "one line per finding". Without that request, use the full format above.
+
+In compact mode, write each finding as one list item:
+
+```
+- path/to/file.ext:line: Severity: problem → fix
+```
+
+- `line` is the finding's Location: one line or a `start-end` range inside the diff, with the same deletion-only exception (cite the removed old-side lines, including a whole deleted file). `Severity` is Critical, Warning or Suggestion.
+- The severity, evidence and confidence rules still apply: High-confidence lines first, Medium-confidence lines under a `## Needs human verification` heading after them, Low-confidence findings never.
+- Skip What Was Done Well and the Summary table. If there are no High-confidence findings, write only **"Code review passed — no issues found."** and any `## Needs human verification` lines.

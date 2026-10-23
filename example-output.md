@@ -23,26 +23,46 @@ Reviewing a feature branch that adds user authentication with JWT to a Node.js/E
 
 ### Security — Critical
 
-**File:** `src/services/auth.service.ts:45`
-**Issue:** JWT secret is read from `process.env.JWT_SECRET` without validation. If undefined, the app will use `undefined` as the secret.
-**Fix:** Add validation at startup:
+**Location:** `src/services/auth.service.ts:45-46`
+**Issue:** The JWT secret falls back to the hard-coded string `'dev-secret'` when `JWT_SECRET` is not set.
+**Evidence:** A deployment without `JWT_SECRET` signs every token with `'dev-secret'` → anyone who reads this repository can forge a token for any user ID and pass `authMiddleware`.
+**Confidence:** High
+**Fix:** Fail at startup instead of falling back:
 ```typescript
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
 }
 ```
 
+### Potential Bugs — Critical
+
+**Location:** `src/services/auth.service.ts:89-97`
+**Issue:** Token refresh reads the stored refresh token, then deletes it and creates a new one in separate queries.
+**Evidence:** Two concurrent `POST /auth/refresh` requests with the same refresh token both pass the `findUnique` check before either delete runs → both receive a new valid refresh token, so a stolen token can be replayed without ending the session.
+**Confidence:** High
+**Fix:** Rotate the token in one transaction, so the second request fails on the delete:
+```typescript
+await db.$transaction(async (tx) => {
+  await tx.refreshTokens.delete({ where: { token: oldToken } });
+  await tx.refreshTokens.create({ data: { token: newToken, userId } });
+});
+```
+
 ### Security — Warning
 
-**File:** `src/controllers/auth.controller.ts:23`
-**Issue:** Error message exposes whether email exists ("User not found" vs "Invalid credentials"), enabling user enumeration attacks.
-**Fix:** Use generic error message for both cases: "Invalid email or password"
+**Location:** `src/controllers/auth.controller.ts:23-27`
+**Issue:** Login answers "User not found" for an unknown email and "Invalid credentials" for a wrong password.
+**Evidence:** `POST /auth/login` with `alice@example.com` and a wrong password answers "Invalid credentials" when that account exists and "User not found" when it does not → an attacker can find out which emails are registered.
+**Confidence:** High
+**Fix:** Return the same message for both cases: "Invalid email or password".
 
 ### Performance — Suggestion
 
-**File:** `src/services/auth.service.ts:67`
-**Issue:** Database query fetches all user fields including password hash when only `id` and `email` are needed for JWT generation.
-**Fix:** Use `select` to limit fields:
+**Location:** `src/services/auth.service.ts:67-69`
+**Issue:** The query that loads the user for token generation fetches every column, including the password hash, when only `id` and `email` are used.
+**Evidence:** Each token refresh reads the full user row, including `passwordHash` → the result is correct, but the query moves more data than needed and keeps the hash in memory for no reason.
+**Confidence:** High
+**Fix:** Select only the needed fields:
 ```typescript
 const user = await db.users.findFirst({
   where: { email },
@@ -50,11 +70,13 @@ const user = await db.users.findFirst({
 });
 ```
 
-### Tests — Warning
+### Tests/Coverage — Suggestion
 
-**File:** `tests/auth.test.ts:34`
-**Issue:** Test mocks JWT signing but doesn't verify the actual token structure or expiration.
-**Fix:** Add assertions to verify token contains expected claims:
+**Location:** `tests/auth.test.ts:34-41`
+**Issue:** The login test mocks `jwt.sign`, so it never checks the claims or the expiry of the real token.
+**Evidence:** If `generateToken` stopped passing `expiresIn`, this test would still pass → tokens that never expire could ship unnoticed. The code is correct today; the test is weaker than it looks.
+**Confidence:** High
+**Fix:** Verify the real token:
 ```typescript
 const decoded = jwt.verify(token, process.env.JWT_SECRET!);
 expect(decoded).toHaveProperty('userId');
@@ -63,37 +85,31 @@ expect(decoded).toHaveProperty('exp');
 
 ### Architecture — Suggestion
 
-**File:** `src/middleware/auth.middleware.ts:18`
-**Issue:** Middleware function exceeds 50 lines and handles multiple responsibilities (token extraction, verification, and user lookup).
+**Location:** `src/middleware/auth.middleware.ts:18-74`
+**Issue:** `authMiddleware` is 57 lines long and handles token extraction, verification and user lookup.
+**Evidence:** Adding API-key authentication means editing this one function in three places → the change is harder to review and to test in isolation. Behavior is correct today.
+**Confidence:** High
 **Fix:** Extract token extraction and user lookup into separate functions:
 ```typescript
 const extractToken = (authHeader: string): string | null => { ... }
 const getUserFromToken = (token: string): Promise<User | null> => { ... }
 ```
 
-### Potential Bugs — Critical
+### Code & File Size — Suggestion
 
-**File:** `src/services/auth.service.ts:89`
-**Issue:** Race condition in token refresh - concurrent requests could generate multiple valid refresh tokens for the same user.
-**Fix:** Use database transaction or atomic operation:
-```typescript
-await db.$transaction(async (tx) => {
-  await tx.refreshTokens.deleteMany({ where: { userId } });
-  await tx.refreshTokens.create({ data: { token: newToken, userId } });
-});
-```
-
-### Code & File Size — Warning
-
-**File:** `src/controllers/auth.controller.ts`
-**Issue:** File is 487 lines and contains controller logic for login, register, logout, refresh token, password reset, and email verification.
+**Location:** `src/controllers/auth.controller.ts:1-487`
+**Issue:** The branch adds a 487-line controller for login, register, logout, token refresh, password reset and email verification.
+**Evidence:** A change to password reset edits the same file as login → unrelated changes conflict and every review covers all six flows. Behavior is correct.
+**Confidence:** High
 **Fix:** Split into separate controllers: `login.controller.ts`, `register.controller.ts`, etc.
 
 ### Observability — Suggestion
 
-**File:** `src/services/auth.service.ts:112`
-**Issue:** Authentication failures are logged with `console.error` instead of structured logging, making it hard to aggregate and alert on security events.
-**Fix:** Use structured logger:
+**Location:** `src/services/auth.service.ts:112`
+**Issue:** Authentication failures are logged with `console.error` instead of the structured logger.
+**Evidence:** A burst of failed logins writes free-text lines → the log pipeline cannot count or alert on them by `reason`. Login behavior itself is correct.
+**Confidence:** High
+**Fix:** Use the structured logger:
 ```typescript
 logger.warn('Authentication failed', {
   email: emailMasked,
@@ -105,15 +121,27 @@ logger.warn('Authentication failed', {
 
 ---
 
+## Needs human verification
+
+### Concurrency — Warning
+
+**Location:** `src/services/auth.service.ts:131-133`
+**Issue:** Failed attempts are counted with a read-modify-write (`user.failedAttempts + 1`) instead of an atomic increment.
+**Evidence:** Six wrong-password requests for the same account arrive at the same time while `failedAttempts = 0`; all six read 0 before any update runs, and all six write 1 → after six failures the stored count is 1, so the lockout, which engages when the stored count reaches 5, does not engage. This assumes the lockout is decided only by the stored `failedAttempts` count. Check whether the deployment serializes requests per user (for example a per-user lock in the gateway); the diff does not show it.
+**Confidence:** Medium
+**Fix:** Use an atomic update: `db.users.update({ where: { id }, data: { failedAttempts: { increment: 1 } } })`.
+
+---
+
 ## Summary
 
 | Category | Critical | Warning | Suggestion | N/A |
 |-----------------------|----------|---------|------------|-----|
 | Security | 1 | 1 | 0 | |
 | Performance | 0 | 0 | 1 | |
-| Tests/Coverage | 0 | 1 | 0 | |
+| Tests/Coverage | 0 | 0 | 1 | |
 | Architecture | 0 | 0 | 1 | |
-| Code & File Size | 0 | 1 | 0 | |
+| Code & File Size | 0 | 0 | 1 | |
 | Potential Bugs | 1 | 0 | 0 | |
 | Accessibility | 0 | 0 | 0 | ✓ |
 | Observability | 0 | 0 | 1 | |
@@ -124,40 +152,50 @@ logger.warn('Authentication failed', {
 | i18n | 0 | 0 | 0 | ✓ |
 | Privacy/Compliance | 0 | 0 | 0 | ✓ |
 | Architecture Patterns | 0 | 0 | 0 | |
-| Stack-Specific | 0 | 1 | 1 | |
-| **Total** | **2** | **4** | **4** | |
+| Stack-Specific | 0 | 0 | 0 | |
+| **Total** | **2** | **1** | **5** | |
+
+The Medium-confidence finding under Needs human verification is not counted in the table.
 
 ---
 
 ## Action Items
 
 ### Must Fix Before Merge
-1. ✅ Add JWT_SECRET environment variable validation (Critical - Security)
-2. ✅ Fix race condition in token refresh (Critical - Potential Bugs)
+1. ✅ Remove the hard-coded JWT secret fallback (Critical - Security)
+2. ✅ Rotate refresh tokens in one transaction (Critical - Potential Bugs)
 
 ### Should Fix Soon After
-3. ⏳ Fix user enumeration vulnerability (Warning - Security)
-4. ⏳ Add token structure verification in tests (Warning - Tests)
-5. ⏳ Split auth controller into smaller files (Warning - Code & File Size)
+3. ⏳ Use one error message for unknown email and wrong password (Warning - Security)
 
 ### Optional Improvements
-6. 💡 Optimize database query to select only needed fields
-7. 💡 Refactor middleware into smaller functions
+4. 💡 Select only the needed fields when loading the user
+5. 💡 Assert the real token claims and expiry in tests
+6. 💡 Split the auth middleware into smaller functions
+7. 💡 Split the auth controller into smaller files
 8. 💡 Replace console.error with structured logging
+
+### Ask a Human
+9. 🔍 Check whether failed-login counting can run in parallel for one account
 
 ---
 
-## Stack-Specific Notes
+## Compact Mode
 
-### Node.js/Express
-- Consider using `helmet` middleware for security headers
-- Add rate limiting on auth endpoints using `express-rate-limit`
-- Use `joi` or `zod` for input validation instead of manual checks
+The same review when the user asks for `/code-review compact`:
 
-### JWT Best Practices
-- Consider using RS256 (asymmetric) instead of HS256 for multi-service architectures
-- Set reasonable token expiration (15 min for access, 7 days for refresh)
-- Implement token blacklisting for logout functionality
+- src/services/auth.service.ts:45-46: Critical: the JWT secret falls back to 'dev-secret', so anyone can forge tokens → fail at startup when JWT_SECRET is unset
+- src/services/auth.service.ts:89-97: Critical: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction
+- src/controllers/auth.controller.ts:23-27: Warning: different login errors reveal which emails are registered → return one message for both cases
+- src/services/auth.service.ts:67-69: Suggestion: token generation loads every user column, including the password hash → select only id and email
+- tests/auth.test.ts:34-41: Suggestion: the test mocks jwt.sign and never checks claims or expiry → verify the real token
+- src/middleware/auth.middleware.ts:18-74: Suggestion: the 57-line middleware mixes extraction, verification and lookup → extract helpers
+- src/controllers/auth.controller.ts:1-487: Suggestion: one 487-line controller handles six flows → split it into one controller per flow
+- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error → use the structured logger
+
+## Needs human verification
+
+- src/services/auth.service.ts:131-133: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment
 
 ---
 
