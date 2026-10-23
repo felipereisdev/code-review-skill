@@ -219,6 +219,53 @@ check_skill_output_rules() {
   fi
 }
 
+check_skill_verification() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Step 2 — Verify Findings"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+start = first(heading)
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    section = "\n".join(lines[start:end])
+    last_check, report = first("## 13. "), first("## 14. What Was Done Well")
+    if last_check is None or report is None or not last_check < start < report:
+        errors.append(f"'{heading}' must come after '## 13.' and before '## 14. What Was Done Well'")
+    for s in ("refute", "**CONFIRMED**", "**DOWNGRADED**", "**REFUTED**", "Suggestions skip this step",
+              "**Confidence:** Medium", "name it in the Evidence", "**With subagents**", "**Without subagents**"):
+        if s not in section:
+            errors.append(f"Step 2 — Verify Findings is missing: {s}")
+    for s in ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot"):
+        if s in section:
+            errors.append(f"Step 2 — Verify Findings names an agent-specific tool: {s}")
+output_start = first("## 15. Output Format")
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+for s in ("**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.",
+          "Do not list refuted findings unless the user asks for them.",
+          "but end with the verification line"):
+    if s not in output:
+        errors.append(f"Output Format is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Step 2 verifies Critical/Warning findings before the report"
+  else
+    fail "SKILL.md verification step (see messages above)"
+  fi
+}
+
 check_example_findings() {
   if python3 - <<'PY'
 import re, sys
@@ -264,12 +311,32 @@ if severities(f for f in compact if not f["needs_verification"]) != severities(m
     errors.append("compact-mode lines must have the same severities as ## Findings")
 if severities(f for f in compact if f["needs_verification"]) != severities(verify):
     errors.append("compact-mode Needs human verification lines must match the full report")
+verify_lines = list(re.finditer(
+    r"^\*\*Verification:\*\* (\d+) Critical/Warning candidates checked, (\d+) refuted\.$", text, re.M))
+if len(verify_lines) != 2:
+    errors.append("example-output.md must have 2 **Verification:** lines (full report and compact mode), "
+                  f"found {len(verify_lines)}")
+else:
+    full_line, compact_line = verify_lines
+    checked, refuted = int(full_line.group(1)), int(full_line.group(2))
+    if full_line.groups() != compact_line.groups():
+        errors.append("the full-report and compact-mode **Verification:** lines must match")
+    if total is not None and full_line.start() < total.start():
+        errors.append("the full-report **Verification:** line must come after the Summary table")
+    if refuted < 1:
+        errors.append("the example **Verification:** line must show at least 1 refuted candidate")
+    kept = sum(f["severity"] in ("Critical", "Warning") for f in full)
+    if checked - refuted < kept:
+        errors.append(f"**Verification:** leaves {checked - refuted} unrefuted candidates but the full report "
+                      f"has {kept} Critical/Warning findings")
+if not any("Verification checked" in f["text"] for f in full):
+    errors.append("no example finding's Evidence names what verification checked ('Verification checked ...')")
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "example-output.md findings carry Location, Evidence and Confidence and match the Summary"
+    pass "example-output.md findings carry Location, Evidence and Confidence and match the Summary and the Verification line"
   else
     fail "example-output.md findings (see messages above)"
   fi
@@ -280,6 +347,7 @@ check_license
 check_frontmatter
 check_skill_references
 check_skill_output_rules
+check_skill_verification
 check_readme_counts
 check_example_output
 check_example_findings

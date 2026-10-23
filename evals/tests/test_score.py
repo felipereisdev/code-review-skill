@@ -266,6 +266,26 @@ class ScoreCleanTest(unittest.TestCase):
         self.assertEqual(score_clean("Code review passed — no issues found."), {"false_positives": 0})
 
 
+VERIFICATION_LINE = "**Verification:** 3 Critical/Warning candidates checked, 1 refuted.\n"
+
+
+class VerificationLineTest(unittest.TestCase):
+    def test_verification_line_after_summary_is_not_a_finding(self):
+        self.assertEqual(parse_findings(SKILL_FORMAT + "\n" + VERIFICATION_LINE), parse_findings(SKILL_FORMAT))
+
+    def test_compact_report_ending_with_verification_line(self):
+        report = ("- src/a.ts:3: Warning: x is unset → guard it\n\n## Needs human verification\n\n"
+                  "- src/b.ts:9: Warning: y may race → lock it\n\n" + VERIFICATION_LINE)
+        findings = parse_findings(report)
+        self.assertEqual([(f["compact"], f["needs_verification"]) for f in findings], [(True, False), (True, True)])
+
+    def test_passed_report_with_verification_line_is_clean(self):
+        report = "**Code review passed — no issues found.**\n\n" + VERIFICATION_LINE
+        self.assertEqual(parse_findings(report), [])
+        self.assertTrue(looks_like_report(report))
+        self.assertEqual(score_clean(report), {"false_positives": 0})
+
+
 class ReportShapeTest(unittest.TestCase):
     def test_finding_or_passed_confirmation_is_a_report(self):
         self.assertTrue(looks_like_report(SKILL_FORMAT))

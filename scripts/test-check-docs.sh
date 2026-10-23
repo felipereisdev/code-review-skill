@@ -95,6 +95,78 @@ make_copy "$work/slowpath"
 drop_lines "$work/slowpath/SKILL.md" 'do work or queries that grow with data size'
 expect_fail "removing the hot-path performance severity rule fails" "$work/slowpath" "SKILL.md is missing: do work or queries that grow with data size"
 
+# move_section_to_end <file> <heading>: moves the section that starts at the line <heading> to the end of <file>.
+move_section_to_end() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+path, heading = sys.argv[1:]
+lines = open(path, encoding="utf-8").read().splitlines()
+start = lines.index(heading)
+end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("## "))
+open(path, "w", encoding="utf-8").write("\n".join(lines[:start] + lines[end:] + [""] + lines[start:end]) + "\n")
+PY
+}
+
+make_copy "$work/noverify"
+drop_lines "$work/noverify/SKILL.md" '## Step 2 — Verify Findings'
+expect_fail "removing the verification step fails" "$work/noverify" "SKILL.md has no '## Step 2 — Verify Findings' section"
+
+make_copy "$work/lateverify"
+move_section_to_end "$work/lateverify/SKILL.md" '## Step 2 — Verify Findings'
+expect_fail "verifying after the report sections fails" "$work/lateverify" "'## Step 2 — Verify Findings' must come after '## 13.' and before '## 14. What Was Done Well'"
+
+make_copy "$work/norefuted"
+drop_lines "$work/norefuted/SKILL.md" '**REFUTED**'
+expect_fail "removing the REFUTED result fails" "$work/norefuted" "Step 2 — Verify Findings is missing: **REFUTED**"
+
+make_copy "$work/verifysuggestions"
+drop_lines "$work/verifysuggestions/SKILL.md" 'Suggestions skip this step'
+expect_fail "dropping the Suggestion exemption fails" "$work/verifysuggestions" "Step 2 — Verify Findings is missing: Suggestions skip this step"
+
+make_copy "$work/toolname"
+replace_first "$work/toolname/SKILL.md" '**With subagents** (' '**With subagents** (use the Task tool; '
+expect_fail "naming an agent-specific tool in the verification step fails" "$work/toolname" "Step 2 — Verify Findings names an agent-specific tool: Task tool"
+
+make_copy "$work/nocount"
+drop_lines "$work/nocount/SKILL.md" '**Verification:** <checked>'
+expect_fail "removing the refuted-count line from Output Format fails" "$work/nocount" "Output Format is missing: **Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted."
+
+make_copy "$work/noverifyline"
+drop_lines "$work/noverifyline/example-output.md" '**Verification:**'
+expect_fail "an example without the verification line fails" "$work/noverifyline" "must have 2 **Verification:** lines (full report and compact mode), found 0"
+
+make_copy "$work/verifymismatch"
+replace_first "$work/verifymismatch/example-output.md" '5 Critical/Warning candidates checked, 1 refuted.' '6 Critical/Warning candidates checked, 1 refuted.'
+expect_fail "full and compact verification lines that disagree fail" "$work/verifymismatch" "the full-report and compact-mode **Verification:** lines must match"
+
+make_copy "$work/verifybeforetotal"
+python3 - "$work/verifybeforetotal/example-output.md" <<'PY'
+import sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8").read().splitlines()
+line = "**Verification:** 5 Critical/Warning candidates checked, 1 refuted."
+lines.pop(lines.index(line))
+lines.insert(next(i for i, text in enumerate(lines) if text.startswith("| **Total**")), line)
+open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+PY
+expect_fail "a verification line before the Summary table fails" "$work/verifybeforetotal" "the full-report **Verification:** line must come after the Summary table"
+
+make_copy "$work/fewsurvivors"
+replace_first "$work/fewsurvivors/example-output.md" '5 Critical/Warning candidates checked, 1 refuted.' '4 Critical/Warning candidates checked, 1 refuted.'
+replace_first "$work/fewsurvivors/example-output.md" '5 Critical/Warning candidates checked, 1 refuted.' '4 Critical/Warning candidates checked, 1 refuted.'
+expect_fail "fewer unrefuted candidates than reported findings fails" "$work/fewsurvivors" "leaves 3 unrefuted candidates but the full report has 4 Critical/Warning findings"
+
+make_copy "$work/norefutedexample"
+replace_first "$work/norefutedexample/example-output.md" '5 Critical/Warning candidates checked, 1 refuted.' '4 Critical/Warning candidates checked, 0 refuted.'
+replace_first "$work/norefutedexample/example-output.md" '5 Critical/Warning candidates checked, 1 refuted.' '4 Critical/Warning candidates checked, 0 refuted.'
+expect_fail "an example with no refuted candidate fails" "$work/norefutedexample" "must show at least 1 refuted candidate"
+
+make_copy "$work/noverifyevidence"
+replace_first "$work/noverifyevidence/example-output.md" 'Verification checked' 'It checked'
+replace_first "$work/noverifyevidence/example-output.md" 'Verification checked' 'It checked'
+expect_fail "an example whose Evidence never cites verification fails" "$work/noverifyevidence" "no example finding's Evidence names what verification checked"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

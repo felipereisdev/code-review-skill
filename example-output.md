@@ -38,7 +38,7 @@ if (!process.env.JWT_SECRET) {
 
 **Location:** `src/services/auth.service.ts:89-97`
 **Issue:** Token refresh reads the stored refresh token, then deletes it and creates a new one in separate queries.
-**Evidence:** Two concurrent `POST /auth/refresh` requests with the same refresh token both pass the `findUnique` check before either delete runs → both receive a new valid refresh token, so a stolen token can be replayed without ending the session.
+**Evidence:** Two concurrent `POST /auth/refresh` requests with the same refresh token both pass the `findUnique` check before either delete runs → both receive a new valid refresh token, so a stolen token can be replayed without ending the session. Verification checked `POST /auth/refresh`, the only caller of the rotation code, and found no lock or transaction around the read and the delete.
 **Confidence:** High
 **Fix:** Rotate the token in one transaction, so the second request fails on the delete:
 ```typescript
@@ -127,7 +127,7 @@ logger.warn('Authentication failed', {
 
 **Location:** `src/services/auth.service.ts:131-133`
 **Issue:** Failed attempts are counted with a read-modify-write (`user.failedAttempts + 1`) instead of an atomic increment.
-**Evidence:** Six wrong-password requests for the same account arrive at the same time while `failedAttempts = 0`; all six read 0 before any update runs, and all six write 1 → after six failures the stored count is 1, so the lockout, which engages when the stored count reaches 5, does not engage. This assumes the lockout is decided only by the stored `failedAttempts` count. Check whether the deployment serializes requests per user (for example a per-user lock in the gateway); the diff does not show it.
+**Evidence:** Six wrong-password requests for the same account arrive at the same time while `failedAttempts = 0`; all six read 0 before any update runs, and all six write 1 → after six failures the stored count is 1, so the lockout, which engages when the stored count reaches 5, does not engage. This assumes the lockout is decided only by the stored `failedAttempts` count. Verification checked the login route and `src/middleware/` and found no per-user lock, but the gateway configuration is not in the repository. Check whether the gateway serializes requests per user.
 **Confidence:** Medium
 **Fix:** Use an atomic update: `db.users.update({ where: { id }, data: { failedAttempts: { increment: 1 } } })`.
 
@@ -155,7 +155,9 @@ logger.warn('Authentication failed', {
 | Stack-Specific | 0 | 0 | 0 | |
 | **Total** | **2** | **1** | **5** | |
 
-The Medium-confidence finding under Needs human verification is not counted in the table.
+**Verification:** 5 Critical/Warning candidates checked, 1 refuted.
+
+The Medium-confidence finding under Needs human verification is not counted in the table. The refuted candidate is not listed.
 
 ---
 
@@ -196,6 +198,8 @@ The same review when the user asks for `/code-review compact`:
 ## Needs human verification
 
 - src/services/auth.service.ts:131-133: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment
+
+**Verification:** 5 Critical/Warning candidates checked, 1 refuted.
 
 ---
 

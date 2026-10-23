@@ -340,6 +340,35 @@ Actively trace the modified code looking for latent bugs — do not just check s
 
 ---
 
+## Step 2 — Verify Findings
+
+Run this step after the checklist pass (sections 1 to 13) and before you write the report. Try to refute every candidate **Critical** and **Warning** finding by reading the real code, not only the diff. Suggestions skip this step: report them as found, under the same evidence and confidence rules.
+
+For each candidate, look for anything that makes its Evidence scenario impossible:
+
+- **Upstream guards and validation**: a check, early return, validation rule, middleware or schema that stops the triggering input before it reaches the changed lines.
+- **Callers**: the call sites of the changed code. Does any of them pass the triggering input, state or call sequence?
+- **Types**: type declarations, nullability or database constraints that rule the scenario out.
+- **Existing tests**: a test that runs the scenario and passes with the change.
+- **Framework and configuration**: framework defaults, configuration or environment settings that already prevent it (for example automatic output escaping or a global exception handler).
+
+Give each candidate exactly one result:
+
+- **CONFIRMED**: the refutation attempt failed and the scenario follows from the code you read. Keep the finding.
+- **DOWNGRADED**: the scenario still happens, but it is less severe or less certain than claimed. Lower the severity to the highest level whose definition it still meets. If the code you read neither confirms nor refutes the scenario, because it depends on a caller, configuration, data or runtime behavior you cannot see, set **Confidence:** Medium and move the finding to `## Needs human verification`.
+- **REFUTED**: the code you read shows that the scenario cannot happen. Remove the finding from the report.
+
+When a check you made here is what confirms or limits a finding, name it in the Evidence, for example: "Verification checked both callers of `findUser` and the request schema; none validates `id`."
+
+How to run this step:
+
+- **With subagents** (if your agent can start subagents): start one verifier per candidate finding, or one per small batch of findings. Give each verifier only the finding block and the paths of the files involved, not your own reasoning. Instruct it to try to refute the finding with the checks above and to answer CONFIRMED, DOWNGRADED or REFUTED with the reason.
+- **Without subagents**: run the same checks yourself, one candidate at a time, before you write the report.
+
+Count the candidates you checked and the ones you refuted; the report states both (see Output Format).
+
+---
+
 ## 14. What Was Done Well
 
 Before listing issues, acknowledge what was done well in this change. Point out strong design decisions, good test coverage, clean abstractions, or anything that should be recognized and repeated.
@@ -348,7 +377,7 @@ Before listing issues, acknowledge what was done well in this change. Point out 
 
 ## 15. Output Format
 
-Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Summary`.
+Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Summary`, then the verification line.
 
 Use this block for each finding:
 
@@ -392,7 +421,15 @@ At the end, provide a summary table covering all evaluated categories (use N/A f
 | **Total**             | **0**    | **0**   | **0**      |     |
 ```
 
-If there are no High-confidence findings, state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification`.
+Right after the Summary table, write one verification line with the counts from Step 2:
+
+```
+**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.
+```
+
+Write the line even when both counts are 0. Do not list refuted findings unless the user asks for them.
+
+If there are no High-confidence findings, state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification`, and end with the verification line.
 
 ### Compact mode
 
@@ -406,4 +443,4 @@ In compact mode, write each finding as one list item:
 
 - `line` is the finding's Location: one line or a `start-end` range inside the diff, with the same deletion-only exception (cite the removed old-side lines, including a whole deleted file). `Severity` is Critical, Warning or Suggestion.
 - The severity, evidence and confidence rules still apply: High-confidence lines first, Medium-confidence lines under a `## Needs human verification` heading after them, Low-confidence findings never.
-- Skip What Was Done Well and the Summary table. If there are no High-confidence findings, write only **"Code review passed — no issues found."** and any `## Needs human verification` lines.
+- Skip What Was Done Well and the Summary table, but end with the verification line. If there are no High-confidence findings, write only **"Code review passed — no issues found."**, any `## Needs human verification` lines and the verification line.
