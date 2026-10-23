@@ -486,12 +486,33 @@ else:
                       f"has {kept} Critical/Warning findings")
 if not any("Verification checked" in f["text"] for f in full):
     errors.append("no example finding's Evidence names what verification checked ('Verification checked ...')")
+RULE_FILE = re.compile(r"(^|/)(CLAUDE\.md|AGENTS\.md|\.cursorrules|\.github/copilot-instructions\.md"
+                       r"|\.cursor/rules/.+\.mdc?|\.github/instructions/[^/]+\.instructions\.md)$")
+rules = []
+for f in full:
+    for m in re.finditer(r"^\*\*Rule:\*\* (.*)$", f["text"], re.M):
+        cite = re.fullmatch(r"`([^`\s]+):L(\d+)(?:-L(\d+))?`", m.group(1))
+        if cite is None:
+            errors.append(f"finding '{f['heading']}' has a **Rule:** line that is not `path:Lstart-Lend`")
+            continue
+        path, start = cite.group(1), int(cite.group(2))
+        end = int(cite.group(3) or start)
+        if not RULE_FILE.search(path):
+            errors.append(f"finding '{f['heading']}' cites {path}, which is not a repository rules file")
+        if end < start:
+            errors.append(f"finding '{f['heading']}' cites rule lines L{start}-L{end} out of order")
+        rules.append(m.group(1).strip("`"))
+if not rules:
+    errors.append("example-output.md has no finding with a **Rule:** citation")
+for cite in rules:
+    if not any(c["text"].endswith(f"(Rule: {cite})") for c in compact):
+        errors.append(f"no compact-mode line ends with (Rule: {cite})")
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "example-output.md findings carry Location, Evidence and Confidence and match the Summary and the Verification line"
+    pass "example-output.md findings carry Location, Evidence, Confidence and a cited Rule and match the Summary and the Verification line"
   else
     fail "example-output.md findings (see messages above)"
   fi

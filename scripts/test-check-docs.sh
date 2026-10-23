@@ -301,6 +301,26 @@ make_copy "$work/nocompactrule"
 drop_lines "$work/nocompactrule/SKILL.md" '(Rule: path/to/rules-file:Lstart-Lend)'
 expect_fail "removing the compact rule citation fails" "$work/nocompactrule" "Output Format is missing: (Rule: path/to/rules-file:Lstart-Lend)"
 
+make_copy "$work/norulefinding"
+drop_lines "$work/norulefinding/example-output.md" '**Rule:**'
+expect_fail "an example without a rule finding fails" "$work/norulefinding" "example-output.md has no finding with a **Rule:** citation"
+
+make_copy "$work/notrulefile"
+replace_first "$work/notrulefile/example-output.md" '**Rule:** `src/services/AGENTS.md:L4-L5`' '**Rule:** `src/services/logging.md:L4-L5`'
+expect_fail "citing a file that is not a rules file fails" "$work/notrulefile" "cites src/services/logging.md, which is not a repository rules file"
+
+make_copy "$work/rulenoL"
+replace_first "$work/rulenoL/example-output.md" '**Rule:** `src/services/AGENTS.md:L4-L5`' '**Rule:** `src/services/AGENTS.md:4-5`'
+expect_fail "a rule citation without L line numbers fails" "$work/rulenoL" "has a **Rule:** line that is not \`path:Lstart-Lend\`"
+
+make_copy "$work/rulereversed"
+replace_first "$work/rulereversed/example-output.md" '**Rule:** `src/services/AGENTS.md:L4-L5`' '**Rule:** `src/services/AGENTS.md:L5-L4`'
+expect_fail "a reversed rule line range fails" "$work/rulereversed" "cites rule lines L5-L4 out of order"
+
+make_copy "$work/nocompactcite"
+replace_first "$work/nocompactcite/example-output.md" ' (Rule: src/services/AGENTS.md:L4-L5)' ''
+expect_fail "a compact line without the rule citation fails" "$work/nocompactcite" "no compact-mode line ends with (Rule: src/services/AGENTS.md:L4-L5)"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
