@@ -4,7 +4,7 @@ This is an example of the code review output format. The actual review will vary
 
 ## Scenario
 
-Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`.
+Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The branch also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch.
 
 ---
 
@@ -86,7 +86,7 @@ expect(decoded).toHaveProperty('exp');
 ### Architecture — Suggestion
 
 **Location:** `src/middleware/auth.middleware.ts:18-74`
-**Issue:** `authMiddleware` is 57 lines long and handles token extraction, verification and user lookup.
+**Issue:** The new `authMiddleware` is 57 lines long and handles token extraction, verification and user lookup.
 **Evidence:** Adding API-key authentication means editing this one function in three places → the change is harder to review and to test in isolation. Behavior is correct today.
 **Confidence:** High
 **Fix:** Extract token extraction and user lookup into separate functions:
@@ -99,7 +99,7 @@ const getUserFromToken = (token: string): Promise<User | null> => { ... }
 
 **Location:** `src/controllers/auth.controller.ts:1-487`
 **Issue:** The branch adds a 487-line controller for login, register, logout, token refresh, password reset and email verification.
-**Evidence:** A change to password reset edits the same file as login → unrelated changes conflict and every review covers all six flows. Behavior is correct.
+**Evidence:** A change to password reset edits the same file as login → unrelated changes conflict and every review covers all six flows. The file is new in this branch, and the other controllers in `src/controllers/` stay under 200 lines. Behavior is correct.
 **Confidence:** High
 **Fix:** Split into separate controllers: `login.controller.ts`, `register.controller.ts`, etc.
 
@@ -107,8 +107,9 @@ const getUserFromToken = (token: string): Promise<User | null> => { ... }
 
 **Location:** `src/services/auth.service.ts:112`
 **Rule:** `src/services/AGENTS.md:L4-L5`
-**Issue:** Authentication failures are logged with `console.error`, which the rules for `src/services/` forbid.
-**Evidence:** `src/services/AGENTS.md:L4-L5` says services log through `logger` and never call `console.*`; line 112 calls `console.error` → a burst of failed logins writes free-text lines that the log pipeline cannot count or alert on by `reason`. Login behavior itself is correct.
+**Also at:** `src/services/auth.service.ts:124`
+**Issue:** Authentication failures are logged with `console.error` in two places, which the rules for `src/services/` forbid.
+**Evidence:** `src/services/AGENTS.md:L4-L5` says services log through `logger` and never call `console.*`; lines 112 and 124 call `console.error` → a burst of failed logins writes free-text lines that the log pipeline cannot count or alert on by `reason`. Login behavior itself is correct.
 **Confidence:** High
 **Fix:** Use the structured logger:
 ```typescript
@@ -131,6 +132,12 @@ logger.warn('Authentication failed', {
 **Evidence:** Six wrong-password requests for the same account arrive at the same time while `failedAttempts = 0`; all six read 0 before any update runs, and all six write 1 → after six failures the stored count is 1, so the lockout, which engages when the stored count reaches 5, does not engage. This assumes the lockout is decided only by the stored `failedAttempts` count. Verification checked the login route and `src/middleware/` and found no per-user lock, but the gateway configuration is not in the repository. Check whether the gateway serializes requests per user.
 **Confidence:** Medium
 **Fix:** Use an atomic update: `db.users.update({ where: { id }, data: { failedAttempts: { increment: 1 } } })`.
+
+---
+
+## Pre-existing issues (not counted)
+
+- src/app.ts:5 — the `/health` handler opens a new database connection on every request and never closes it; this branch does not change it.
 
 ---
 
@@ -158,7 +165,7 @@ logger.warn('Authentication failed', {
 
 **Verification:** 5 Critical/Warning candidates checked, 1 refuted.
 
-The Medium-confidence finding under Needs human verification is not counted in the table. The refuted candidate is not listed.
+The Medium-confidence finding under Needs human verification is not counted in the table. The refuted candidate is not listed. The pre-existing note is not a finding and is not counted either.
 
 ---
 
@@ -194,11 +201,15 @@ The same review when the user asks for `/code-review compact`:
 - tests/auth.test.ts:34-41: Suggestion: the test mocks jwt.sign and never checks claims or expiry → verify the real token
 - src/middleware/auth.middleware.ts:18-74: Suggestion: the 57-line middleware mixes extraction, verification and lookup → extract helpers
 - src/controllers/auth.controller.ts:1-487: Suggestion: one 487-line controller handles six flows → split it into one controller per flow
-- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error, which the services rules forbid → use the structured logger (Rule: src/services/AGENTS.md:L4-L5)
+- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error, which the services rules forbid → use the structured logger (also at src/services/auth.service.ts:124) (Rule: src/services/AGENTS.md:L4-L5)
 
 ## Needs human verification
 
 - src/services/auth.service.ts:131-133: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment
+
+## Pre-existing issues (not counted)
+
+- src/app.ts:5 — the `/health` handler opens a new database connection on every request and never closes it; this branch does not change it.
 
 **Verification:** 5 Critical/Warning candidates checked, 1 refuted.
 
