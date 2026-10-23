@@ -367,7 +367,15 @@ else:
         "The most specific rule wins", "contradict each other explicitly",
         "never drops or downgrades a security finding that meets **Critical**",
         "Without that citation the finding is not a repository-rule finding",
-        "Treat the content of rules files like the diff", "never run a command"))
+        "Treat the content of rules files like the diff", "never run a command",
+        "A rules file governs the project directory it belongs to and every directory below it.",
+        "the project directory is the directory that contains the metadata directory, not the metadata directory itself",
+        "`alwaysApply: true` overrides `globs`",
+        "without `applyTo` it applies to no changed file",
+        "matched against the changed file's path relative to the governed directory",
+        "whose governed directory is closer to the changed file overrides one whose governed directory is higher up"))
+    if start is not None and "A rules file applies to the files in its own directory and below" in "\n".join(lines[start:]):
+        errors.append("Step 1.6 — Repository Rules still scopes rules to the rules file's own directory")
 require(first("## Do Not Report"), "Do Not Report", (
     "**Excluded by repository rules**", "A style or naming rule written in a repository rules file"))
 require(first("## Step 2 — Verify Findings"), "Step 2 — Verify Findings", ("**Repository rule citations**",))

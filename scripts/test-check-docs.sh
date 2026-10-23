@@ -321,6 +321,30 @@ make_copy "$work/nocompactcite"
 replace_first "$work/nocompactcite/example-output.md" ' (Rule: src/services/AGENTS.md:L4-L5)' ''
 expect_fail "a compact line without the rule citation fails" "$work/nocompactcite" "no compact-mode line ends with (Rule: src/services/AGENTS.md:L4-L5)"
 
+make_copy "$work/rulescopedir"
+replace_first "$work/rulescopedir/SKILL.md" 'the project directory is the directory that contains the metadata directory, not the metadata directory itself' 'the metadata directory itself'
+expect_fail "scoping a .github or .cursor rule to its metadata folder fails" "$work/rulescopedir" "Step 1.6 — Repository Rules is missing: the project directory is the directory that contains the metadata directory, not the metadata directory itself"
+
+make_copy "$work/rulesolddir"
+replace_first "$work/rulesolddir/SKILL.md" 'A rules file governs the project directory it belongs to and every directory below it.' 'A rules file applies to the files in its own directory and below.'
+expect_fail "keeping the directory-only rule scope fails" "$work/rulesolddir" "Step 1.6 — Repository Rules still scopes rules to the rules file's own directory"
+
+make_copy "$work/rulealwaysglobs"
+replace_first "$work/rulealwaysglobs/SKILL.md" ' `alwaysApply: true` overrides `globs`' ''
+expect_fail "letting globs override alwaysApply fails" "$work/rulealwaysglobs" "Step 1.6 — Repository Rules is missing: \`alwaysApply: true\` overrides \`globs\`"
+
+make_copy "$work/ruleapplyto"
+replace_first "$work/ruleapplyto/SKILL.md" ' without `applyTo` it applies to no changed file.' ''
+expect_fail "leaving the applyTo-less policy unstated fails" "$work/ruleapplyto" "Step 1.6 — Repository Rules is missing: without \`applyTo\` it applies to no changed file"
+
+make_copy "$work/rulepatternbase"
+replace_first "$work/rulepatternbase/SKILL.md" "matched against the changed file's path relative to the governed directory" "matched against the changed file's path from the repository root"
+expect_fail "matching rule globs from the repository root fails" "$work/rulepatternbase" "Step 1.6 — Repository Rules is missing: matched against the changed file's path relative to the governed directory"
+
+make_copy "$work/ruleprecedence"
+replace_first "$work/ruleprecedence/SKILL.md" 'whose governed directory is closer to the changed file overrides one whose governed directory is higher up' 'from a directory closer to the changed file overrides a rule from a directory above it'
+expect_fail "ranking precedence by storage folder instead of governed directory fails" "$work/ruleprecedence" "Step 1.6 — Repository Rules is missing: whose governed directory is closer to the changed file overrides one whose governed directory is higher up"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
