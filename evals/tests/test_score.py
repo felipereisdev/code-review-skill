@@ -133,6 +133,31 @@ class ParseFindingsTest(unittest.TestCase):
     def test_old_file_format_is_never_flagged(self):
         self.assertEqual([f["needs_verification"] for f in parse_findings(SKILL_FORMAT)], [False, False])
 
+    RULE_REPORT = """\
+## Findings
+
+### Observability — Suggestion
+
+**Location:** `src/services/auth.service.ts:112`
+**Rule:** `src/services/AGENTS.md:L4-L5`
+**Issue:** Authentication failures are logged with `console.error`.
+**Evidence:** `src/services/AGENTS.md:L4-L5` forbids `console.*` in services → failed logins cannot be counted.
+**Confidence:** High
+**Fix:** Use the structured logger.
+
+## Compact
+
+- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error → use the logger (Rule: src/services/AGENTS.md:L4-L5)
+"""
+
+    def test_rule_citation_does_not_change_the_parse(self):
+        findings = parse_findings(self.RULE_REPORT)
+        self.assertEqual([(f["severity"], f["compact"], f["needs_verification"]) for f in findings],
+                         [("Suggestion", False, False), ("Suggestion", True, False)])
+        self.assertIn("**Rule:** `src/services/AGENTS.md:L4-L5`", findings[0]["text"])
+        self.assertTrue(findings[1]["heading"].startswith("src/services/auth.service.ts:112: Suggestion:"))
+        self.assertTrue(findings[1]["text"].endswith("(Rule: src/services/AGENTS.md:L4-L5)"))
+
 
 class CompactFormatTest(unittest.TestCase):
     def test_compact_lines_are_findings(self):

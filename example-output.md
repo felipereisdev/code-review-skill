@@ -4,7 +4,7 @@ This is an example of the code review output format. The actual review will vary
 
 ## Scenario
 
-Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API.
+Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`.
 
 ---
 
@@ -106,8 +106,9 @@ const getUserFromToken = (token: string): Promise<User | null> => { ... }
 ### Observability — Suggestion
 
 **Location:** `src/services/auth.service.ts:112`
-**Issue:** Authentication failures are logged with `console.error` instead of the structured logger.
-**Evidence:** A burst of failed logins writes free-text lines → the log pipeline cannot count or alert on them by `reason`. Login behavior itself is correct.
+**Rule:** `src/services/AGENTS.md:L4-L5`
+**Issue:** Authentication failures are logged with `console.error`, which the rules for `src/services/` forbid.
+**Evidence:** `src/services/AGENTS.md:L4-L5` says services log through `logger` and never call `console.*`; line 112 calls `console.error` → a burst of failed logins writes free-text lines that the log pipeline cannot count or alert on by `reason`. Login behavior itself is correct.
 **Confidence:** High
 **Fix:** Use the structured logger:
 ```typescript
@@ -175,7 +176,7 @@ The Medium-confidence finding under Needs human verification is not counted in t
 5. 💡 Assert the real token claims and expiry in tests
 6. 💡 Split the auth middleware into smaller functions
 7. 💡 Split the auth controller into smaller files
-8. 💡 Replace console.error with structured logging
+8. 💡 Replace console.error with structured logging (rule in src/services/AGENTS.md)
 
 ### Ask a Human
 9. 🔍 Check whether failed-login counting can run in parallel for one account
@@ -193,7 +194,7 @@ The same review when the user asks for `/code-review compact`:
 - tests/auth.test.ts:34-41: Suggestion: the test mocks jwt.sign and never checks claims or expiry → verify the real token
 - src/middleware/auth.middleware.ts:18-74: Suggestion: the 57-line middleware mixes extraction, verification and lookup → extract helpers
 - src/controllers/auth.controller.ts:1-487: Suggestion: one 487-line controller handles six flows → split it into one controller per flow
-- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error → use the structured logger
+- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error, which the services rules forbid → use the structured logger (Rule: src/services/AGENTS.md:L4-L5)
 
 ## Needs human verification
 
