@@ -1,0 +1,32 @@
+diff --git a/src/charge.ts b/src/charge.ts
+index 488e978..e12a135 100644
+--- a/src/charge.ts
++++ b/src/charge.ts
+@@ -9,6 +9,11 @@ export async function chargeInvoice(
+   customerId: string,
+   amountCents: number,
+ ): Promise<ChargeResult> {
+-  const charge = await gateway.charge(customerId, amountCents);
+-  return { ok: true, chargeId: charge.id };
++  try {
++    const charge = await gateway.charge(customerId, amountCents);
++    return { ok: true, chargeId: charge.id };
++  } catch (error) {
++    const message = error instanceof Error ? error.message : String(error);
++    return { ok: false, error: message };
++  }
+ }
+diff --git a/test/charge.test.ts b/test/charge.test.ts
+index 65a6565..f5c5473 100644
+--- a/test/charge.test.ts
++++ b/test/charge.test.ts
+@@ -9,4 +9,9 @@ describe('chargeInvoice', () => {
+   it('returns the charge id on success', async () => {
+     await expect(chargeInvoice(okGateway, 'cus_1', 500)).resolves.toEqual({ ok: true, chargeId: 'ch_123' });
+   });
++
++  it('returns the gateway error when the charge fails', async () => {
++    const failing: PaymentGateway = { charge: async () => { throw new Error('card declined'); } };
++    await expect(chargeInvoice(failing, 'cus_1', 500)).resolves.toEqual({ ok: false, error: 'card declined' });
++  });
+ });

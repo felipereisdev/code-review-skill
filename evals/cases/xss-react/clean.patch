@@ -1,0 +1,27 @@
+diff --git a/src/components/CommentList.test.tsx b/src/components/CommentList.test.tsx
+index ecd3dd2..b8b0b7a 100644
+--- a/src/components/CommentList.test.tsx
++++ b/src/components/CommentList.test.tsx
+@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
+ import { CommentList } from './CommentList';
+ 
+ describe('CommentList', () => {
+-  it('shows each author', () => {
++  it('shows each author and comment body', () => {
+     render(<CommentList comments={[{ id: 1, author: 'Ada', body: 'Hello' }]} />);
+     expect(screen.getByText('Ada')).toBeTruthy();
++    expect(screen.getByText('Hello')).toBeTruthy();
+   });
+ });
+diff --git a/src/components/CommentList.tsx b/src/components/CommentList.tsx
+index 1208df5..2053d95 100644
+--- a/src/components/CommentList.tsx
++++ b/src/components/CommentList.tsx
+@@ -6,6 +6,7 @@ export function CommentList({ comments }: { comments: Comment[] }) {
+       {comments.map((comment) => (
+         <li key={comment.id}>
+           <strong>{comment.author}</strong>
++          <p style={{ whiteSpace: 'pre-line' }}>{comment.body}</p>
+         </li>
+       ))}
+     </ul>

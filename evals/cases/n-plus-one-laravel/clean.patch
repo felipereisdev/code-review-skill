@@ -1,0 +1,26 @@
+diff --git a/app/Http/Controllers/OrderController.php b/app/Http/Controllers/OrderController.php
+index 3c9f47e..075f0fc 100644
+--- a/app/Http/Controllers/OrderController.php
++++ b/app/Http/Controllers/OrderController.php
+@@ -10,6 +10,8 @@ class OrderController extends Controller
+     public function index(): View
+     {
+         $orders = Order::query()
++            ->with('customer')
++            ->withCount('items')
+             ->latest()
+             ->paginate(25);
+ 
+diff --git a/resources/views/orders/index.blade.php b/resources/views/orders/index.blade.php
+index 537345a..a85396c 100644
+--- a/resources/views/orders/index.blade.php
++++ b/resources/views/orders/index.blade.php
+@@ -2,6 +2,8 @@
+     @foreach ($orders as $order)
+         <tr>
+             <td>{{ $order->number }}</td>
++            <td>{{ $order->customer?->name }}</td>
++            <td>{{ $order->items_count }}</td>
+             <td>{{ $order->created_at->toDateString() }}</td>
+         </tr>
+     @endforeach

@@ -1,0 +1,12 @@
+{
+  "topic": "swallowed-error",
+  "stack": "typescript",
+  "description": "Wraps the gateway charge in try/catch; the bug swallows the error and reports success, the clean diff returns the error to the caller.",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": [
+      "swallow|silent|ignor|success|ok: true|mask|hid(e|es|ing)|lost",
+      "catch|charge\\.ts|chargeInvoice"
+    ]
+  }
+}
