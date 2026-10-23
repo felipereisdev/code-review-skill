@@ -68,3 +68,8 @@
 - Dataset not used for validation rule tests — copy-paste test blocks drift out of sync
 - `RefreshDatabase` on every test in a large suite — unnecessarily slow
 - `expect(true)->toBeTrue()` as placeholder assertion — test always passes, covers nothing
+
+## Precedents
+
+- **`RefreshDatabase` rolls back each test's transactional writes**: tests that use `RefreshDatabase` (in the test file or through `tests/Pest.php`) run inside a transaction on each connection in `$connectionsToTransact` (the default connection when it is not set), and that transaction is rolled back afterward, so writes to transactional tables made inside it do not reach the next test. Do not report data from one test leaking into the next when those writes stay inside that transaction. **Exception:** database connections not listed in `$connectionsToTransact`, test files outside the directories that `tests/Pest.php` binds to `RefreshDatabase`, tables on a non-transactional storage engine such as MySQL `MyISAM`, whose writes a rollback does not undo, MySQL statements that commit implicitly, such as `ALTER TABLE` or `TRUNCATE`, and writes made through another connection or another process (a queue worker, a spawned command, or an HTTP request to a running server), which the test's transaction does not contain.
+- **Laravel fakes reset between tests**: Laravel's base `TestCase` boots a fresh application for every test, so `Queue::fake()`, `Mail::fake()`, `Event::fake()` and `Http::fake()` do not carry over. Do not report a missing cleanup of these fakes. **Exception:** static properties and other global state outside the service container, and Pest tests that do not extend Laravel's `TestCase`.

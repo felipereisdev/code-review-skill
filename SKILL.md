@@ -83,6 +83,28 @@ If you cannot write the Evidence scenario, the finding is Low: drop it.
 
 ---
 
+## Do Not Report
+
+Drop any candidate finding, of any severity, that matches an item below. Each item says why.
+
+- **Pre-existing problems**: the problem is in code the change does not add or modify, and the change does not trigger it. Why: the review judges this change; older problems belong in their own ticket. When a changed line triggers a problem in old code, report it and cite the changed line (see Evidence and Confidence).
+- **What tooling already catches**: a linter, formatter or type checker configured in the repository (for example ESLint, Prettier, PHPStan, mypy or `tsc`) reports or fixes the problem. Why: that tool already enforces it, and repeating it buries the findings only a reviewer can make.
+- **Silenced rules**: the code or the tool's configuration explicitly silences the rule (for example `eslint-disable`, `# noqa` or `@phpstan-ignore`), and the change gives no new reason the silence is now wrong, such as user input now reaching the silenced line. Why: someone already made that decision on purpose.
+- **Style and naming nits**: formatting, ordering or naming preferences that change neither behavior nor how easily the code is understood, such as a clear name you would have chosen differently. Why: they are taste, not defects. A misleading name, one that says something different from what the code does, is not a nit.
+- **Theoretical denial of service**: resource exhaustion, slow regular expressions or large inputs with no realistic path from an attacker or from production data to the changed code. Why: without that path there is no Evidence scenario. When you can name the input and the path, it is a normal finding under Severity Levels.
+- **"Verify" or "ensure" without a scenario**: advice to verify, ensure, confirm or check something when you cannot write its trigger → effect. Why: without a scenario the finding is Low confidence, and Low-confidence findings are never reported; the **Warning** cap for verify-only advice applies only when a scenario exists.
+- **Generic hardening**: defense-in-depth advice (an extra header, a stricter flag, a tighter limit) when you cannot name the attack the change makes possible. Why: it is a wish for the codebase, not a defect in this change.
+
+Apply this list to every candidate before you write the report:
+
+- A **Critical** or **Warning** candidate that matches an item is **REFUTED** in Step 2 and counts as refuted on the verification line.
+- A **Suggestion** that matches is dropped without being counted.
+- Do not move a matching finding to `## Needs human verification`; drop it.
+
+Each loaded stack file's `## Precedents` section works the same way (see Step 1).
+
+---
+
 ## Step 1 — Codebase Investigation
 
 Before reviewing anything, identify the project's stack by inspecting the following files (read only what exists):
@@ -129,6 +151,8 @@ Read these files using the path relative to this skill file's directory. If a fi
 - `./stacks/kafka.md`
 - `./stacks/inertia.md`
 - `./stacks/pest.md`
+
+Each stack file ends with a `## Precedents` section: protections that stack already provides, each with the **Exception:** under which it stops holding. Apply the precedents of every stack file you load together with its checklist: do not report a candidate that a precedent covers, unless that precedent's **Exception:** applies. When the exception applies, the finding stands and goes through Step 2 like any other.
 
 **Pattern files to load if relevant:**
 
@@ -344,19 +368,20 @@ Actively trace the modified code looking for latent bugs — do not just check s
 
 Run this step after the checklist pass (sections 1 to 13) and before you write the report. Try to refute every candidate **Critical** and **Warning** finding by reading the real code, not only the diff. Suggestions skip this step: report them as found, under the same evidence and confidence rules.
 
-For each candidate, look for anything that makes its Evidence scenario impossible:
+For each candidate, look for anything that makes its Evidence scenario impossible, or that excludes it from the report:
 
 - **Upstream guards and validation**: a check, early return, validation rule, middleware or schema that stops the triggering input before it reaches the changed lines.
 - **Callers**: the call sites of the changed code. Does any of them pass the triggering input, state or call sequence?
 - **Types**: type declarations, nullability or database constraints that rule the scenario out.
 - **Existing tests**: a test that runs the scenario and passes with the change.
 - **Framework and configuration**: framework defaults, configuration or environment settings that already prevent it (for example automatic output escaping or a global exception handler).
+- **Do Not Report and stack precedents**: the candidate matches an item in `## Do Not Report`, or a `## Precedents` entry of a loaded stack file whose **Exception:** does not apply. Such a candidate is **REFUTED** even if its scenario can happen.
 
 Give each candidate exactly one result:
 
 - **CONFIRMED**: the refutation attempt failed and the scenario follows from the code you read. Keep the finding.
 - **DOWNGRADED**: the scenario still happens, but it is less severe or less certain than claimed. Lower the severity to the highest level whose definition it still meets. If the code you read neither confirms nor refutes the scenario, because it depends on a caller, configuration, data or runtime behavior you cannot see, set **Confidence:** Medium and move the finding to `## Needs human verification`.
-- **REFUTED**: the code you read shows that the scenario cannot happen. Remove the finding from the report.
+- **REFUTED**: the code you read shows that the scenario cannot happen, or the candidate matches `## Do Not Report` or a stack precedent (the last check above). Remove the finding from the report.
 
 When a check you made here is what confirms or limits a finding, name it in the Evidence, for example: "Verification checked both callers of `findUser` and the request schema; none validates `id`."
 
