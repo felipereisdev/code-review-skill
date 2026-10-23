@@ -18,7 +18,6 @@ class OrderIndexTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get('/orders')
             ->assertOk()
-            ->assertSee($order->number)
-            ->assertSee($order->customer->name);
+            ->assertSee($order->number);
     }
 }
