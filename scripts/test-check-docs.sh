@@ -135,7 +135,7 @@ expect_fail "removing the verification step fails" "$work/noverify" "SKILL.md ha
 
 make_copy "$work/lateverify"
 move_section_to_end "$work/lateverify/SKILL.md" '## Step 2 — Verify Findings'
-expect_fail "verifying after the report sections fails" "$work/lateverify" "'## Step 2 — Verify Findings' must come after '## 13.' and before '## 14. What Was Done Well'"
+expect_fail "verifying after the report sections fails" "$work/lateverify" "'## Step 2 — Verify Findings' must come after '## Conditional Categories' and before '## 6. What Was Done Well'"
 
 make_copy "$work/norefuted"
 drop_lines "$work/norefuted/SKILL.md" '**REFUTED**'
@@ -486,6 +486,71 @@ lines.insert(lines.index("**Location:** `src/services/auth.service.ts:112`"), al
 open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
 PY
 expect_fail "an Also at line before Location fails" "$work/alsoorder" "finding 'Observability — Suggestion' must put **Also at:** after **Location:** and **Rule:**"
+
+make_copy "$work/orphanref"
+printf '# GraphQL\n' > "$work/orphanref/references/graphql.md"
+expect_fail "an uncited reference file fails" "$work/orphanref" "references/graphql.md is not cited in SKILL.md"
+
+make_copy "$work/uncitedtrigger"
+printf '# GraphQL\n' > "$work/uncitedtrigger/references/graphql.md"
+printf -- '- `./references/graphql.md`\n' >> "$work/uncitedtrigger/SKILL.md"
+expect_fail "a reference file cited outside the index fails" "$work/uncitedtrigger" "references/graphql.md has no trigger in SKILL.md Conditional Categories"
+
+make_copy "$work/deletedref"
+rm "$work/deletedref/references/i18n.md"
+expect_fail "deleting an indexed reference file fails" "$work/deletedref" "SKILL.md cites missing file: references/i18n.md"
+
+make_copy "$work/notrigger"
+replace_first "$work/notrigger/SKILL.md" '`./references/privacy.md`: load when' '`./references/privacy.md`'
+expect_fail "an index line without a trigger fails" "$work/notrigger" "Conditional Categories item does not match"
+
+make_copy "$work/refheading"
+replace_first "$work/refheading/references/privacy.md" '# Privacy & Data Compliance' '# Privacy'
+expect_fail "a reference file whose heading does not match its index name fails" "$work/refheading" "references/privacy.md must start with '# Privacy & Data Compliance'"
+
+make_copy "$work/leftover"
+printf '\n## 8. Accessibility\n\n- item\n' >> "$work/leftover/SKILL.md"
+expect_fail "a moved section left in SKILL.md fails" "$work/leftover" "SKILL.md still has the moved section: Accessibility"
+
+make_copy "$work/stalesections"
+printf -- '- the generic checklist (sections 1 to 13)\n' >> "$work/stalesections/SKILL.md"
+expect_fail "the old section range in SKILL.md fails" "$work/stalesections" "SKILL.md still says: sections 1 to 13"
+
+make_copy "$work/noindex"
+drop_lines "$work/noindex/SKILL.md" '## Conditional Categories'
+expect_fail "removing the conditional categories index fails" "$work/noindex" "SKILL.md has no '## Conditional Categories' section"
+
+make_copy "$work/lateindex"
+move_section_to_end "$work/lateindex/SKILL.md" '## Conditional Categories'
+expect_fail "an index after the report sections fails" "$work/lateindex" "'## Conditional Categories' must come after '## 5. Potential Bug Investigation' and before '## Step 2 — Verify Findings'"
+
+make_copy "$work/nounsure"
+replace_first "$work/nounsure/SKILL.md" ' When you are not sure whether the diff matches a trigger, read the file.' ''
+expect_fail "dropping the read-when-unsure rule fails" "$work/nounsure" "Conditional Categories is missing: When you are not sure whether the diff matches a trigger, read the file"
+
+make_copy "$work/nonotapplicable"
+replace_first "$work/nonotapplicable/SKILL.md" ', and mark that category N/A in the Summary table' ''
+expect_fail "dropping the N/A rule for unloaded categories fails" "$work/nonotapplicable" "Conditional Categories is missing: mark that category N/A in the Summary table"
+
+make_copy "$work/readmecore"
+replace_first "$work/readmecore/README.md" ' - 5 core categories applied to every diff' ' - 6 core categories applied to every diff'
+expect_fail "a README core count that does not match SKILL.md fails" "$work/readmecore" "README must say '**13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from'"
+
+make_copy "$work/readmealways"
+replace_first "$work/readmealways/README.md" '| **Potential Bugs** | Always |' '| **Potential Bugs** | When the diff changes logic |'
+expect_fail "a README table with too few Always rows fails" "$work/readmealways" "README Review Categories table has 4 'Always' rows, SKILL.md has 5 core checklist sections"
+
+make_copy "$work/notree"
+drop_lines "$work/notree/README.md" '── concurrency.md'
+expect_fail "a reference file missing from the README tree fails" "$work/notree" "README Project Structure is missing: references/concurrency.md"
+
+make_copy "$work/i18nlayoutless"
+replace_first "$work/i18nlayoutless/SKILL.md" ', or UI layout or styles that could break right-to-left (RTL) layouts.' '.'
+expect_fail "an i18n trigger that ignores RTL layout changes fails" "$work/i18nlayoutless" "references/i18n.md trigger must cover: UI layout or styles that could break right-to-left (RTL) layouts"
+
+make_copy "$work/apiclientshttp"
+replace_first "$work/apiclientshttp/SKILL.md" 'or API client code, including SDK wrappers and non-HTTP transports such as WebSocket or gRPC clients.' 'or code that calls an HTTP API.'
+expect_fail "an API Design trigger narrowed to HTTP calls fails" "$work/apiclientshttp" "references/api-design.md trigger must cover: API client code, including SDK wrappers and non-HTTP transports"
 
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"

@@ -221,7 +221,7 @@ Before the checklist pass, read the rules the repository writes down for its own
 
 - The most specific rule wins: a rule whose governed directory is closer to the changed file overrides one whose governed directory is higher up. A file in `.github/` or `.cursor/rules/` is compared by the directory it governs, not by its storage folder, so it is no more specific than another rule of the same governed directory.
 - When two rules that apply to the same file contradict each other explicitly and neither is more specific, follow the one whose text is narrower (it names the path, file type or construct in the diff). If neither is narrower, report neither as a violation. When the conflict affects a finding, cite both rules in its Evidence and say which one you followed and why.
-- A repository rule overrides the generic checklist (sections 1 to 13) and the stack and pattern files.
+- A repository rule overrides the generic checklist (sections 1 to 5 and the conditional categories in `references/`) and the stack and pattern files.
 - A repository rule never drops or downgrades a security finding that meets **Critical**, whatever the rule says.
 
 **Reporting a violation.**
@@ -335,100 +335,24 @@ Actively trace the modified code looking for latent bugs — do not just check s
 
 ---
 
-## 6. Accessibility *(only if the diff includes frontend/UI changes)*
+## Conditional Categories
 
-- **Semantic HTML**: correct use of headings, landmarks, lists, buttons, and form elements
-- **ARIA attributes**: `aria-label`, `aria-describedby`, `role`, etc. used correctly and only when native semantics are insufficient
-- **Keyboard navigation**: all interactive elements reachable and operable via keyboard
-- **Focus management**: focus order is logical; focus traps used appropriately in modals/dialogs
-- **Color contrast**: text and UI elements meet WCAG AA contrast ratios
-- **Images & icons**: meaningful images have `alt` text; decorative images use `alt=""`
-- **Form labels**: all inputs have associated `<label>` or `aria-label`
+The checklists below apply only to some changes, so each one lives in its own file under `references/`. For each category whose trigger the diff matches, read its file, using the path relative to this skill file's directory, and apply its checklist together with sections 1 to 5: the same severity, evidence, Do Not Report and Step 2 rules apply to its findings. When you are not sure whether the diff matches a trigger, read the file. Do not read a file whose trigger the diff does not match, and mark that category N/A in the Summary table. If a file cannot be read, continue with sections 1 to 5.
 
----
-
-## 7. Observability
-
-- **Structured logging**: logs use a structured format (JSON or key=value); no `console.log` / `var_dump` left in production code
-- **Sensitive data in logs**: no passwords, tokens, PII, or secrets logged — even partially
-- **Log levels**: appropriate log levels used (`debug`, `info`, `warning`, `error`); no critical events logged at `debug`
-- **Correlation IDs**: requests and async jobs carry a trace/correlation ID through logs
-- **Error reporting**: exceptions are captured and forwarded to the error tracking system (e.g. Sentry, Bugsnag)
-- **Metrics**: significant new operations (queue jobs, external calls, cache hits) are instrumented where relevant
-
----
-
-## 8. API Design *(only if the diff includes API endpoints or API client code)*
-
-- **HTTP methods**: correct verbs used (`GET` for reads, `POST` for creation, `PUT`/`PATCH` for updates, `DELETE` for removal)
-- **Status codes**: correct HTTP status codes returned (`201` for creation, `204` for no content, `422` for validation errors, `404` for not found, etc.)
-- **Versioning**: API version is reflected in the URL or header; breaking changes bump the version
-- **Consistent error responses**: error payloads follow a uniform structure across all endpoints
-- **Pagination**: consistent strategy used (cursor or offset); metadata included in response
-- **Filtering & sorting**: query parameters follow established conventions
-- **Idempotency**: `PUT`/`PATCH`/`DELETE` operations are idempotent; `POST` operations are idempotent where appropriate (e.g. with idempotency keys)
-- **No sensitive data in URLs**: tokens, passwords, and PII passed in headers or body, not in query strings or paths
-- **GraphQL** *(only if project uses GraphQL)*: N+1 prevented with DataLoader, query depth limited, introspection disabled in production, mutations validate input
-
----
-
-## 9. Resilience & Fault Tolerance *(only if the diff involves external calls, queues, or critical flows)*
-
-- **Timeouts**: all outbound HTTP calls, database queries, and queue operations have explicit timeouts
-- **Retry with backoff**: transient failures retried with exponential backoff and jitter; non-retriable errors not retried
-- **Circuit breakers**: repeated failures to an external dependency trip a circuit breaker to prevent cascade
-- **Graceful degradation**: the system degrades gracefully when a non-critical dependency is unavailable
-- **Idempotency**: operations that may be retried are idempotent (safe to execute more than once)
-- **Bulkhead isolation**: slow or failing dependencies do not exhaust shared resources (thread pools, connections)
-
----
-
-## 10. Zero-Downtime Database Migrations *(only if the diff includes migrations)*
-
-- **Additive changes first**: new columns added as nullable or with a default before application code uses them
-- **No instant NOT NULL without default**: adding a NOT NULL column without a default on a large table causes a full table lock
-- **Column/table rename safety**: old column kept alongside new one during a transition period; renamed in a follow-up migration after code is deployed
-- **Column removal safety**: column removed only after code no longer references it and the deployment is stable
-- **Index creation**: indexes on large tables created concurrently (e.g. `CREATE INDEX CONCURRENTLY`) to avoid locking
-- **Reversibility**: `down` method correctly undoes the `up` method without data loss
-
----
-
-## 11. Concurrency & Thread Safety *(only if the diff involves shared state, background jobs, or concurrent operations)*
-
-- **Race conditions**: operations on shared state are atomic or properly synchronized
-- **Locks & mutexes**: locking strategy is correct; no deadlock potential (consistent lock ordering)
-- **Atomic operations**: counters and flags updated atomically (e.g. database atomic increments, compare-and-swap)
-- **Job uniqueness**: background jobs that must not run concurrently are protected by a unique lock
-- **Shared mutable state**: global or static mutable state avoided; dependencies injected rather than shared
-
----
-
-## 12. Internationalization (i18n) *(only if the project supports multiple languages or locales)*
-
-- **No hardcoded strings**: all user-facing text uses translation keys, not inline strings
-- **Date & time formatting**: dates, times, and durations formatted via locale-aware utilities, not manual string building
-- **Number & currency formatting**: numbers and currency amounts formatted according to the user's locale
-- **Pluralization**: plural forms handled correctly via i18n library, not with manual conditionals
-- **RTL support**: layout does not break for right-to-left languages if RTL is supported
-- **Locale in URLs or headers**: locale derived from user preference or `Accept-Language`, not hardcoded
-
----
-
-## 13. Privacy & Data Compliance *(only if the diff involves user data, PII, or data storage)*
-
-- **Minimal data collection**: only data strictly necessary for the feature is collected and stored
-- **PII handling**: personal data identified, encrypted at rest where required, and access-controlled
-- **Data retention**: data is deleted or anonymized according to defined retention policies
-- **Consent**: data collection requiring user consent is gated behind explicit opt-in
-- **Audit trail**: access to and modification of sensitive data is logged for audit purposes
-- **Third-party data sharing**: data shared with external services is documented and limited to what is necessary
+- **Accessibility** — `./references/accessibility.md`: load when the diff changes frontend UI: markup, templates or components that render UI (for example `.html`, `.vue`, `.svelte`, `.jsx` or `.tsx` files, Blade or other view templates) or the styles they use.
+- **Observability** — `./references/observability.md`: load when the diff adds or changes logging, exception handling, error reporting, metrics, background jobs, queue consumers or calls to external services.
+- **API Design** — `./references/api-design.md`: load when the diff adds or changes API endpoints, routes, controllers, request or response schemas, GraphQL schemas or resolvers, or API client code, including SDK wrappers and non-HTTP transports such as WebSocket or gRPC clients.
+- **Resilience & Fault Tolerance** — `./references/resilience.md`: load when the diff adds or changes calls to external services (HTTP clients, SDKs, remote databases or caches), queue producers or consumers, or critical flows such as payments, checkout or authentication.
+- **Zero-Downtime Database Migrations** — `./references/database-migrations.md`: load when the diff adds or changes database migrations or schema definitions (for example files under `migrations/`, `database/migrations/` or `db/migrate/`, or SQL such as `ALTER TABLE` or `CREATE INDEX`).
+- **Concurrency & Thread Safety** — `./references/concurrency.md`: load when the diff adds or changes shared mutable state, locks, background jobs, workers, threads, goroutines, parallel async tasks, or counters and flags that several requests or jobs update.
+- **Internationalization (i18n)** — `./references/i18n.md`: load when the project supports multiple languages or locales (translation files or an i18n library) and the diff adds or changes user-facing text, date, time, number or currency formatting, locale handling, or UI layout or styles that could break right-to-left (RTL) layouts.
+- **Privacy & Data Compliance** — `./references/privacy.md`: load when the diff collects, stores, logs, exports or shares user data or personal data (PII), such as names, emails, addresses, documents, payment or health data, or changes how such data is stored, retained or deleted.
 
 ---
 
 ## Step 2 — Verify Findings
 
-Run this step after the checklist pass (sections 1 to 13) and before you write the report. Try to refute every candidate **Critical** and **Warning** finding by reading the real code, not only the diff. Suggestions skip this step: report them as found, under the same evidence and confidence rules.
+Run this step after the checklist pass (sections 1 to 5 and the conditional categories you loaded) and before you write the report. Try to refute every candidate **Critical** and **Warning** finding by reading the real code, not only the diff. Suggestions skip this step: report them as found, under the same evidence and confidence rules.
 
 For each candidate, look for anything that makes its Evidence scenario impossible, or that excludes it from the report:
 
@@ -457,13 +381,13 @@ Count the candidates you checked and the ones you refuted; the report states bot
 
 ---
 
-## 14. What Was Done Well
+## 6. What Was Done Well
 
 Before listing issues, acknowledge what was done well in this change. Point out strong design decisions, good test coverage, clean abstractions, or anything that should be recognized and repeated.
 
 ---
 
-## 15. Output Format
+## 7. Output Format
 
 Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Pre-existing issues (not counted)` (only when it has lines), `## Summary`, then the verification line.
 
