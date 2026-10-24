@@ -119,6 +119,7 @@ class RunTest(unittest.TestCase):
             report = f.read()
         self.assertIn("SKILL_DIR=" + os.path.dirname(EVALS), report)
         self.assertIn('option 2, "Staged changes only"', report)
+        self.assertIn("./patterns/... and ./references/... are under " + os.path.dirname(EVALS), report)
 
     def test_failing_agent_is_an_error(self):
         r = self.run_demo("exit 3")

@@ -23,7 +23,7 @@ Use another agent CLI with `--agent-cmd` (or `EVAL_AGENT_CMD`) and `--agent-name
 
 ## Baseline
 
-`baseline.json` and `baseline/` hold the run of the skill as it was before any review-behavior change. After changing `SKILL.md`, `stacks/` or `patterns/`, run the suite and compare recall and false positives with `baseline.json`. Refresh the baseline only on purpose:
+`baseline.json` and `baseline/` hold the run of the skill as it was before any review-behavior change. After changing `SKILL.md`, `stacks/`, `patterns/` or `references/`, run the suite and compare recall and false positives with `baseline.json`. Refresh the baseline only on purpose:
 
 ```bash
 python3 evals/run.py --jobs 2 --out-dir evals/baseline --json evals/baseline.json

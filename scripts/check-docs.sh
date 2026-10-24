@@ -82,13 +82,16 @@ PY
 }
 
 check_readme_counts() {
-  local stacks patterns scopes categories listed_patterns listed_categories missing="" f rc
+  local stacks patterns scopes core conditional categories always listed_patterns listed_categories missing="" f rc
   stacks=$(ls stacks/*.md | wc -l | tr -d ' ')
   patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
   scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
-  categories=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
+  core=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
+  conditional=$(ls references/*.md 2>/dev/null | wc -l | tr -d ' ')
+  categories=$((core + conditional))
   listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
   listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
+  always=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*[^|]*\*\* \| Always \|/{n++} END{print n+0}' README.md)
 
   if grep -qF "**Multi-Stack Support** - ${stacks} technology stacks covered" README.md; then
     pass "README stack count matches stacks/ (${stacks})"
@@ -100,15 +103,20 @@ check_readme_counts() {
   else
     fail "README must say '**${scopes} Review Scopes**'"
   fi
-  if grep -qF "**${categories} Review Categories**" README.md; then
-    pass "README category count matches SKILL.md checklist sections (${categories})"
+  if grep -qF "**${categories} Review Categories** - ${core} core categories applied to every diff, plus ${conditional} conditional categories loaded from" README.md; then
+    pass "README category count matches SKILL.md core sections plus references/ (${core} + ${conditional} = ${categories})"
   else
-    fail "README must say '**${categories} Review Categories**'"
+    fail "README must say '**${categories} Review Categories** - ${core} core categories applied to every diff, plus ${conditional} conditional categories loaded from'"
+  fi
+  if [ "$always" = "$core" ]; then
+    pass "README Review Categories table marks ${core} categories as Always"
+  else
+    fail "README Review Categories table has ${always} 'Always' rows, SKILL.md has ${core} core checklist sections"
   fi
   if [ "$listed_categories" = "$categories" ]; then
     pass "README Review Categories table has ${categories} rows"
   else
-    fail "README Review Categories table has ${listed_categories} rows, SKILL.md has ${categories} checklist sections"
+    fail "README Review Categories table has ${listed_categories} rows, SKILL.md and references/ have ${categories} categories"
   fi
   if [ "$listed_patterns" = "$patterns" ]; then
     pass "README lists ${patterns} architectural patterns"
@@ -123,11 +131,11 @@ check_readme_counts() {
   else
     fail "git grep failed (run the script inside a git checkout)"
   fi
-  for f in stacks/*.md patterns/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh evals/run.py evals/score.py evals/make-patch.sh .github/workflows/ci.yml; do
+  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh evals/run.py evals/score.py evals/make-patch.sh .github/workflows/ci.yml; do
     grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
   done
   if [ -z "$missing" ]; then
-    pass "README Project Structure lists every stack, pattern and top-level file"
+    pass "README Project Structure lists every stack, pattern, reference and top-level file"
   else
     fail "README Project Structure is missing:${missing}"
   fi
@@ -178,7 +186,7 @@ if not cited:
 for path in cited:
     if not os.path.isfile(path):
         errors.append(f"SKILL.md cites missing file: {path}")
-for path in sorted(glob.glob("stacks/*.md") + glob.glob("patterns/*.md")):
+for path in sorted(glob.glob("stacks/*.md") + glob.glob("patterns/*.md") + glob.glob("references/*.md")):
     if path not in cited:
         errors.append(f"{path} is not cited in SKILL.md")
 for error in errors:
@@ -186,7 +194,7 @@ for error in errors:
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "SKILL.md cited files exist and every stacks/ and patterns/ file is cited"
+    pass "SKILL.md cited files exist and every stacks/, patterns/ and references/ file is cited"
   else
     fail "SKILL.md file references (see messages above)"
   fi
@@ -243,9 +251,9 @@ if start is None:
 else:
     end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     section = "\n".join(lines[start:end])
-    last_check, report = first("## 13. "), first("## 14. What Was Done Well")
+    last_check, report = first("## Conditional Categories"), first("## 6. What Was Done Well")
     if last_check is None or report is None or not last_check < start < report:
-        errors.append(f"'{heading}' must come after '## 13.' and before '## 14. What Was Done Well'")
+        errors.append(f"'{heading}' must come after '## Conditional Categories' and before '## 6. What Was Done Well'")
     for s in ("refute", "**CONFIRMED**", "**DOWNGRADED**", "**REFUTED**", "Suggestions skip this step",
               "**Confidence:** Medium", "name it in the Evidence", "**With subagents**", "**Without subagents**"):
         if s not in section:
@@ -253,7 +261,7 @@ else:
     for s in ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot"):
         if s in section:
             errors.append(f"Step 2 — Verify Findings names an agent-specific tool: {s}")
-output_start = first("## 15. Output Format")
+output_start = first("## 7. Output Format")
 output = "\n".join(lines[output_start:]) if output_start is not None else ""
 for s in ("**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.",
           "Do not list refuted findings unless the user asks for them.",
@@ -379,7 +387,7 @@ else:
 require(first("## Do Not Report"), "Do Not Report", (
     "**Excluded by repository rules**", "A style or naming rule written in a repository rules file"))
 require(first("## Step 2 — Verify Findings"), "Step 2 — Verify Findings", ("**Repository rule citations**",))
-output_start = first("## 15. Output Format")
+output_start = first("## 7. Output Format")
 output = "\n".join(lines[output_start:]) if output_start is not None else ""
 for s in ("**Rule:** `path/to/rules-file:Lstart-Lend`", "(Rule: path/to/rules-file:Lstart-Lend)"):
     if s not in output:
@@ -496,7 +504,7 @@ for s in ("only to code the change adds, or to growth the change causes",
 for s in ("require refactoring", "require decomposition"):
     if s in size_text:
         errors.append(f"Code & File Size still says: {s}")
-output_start = first("## 15. Output Format")
+output_start = first("## 7. Output Format")
 output = "\n".join(lines[output_start:]) if output_start is not None else ""
 for s in ("`## Pre-existing issues (not counted)` (only when it has lines)",
           "lines under `## Pre-existing issues (not counted)` are never counted",
@@ -513,6 +521,83 @@ PY
     pass "SKILL.md limits findings to changed lines, keeps pre-existing issues out of the count, groups repeats and scopes size limits to new code"
   else
     fail "SKILL.md changed-line scope, grouping and size limits (see messages above)"
+  fi
+}
+
+check_skill_conditional_categories() {
+  if python3 - <<'PY'
+import glob, os, re, sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Conditional Categories"
+ITEM = re.compile(r"^- \*\*(?P<name>[^*]+)\*\* — `\./(?P<path>references/[a-z0-9-]+\.md)`: load when \S.*\.$")
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+start = first(heading)
+bugs = first("## 5. Potential Bug Investigation")
+step2 = first("## Step 2 — Verify Findings")
+listed = {}
+triggers = {}
+REQUIRED_TRIGGERS = {
+    "references/i18n.md": "UI layout or styles that could break right-to-left (RTL) layouts",
+    "references/api-design.md": "API client code, including SDK wrappers and non-HTTP transports",
+}
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if bugs is None or step2 is None or not bugs < start < step2:
+        errors.append(f"'{heading}' must come after '## 5. Potential Bug Investigation' and before "
+                      "'## Step 2 — Verify Findings'")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    body = lines[start:end]
+    text = "\n".join(body)
+    for s in ("For each category whose trigger the diff matches, read its file",
+              "the same severity, evidence, Do Not Report and Step 2 rules apply to its findings",
+              "When you are not sure whether the diff matches a trigger, read the file",
+              "Do not read a file whose trigger the diff does not match",
+              "mark that category N/A in the Summary table"):
+        if s not in text:
+            errors.append(f"Conditional Categories is missing: {s}")
+    for line in body:
+        if not line.startswith("- "):
+            continue
+        m = ITEM.match(line)
+        if m is None:
+            errors.append("Conditional Categories item does not match "
+                          f"'- **Name** — `./references/file.md`: load when ...': {line[:60]}")
+            continue
+        listed[m.group("path")] = m.group("name")
+        triggers[m.group("path")] = line
+for path, phrase in sorted(REQUIRED_TRIGGERS.items()):
+    if phrase not in triggers.get(path, ""):
+        errors.append(f"{path} trigger must cover: {phrase}")
+for path in sorted(glob.glob("references/*.md")):
+    if path not in listed:
+        errors.append(f"{path} has no trigger in SKILL.md Conditional Categories")
+for path, name in sorted(listed.items()):
+    if any(re.match(r"^## (\d+\. )?" + re.escape(name) + r"(\s|$)", line) for line in lines):
+        errors.append(f"SKILL.md still has the moved section: {name}")
+    if not os.path.isfile(path):
+        continue  # check_skill_references reports the missing file
+    with open(path, encoding="utf-8") as ref:
+        top = ref.readline().rstrip("\n")
+    if top != "# " + name and not top.startswith("# " + name + " "):
+        errors.append(f"{path} must start with '# {name}'")
+if "sections 1 to 13" in "\n".join(lines):
+    errors.append("SKILL.md still says: sections 1 to 13")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md indexes every references/ file with a trigger, and no moved section is left behind"
+  else
+    fail "SKILL.md conditional categories (see messages above)"
   fi
 }
 
@@ -703,6 +788,7 @@ check_skill_do_not_report
 check_skill_repo_rules
 check_skill_untrusted_input
 check_skill_scope_and_noise
+check_skill_conditional_categories
 check_stack_precedents
 check_readme_counts
 check_example_output
