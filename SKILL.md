@@ -19,31 +19,49 @@ metadata:
 
 ## Step 0 — Scope Selection
 
-Before anything else, ask the user the following question and wait for their answer:
+Choose the scope before anything else. Take it from the arguments when there are any, and detect it when there are none. Ask the user only in the interactive cases listed under **Interactive runs**.
 
----
+**Scopes.** Each scope is one plain word, followed by a value where shown:
 
-**What would you like to review?**
+1. **`uncommitted`** — staged and unstaged changes to tracked files, plus untracked files that are not ignored. Run `git diff HEAD`, then list the untracked files with `git status --porcelain --untracked-files=all` (the lines that start with `??`) and review each one as a new file. Skip binary files.
+2. **`staged`** — changes added to the index but not committed. Run `git diff --cached`.
+3. **`branch [<base>]`** — every commit on the current branch since it left `<base>`. Run `git diff <base>...HEAD`. Without `<base>`, use the default branch.
+4. **`commit <sha>`** — the changes of one commit. Run `git show <sha>`.
+5. **`range <from>..<to>`** — the changes between two commits. Run `git diff <from>..<to>`.
 
-1. **Uncommitted changes** — files modified but not yet staged or committed (`git diff HEAD`)
-2. **Staged changes only** — files added to the index but not yet committed (`git diff --cached`)
-3. **Current branch vs base branch** — all commits introduced by this branch compared to its merge base (e.g. `git diff main...HEAD`)
-4. **A specific commit** — changes introduced by a single commit (provide the commit hash)
-5. **A commit range** — changes across a range of commits (provide `<from>..<to>`)
+The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.
 
-*Type the number of your choice. For options 4 or 5, also provide the commit hash or range.*
+**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass every value to git as one single-quoted argument.
 
----
+**Default branch.** Run `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`. Its output, for example `origin/main`, is the default branch. If it prints nothing, the default branch is the first of `origin/main`, `origin/master`, `main` and `master` that `git rev-parse --verify --quiet '<ref>^{commit}'` accepts. If none is accepted, the default branch is unknown.
 
-Once the user answers, run the appropriate git command to obtain the diff, then proceed with the review below.
+**Invalid arguments.** Check the arguments before you run the diff. When one is invalid, reply with one line, `Cannot review: <reason>. Nothing was reviewed.`, and stop. Never review a different scope instead. The reasons:
 
-| Choice | Command to run |
-|--------|---------------|
-| 1 | `git diff HEAD` |
-| 2 | `git diff --cached` |
-| 3 | Ask: *"What is the base branch? (e.g. main, develop)"* — then run `git diff $(git merge-base HEAD <base-branch>)...HEAD` |
-| 4 | `git show <commit-hash>` |
-| 5 | `git diff <from>..<to>` |
+- An unknown first word: `unknown scope "<word>"; use uncommitted, staged, branch [<base>], commit <sha> or range <from>..<to>`.
+- The word `pr`: `the pr scope is not supported yet`.
+- `commit` without a value: `commit needs a commit hash`. `range` without a value: `range needs <from>..<to>`.
+- `branch` without a value when the default branch is unknown: `the default branch could not be detected; pass a base with branch <base>`.
+- A word left over after the scope and its value: `unexpected argument "<word>"`.
+- A `range` value without `..` between two refs: `"<value>" is not a range of the form <from>..<to>`.
+- A `<sha>`, `<base>`, `<from>` or `<to>` that `git rev-parse --verify --quiet '<value>^{commit}'` rejects: `"<value>" is not a commit or branch in this repository`. A value that starts with `-` is always rejected.
+- For `branch`, a base that `git merge-base '<base>' HEAD` cannot join with `HEAD`, as in a shallow clone: `no common ancestor between <base> and HEAD; fetch more history or use range <from>..<to>`.
+
+**Without a scope argument**, detect the scope. Apply these rules in order and stop at the first one that matches:
+
+1. If `git status --porcelain --untracked-files=all` prints any line, the scope is `uncommitted`.
+2. If the default branch is known, the current branch (`git branch --show-current`) is not the default branch without its `origin/` prefix, and `git rev-list --count <default>..HEAD` prints a number above 0, the scope is `branch <default>`.
+3. Otherwise there is nothing to review. If the default branch is known, reply `Nothing to review: no uncommitted changes, and no commits ahead of <default>.` and stop. If it is unknown, a headless run replies `Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.` and stops, and an interactive run asks for the base (see **Interactive runs**).
+
+**Headless runs never ask.** A run is headless when no user can answer during it: a CI job, a non-interactive command such as `claude -p`, or a request that says no user is available. In a headless run, never ask a question: take the scope from the arguments or from detection, and when neither gives one, reply with the message from rule 3 and stop.
+
+**Interactive runs** ask only when detection is ambiguous, in these two cases, and wait for the answer:
+
+- Rule 1 matches and the current branch also has commits ahead of the default branch. Ask: *"There are uncommitted changes, and this branch has commits ahead of <default>. Review the uncommitted changes (uncommitted) or the whole branch (branch <default>)?"* A headless run uses `uncommitted`.
+- No rule finds a scope because the default branch is unknown. Ask: *"Which base branch should this branch be compared with?"* and use `branch <answer>`.
+
+**Empty diff.** If the scope's command shows no changes, and for `uncommitted` there are no untracked files either, reply `Nothing to review: <command> shows no changes.` and stop.
+
+**Scope line.** The report starts with one line that names the scope and the git command that produced the diff: `**Scope:** <scope> (<command>)`. When the scope came from detection, add `, auto-detected` after it. Examples: `**Scope:** branch origin/main, auto-detected (git diff origin/main...HEAD)`, `**Scope:** staged (git diff --cached)`, `**Scope:** uncommitted (git diff HEAD + untracked files)`.
 
 ---
 
@@ -389,7 +407,7 @@ Before listing issues, acknowledge what was done well in this change. Point out 
 
 ## 7. Output Format
 
-Write the report in this order: What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Pre-existing issues (not counted)` (only when it has lines), `## Summary`, then the verification line.
+Write the report in this order: the **Scope:** line (Step 0), What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Pre-existing issues (not counted)` (only when it has lines), `## Summary`, then the verification line.
 
 Use this block for each finding:
 
@@ -443,11 +461,11 @@ Right after the Summary table, write one verification line with the counts from 
 
 Write the line even when both counts are 0. Do not list refuted findings unless the user asks for them.
 
-If there are no High-confidence findings, state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification` and any `## Pre-existing issues (not counted)` lines, and end with the verification line.
+If there are no High-confidence findings, write the **Scope:** line, then state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification` and any `## Pre-existing issues (not counted)` lines, and end with the verification line.
 
 ### Compact mode
 
-Use compact mode only when the user asks for it, for example `/code-review compact`, "compact review" or "one line per finding". Without that request, use the full format above.
+Use compact mode only when the user asks for it, for example `/code-review compact` or, with a scope, `/code-review staged compact`, "compact review" or "one line per finding". Without that request, use the full format above.
 
 In compact mode, write each finding as one list item:
 
@@ -460,4 +478,4 @@ In compact mode, write each finding as one list item:
 - A grouped finding lists the other places after the fix: `path/to/file.ext:line: Severity: problem → fix (also at path/to/other.ext:line)`. A repository-rule citation, when there is one, comes last.
 - Write pre-existing lines under a `## Pre-existing issues (not counted)` heading after the `## Needs human verification` lines, in the same `- path/to/file.ext:line — problem` form.
 - The severity, evidence and confidence rules still apply: High-confidence lines first, Medium-confidence lines under a `## Needs human verification` heading after them, Low-confidence findings never.
-- Skip What Was Done Well and the Summary table, but end with the verification line. If there are no High-confidence findings, write only **"Code review passed — no issues found."**, any `## Needs human verification` lines, any `## Pre-existing issues (not counted)` lines and the verification line.
+- Start with the **Scope:** line. Skip What Was Done Well and the Summary table, but end with the verification line. If there are no High-confidence findings, write only the **Scope:** line, **"Code review passed — no issues found."**, any `## Needs human verification` lines, any `## Pre-existing issues (not counted)` lines and the verification line.
