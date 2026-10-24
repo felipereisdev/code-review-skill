@@ -135,7 +135,7 @@ expect_fail "removing the verification step fails" "$work/noverify" "SKILL.md ha
 
 make_copy "$work/lateverify"
 move_section_to_end "$work/lateverify/SKILL.md" '## Step 2 — Verify Findings'
-expect_fail "verifying after the report sections fails" "$work/lateverify" "'## Step 2 — Verify Findings' must come after '## 13.' and before '## 14. What Was Done Well'"
+expect_fail "verifying after the report sections fails" "$work/lateverify" "'## Step 2 — Verify Findings' must come after '## Conditional Categories' and before '## 6. What Was Done Well'"
 
 make_copy "$work/norefuted"
 drop_lines "$work/norefuted/SKILL.md" '**REFUTED**'
