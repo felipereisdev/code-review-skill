@@ -12,7 +12,8 @@ _BODY_SEVERITY_RE = re.compile(r"\bseverity\b\W*(critical|warning|suggestion)", 
 _DETAIL_RE = re.compile(r"^\W*(?:file|issue|location)s?\W*:", re.I)
 _VERIFICATION_HEADING_RE = re.compile(r"\bneeds\s+human\s+verification\b", re.I)
 _PRE_EXISTING_HEADING_RE = re.compile(
-    r"^\W*pre[- ]?existing\s+(?:issues?|problems?)\b(?:\s*\([^)]*\)|\s*[—–-]+\s*[^\W_].*)?\s*$",
+    r"^[\W_]*pre[- ]?existing\s+(?:issues?|problems?)[\W_]*"
+    r"(?:\(\s*not\s+counted\s*\)|[—–-]+\s*not\s+counted)?[\W_]*$",
     re.I,
 )
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
