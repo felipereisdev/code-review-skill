@@ -31,7 +31,7 @@ Choose the scope before anything else. Take it from the arguments when there are
 
 The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.
 
-**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass every value to git as one single-quoted argument.
+**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and for `branch`, `commit` and `range`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass every value to git as one single-quoted argument.
 
 **Default branch.** Run `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`. Its output, for example `origin/main`, is the default branch. If it prints nothing, the default branch is the first of `origin/main`, `origin/master`, `main` and `master` that `git rev-parse --verify --quiet '<ref>^{commit}'` accepts. If none is accepted, the default branch is unknown.
 
@@ -50,6 +50,7 @@ The word `pr` is reserved for reviewing a pull request by number. It is not supp
 
 1. If `git status --porcelain --untracked-files=all` prints any line, the scope is `uncommitted`.
 2. If the default branch is known, the current branch (`git branch --show-current`) is not the default branch without its `origin/` prefix, and `git rev-list --count <default>..HEAD` prints a number above 0, the scope is `branch <default>`.
+   When rule 2 picks `branch <default>`, first run `git merge-base '<default>' HEAD`, as in **Invalid arguments**; when it fails, reply `Cannot review: no common ancestor between <default> and HEAD; fetch more history or use range <from>..<to>. Nothing was reviewed.` and stop.
 3. Otherwise there is nothing to review. If the default branch is known, reply `Nothing to review: no uncommitted changes, and no commits ahead of <default>.` and stop. If it is unknown, a headless run replies `Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.` and stops, and an interactive run asks for the base (see **Interactive runs**).
 
 **Headless runs never ask.** A run is headless when no user can answer during it: a CI job, a non-interactive command such as `claude -p`, or a request that says no user is available. In a headless run, never ask a question: take the scope from the arguments or from detection, and when neither gives one, reply with the message from rule 3 and stop.
