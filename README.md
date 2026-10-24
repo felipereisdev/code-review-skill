@@ -22,7 +22,7 @@
 - **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
-- **13 Review Categories** - From Security to Privacy Compliance
+- **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
 - **5 Review Scopes** - Uncommitted changes, staged, branch comparison, specific commits
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
 
@@ -127,21 +127,23 @@ The skill will ask you to choose the review scope:
 
 ## 🛡️ Review Categories
 
-| Category | What It Checks |
-|----------|----------------|
-| **Security** | Injection vulnerabilities, auth, secrets, input validation |
-| **Performance** | N+1 queries, caching, pagination, memory leaks |
-| **Tests** | Coverage, edge cases, mocking, assertions |
-| **Architecture** | SOLID, DRY, KISS, separation of concerns |
-| **Potential Bugs** | Null dereferences, off-by-one errors, race conditions |
-| **Accessibility** | Semantic HTML, ARIA, keyboard navigation |
-| **Observability** | Logging, metrics, error tracking |
-| **API Design** | HTTP methods, status codes, versioning |
-| **Resilience** | Timeouts, retries, circuit breakers |
-| **Database** | Zero-downtime migrations, indexing |
-| **Concurrency** | Thread safety, atomic operations |
-| **i18n** | Translation keys, locale formatting |
-| **Privacy** | PII handling, data retention, consent |
+| Category | Applied | What It Checks |
+|----------|---------|----------------|
+| **Security** | Always | Injection vulnerabilities, auth, secrets, input validation |
+| **Performance** | Always | N+1 queries, caching, pagination, memory leaks |
+| **Tests** | Always | Coverage, edge cases, mocking, assertions |
+| **Architecture** | Always | SOLID, DRY, KISS, separation of concerns |
+| **Potential Bugs** | Always | Null dereferences, off-by-one errors, race conditions |
+| **Accessibility** | When the diff changes UI markup, templates, components or styles | Semantic HTML, ARIA, keyboard navigation |
+| **Observability** | When the diff changes logging, error handling, metrics, jobs or external calls | Logging, metrics, error tracking |
+| **API Design** | When the diff changes API endpoints, schemas or API clients | HTTP methods, status codes, versioning |
+| **Resilience** | When the diff changes external calls, queues or critical flows | Timeouts, retries, circuit breakers |
+| **Database** | When the diff changes migrations or schema definitions | Zero-downtime migrations, indexing |
+| **Concurrency** | When the diff changes shared state, locks, jobs or parallel work | Thread safety, atomic operations |
+| **i18n** | When the project has several locales and the diff changes user-facing text or formatting | Translation keys, locale formatting |
+| **Privacy** | When the diff collects, stores, logs or shares user data | PII handling, data retention, consent |
+
+The five **Always** categories live in `SKILL.md`. Each of the others lives in its own file under `references/`, and the skill reads it only when the diff matches its trigger, so a CSS-only diff does not load the API, migration or concurrency rules.
 
 ## 🏗️ Supported Stacks
 
@@ -230,7 +232,7 @@ This skill follows the [Agent Skills Standard](https://agentskills.io), making i
 - `Glob` - File discovery
 - `Bash` - Git operations and diff extraction
 
-Runs with automatic stack detection and loads only relevant pattern/stack rules.
+Runs with automatic stack detection and loads only the relevant stack and pattern rules, plus the conditional categories whose trigger the diff matches.
 
 ## 📁 Project Structure
 
@@ -261,6 +263,15 @@ code-review-skill/
 │   ├── ddd.md
 │   ├── event-driven.md
 │   └── microservices.md
+├── references/          # Conditional checklists, read only when the diff touches their area
+│   ├── accessibility.md
+│   ├── api-design.md
+│   ├── concurrency.md
+│   ├── database-migrations.md
+│   ├── i18n.md
+│   ├── observability.md
+│   ├── privacy.md
+│   └── resilience.md
 └── stacks/              # Technology-specific rules
     ├── angular.md
     ├── docker.md
@@ -290,7 +301,7 @@ Contributions welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Run `bash scripts/check-docs.sh` and `bash scripts/test-check-docs.sh` and make sure all checks pass; if you change `SKILL.md`, `stacks/` or `patterns/`, also run the evals ([evals/README.md](evals/README.md)) and compare with `evals/baseline.json`
+3. Run `bash scripts/check-docs.sh` and `bash scripts/test-check-docs.sh` and make sure all checks pass; if you change `SKILL.md`, `stacks/`, `patterns/` or `references/`, also run the evals ([evals/README.md](evals/README.md)) and compare with `evals/baseline.json`
 4. Commit your changes (`git commit -m 'Add amazing feature'`)
 5. Push to the branch (`git push origin feature/amazing-feature`)
 6. Open a Pull Request
