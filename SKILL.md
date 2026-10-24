@@ -341,11 +341,11 @@ The checklists below apply only to some changes, so each one lives in its own fi
 
 - **Accessibility** — `./references/accessibility.md`: load when the diff changes frontend UI: markup, templates or components that render UI (for example `.html`, `.vue`, `.svelte`, `.jsx` or `.tsx` files, Blade or other view templates) or the styles they use.
 - **Observability** — `./references/observability.md`: load when the diff adds or changes logging, exception handling, error reporting, metrics, background jobs, queue consumers or calls to external services.
-- **API Design** — `./references/api-design.md`: load when the diff adds or changes API endpoints, routes, controllers, request or response schemas, GraphQL schemas or resolvers, or code that calls an HTTP API.
+- **API Design** — `./references/api-design.md`: load when the diff adds or changes API endpoints, routes, controllers, request or response schemas, GraphQL schemas or resolvers, or API client code, including SDK wrappers and non-HTTP transports such as WebSocket or gRPC clients.
 - **Resilience & Fault Tolerance** — `./references/resilience.md`: load when the diff adds or changes calls to external services (HTTP clients, SDKs, remote databases or caches), queue producers or consumers, or critical flows such as payments, checkout or authentication.
 - **Zero-Downtime Database Migrations** — `./references/database-migrations.md`: load when the diff adds or changes database migrations or schema definitions (for example files under `migrations/`, `database/migrations/` or `db/migrate/`, or SQL such as `ALTER TABLE` or `CREATE INDEX`).
 - **Concurrency & Thread Safety** — `./references/concurrency.md`: load when the diff adds or changes shared mutable state, locks, background jobs, workers, threads, goroutines, parallel async tasks, or counters and flags that several requests or jobs update.
-- **Internationalization (i18n)** — `./references/i18n.md`: load when the project supports multiple languages or locales (translation files or an i18n library) and the diff adds or changes user-facing text, date, time, number or currency formatting, or locale handling.
+- **Internationalization (i18n)** — `./references/i18n.md`: load when the project supports multiple languages or locales (translation files or an i18n library) and the diff adds or changes user-facing text, date, time, number or currency formatting, locale handling, or UI layout or styles that could break right-to-left (RTL) layouts.
 - **Privacy & Data Compliance** — `./references/privacy.md`: load when the diff collects, stores, logs, exports or shares user data or personal data (PII), such as names, emails, addresses, documents, payment or health data, or changes how such data is stored, retained or deleted.
 
 ---

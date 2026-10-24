@@ -542,6 +542,11 @@ start = first(heading)
 bugs = first("## 5. Potential Bug Investigation")
 step2 = first("## Step 2 — Verify Findings")
 listed = {}
+triggers = {}
+REQUIRED_TRIGGERS = {
+    "references/i18n.md": "UI layout or styles that could break right-to-left (RTL) layouts",
+    "references/api-design.md": "API client code, including SDK wrappers and non-HTTP transports",
+}
 if start is None:
     errors.append(f"SKILL.md has no '{heading}' section")
 else:
@@ -567,6 +572,10 @@ else:
                           f"'- **Name** — `./references/file.md`: load when ...': {line[:60]}")
             continue
         listed[m.group("path")] = m.group("name")
+        triggers[m.group("path")] = line
+for path, phrase in sorted(REQUIRED_TRIGGERS.items()):
+    if phrase not in triggers.get(path, ""):
+        errors.append(f"{path} trigger must cover: {phrase}")
 for path in sorted(glob.glob("references/*.md")):
     if path not in listed:
         errors.append(f"{path} has no trigger in SKILL.md Conditional Categories")

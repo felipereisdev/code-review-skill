@@ -544,6 +544,14 @@ make_copy "$work/notree"
 drop_lines "$work/notree/README.md" '── concurrency.md'
 expect_fail "a reference file missing from the README tree fails" "$work/notree" "README Project Structure is missing: references/concurrency.md"
 
+make_copy "$work/i18nlayoutless"
+replace_first "$work/i18nlayoutless/SKILL.md" ', or UI layout or styles that could break right-to-left (RTL) layouts.' '.'
+expect_fail "an i18n trigger that ignores RTL layout changes fails" "$work/i18nlayoutless" "references/i18n.md trigger must cover: UI layout or styles that could break right-to-left (RTL) layouts"
+
+make_copy "$work/apiclientshttp"
+replace_first "$work/apiclientshttp/SKILL.md" 'or API client code, including SDK wrappers and non-HTTP transports such as WebSocket or gRPC clients.' 'or code that calls an HTTP API.'
+expect_fail "an API Design trigger narrowed to HTTP calls fails" "$work/apiclientshttp" "references/api-design.md trigger must cover: API client code, including SDK wrappers and non-HTTP transports"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

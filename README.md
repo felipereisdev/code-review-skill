@@ -140,7 +140,7 @@ The skill will ask you to choose the review scope:
 | **Resilience** | When the diff changes external calls, queues or critical flows | Timeouts, retries, circuit breakers |
 | **Database** | When the diff changes migrations or schema definitions | Zero-downtime migrations, indexing |
 | **Concurrency** | When the diff changes shared state, locks, jobs or parallel work | Thread safety, atomic operations |
-| **i18n** | When the project has several locales and the diff changes user-facing text or formatting | Translation keys, locale formatting |
+| **i18n** | When the project has several locales and the diff changes user-facing text, formatting or RTL-sensitive layout | Translation keys, locale formatting, RTL layout |
 | **Privacy** | When the diff collects, stores, logs or shares user data | PII handling, data retention, consent |
 
 The five **Always** categories live in `SKILL.md`. Each of the others lives in its own file under `references/`, and the skill reads it only when the diff matches its trigger, so a CSS-only diff does not load the API, migration or concurrency rules.
