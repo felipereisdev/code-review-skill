@@ -22,8 +22,9 @@
 - **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
+- **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and never comments on, approves or changes the pull request; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
 - **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
-- **5 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>` or `range <from>..<to>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and its git command
+- **6 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>`, `range <from>..<to>` or `pr <number|url>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and the command that produced the diff
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
 
 ## 📦 Installation
@@ -125,6 +126,8 @@ Pass the scope after the command, or leave it out and let the skill detect it:
 /code-review branch main          # this branch since it left main (no base: the default branch)
 /code-review commit abc123        # one commit
 /code-review range v1.2.0..HEAD   # a range of commits
+/code-review pr 123               # a GitHub pull request or GitLab merge request (needs gh or glab)
+/code-review pr https://github.com/owner/repo/pull/123   # the same, by URL
 /code-review staged compact       # any scope, in compact mode
 ```
 
@@ -143,8 +146,11 @@ The skill takes the scope from the argument, and detects it when there is none:
 3. **Current branch vs base** (`branch [<base>]`) - all commits since the branch left the base (`git diff <base>...HEAD`)
 4. **Specific commit** (`commit <sha>`) - changes in a single commit (`git show <sha>`)
 5. **Commit range** (`range <from>..<to>`) - changes across a range (`git diff <from>..<to>`)
+6. **Pull request or merge request** (`pr <number|url>`) - the pull request's diff, read with `gh pr diff` (GitHub) or `glab mr diff` (GitLab)
 
 Without an argument, the skill reviews the uncommitted changes if there are any; otherwise, a branch with commits ahead of the default branch (from `origin/HEAD`, falling back to `main` or `master`) is reviewed against it; otherwise it says there is nothing to review. It asks only in an interactive run whose detection is ambiguous, and never in a headless run. An invalid argument, such as an unknown commit or base, stops with `Cannot review: ... Nothing was reviewed.` instead of reviewing another scope. The report starts with the scope and its git command, for example `**Scope:** branch main (git diff main...HEAD)`.
+
+A `pr` review picks `gh` or `glab` from the URL or from the `origin` remote; that CLI must be installed and logged in, or the skill stops with `Cannot review: ... Nothing was reviewed.`. It reads the diff, title, description, commits, linked issues and review threads, never writes to the pull request, and starts the report with, for example, `**Scope:** pr 123 (gh pr diff 123)`. A problem that an open review thread already raises at the same place is listed, one line each with the thread's URL, under `## Already raised in the PR (not repeated)` instead of being reported again. A Critical problem stays a finding, and a resolved thread is never reopened: a finding that matches one is reported only because the current diff still has the problem, and it cites the thread.
 
 ## 🛡️ Review Categories
 
@@ -226,6 +232,7 @@ Each finding carries a severity, a location inside the diff, a concrete trigger 
 - **Verification**: before the report, every Critical and Warning finding is checked against the real code (guards, callers, types, tests, framework configuration) and comes out CONFIRMED, DOWNGRADED or REFUTED. Refuted findings are dropped and the report states how many there were. Suggestions skip this step.
 - **Repository rules**: a finding that breaks a rule from `CLAUDE.md`, `AGENTS.md` or another rules file adds a **Rule:** line that cites the rules file and its lines, for example `src/services/AGENTS.md:L4-L5`; in compact mode the line ends with `(Rule: src/services/AGENTS.md:L4-L5)`. Without a citation that can be checked, it is not a rule finding.
 - **Changed lines, pre-existing issues and repeats**: findings cite only lines the change adds or modifies. An older problem the change does not touch is never a finding; it can go, one line each (`path:line — problem`), under `## Pre-existing issues (not counted)`, which the Summary table does not count. The same problem at several places is one finding whose **Also at:** line lists the other places; in compact mode the line ends with `(also at path:line)` before any rule citation.
+- **Already raised in the PR**: in a `pr` review, the lines under `## Already raised in the PR (not repeated)` have no severity, are not counted in the Summary table and do not change the verdict.
 - **Compact mode**: ask for `/code-review compact` to get one line per finding (`path:line: Severity: problem → fix`).
 
 Plus a summary table that counts the High-confidence findings:

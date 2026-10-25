@@ -102,7 +102,8 @@ class RunTest(unittest.TestCase):
         self.assertTrue(bug["passed"])
         self.assertEqual(bug["matched_finding"], "Security — Critical")
         self.assertEqual(bug["findings"], [{"heading": "Security — Critical", "severity": "Critical",
-                                            "needs_verification": False, "pre_existing": False}])
+                                            "needs_verification": False, "pre_existing": False,
+                                            "already_raised": False}])
         self.assertEqual(clean["false_positives"], 0)
         self.assertTrue(os.path.isfile(os.path.join(self.out, "reports", "demo__bug.md")))
         with open(os.path.join(self.out, "summary.md"), encoding="utf-8") as f:

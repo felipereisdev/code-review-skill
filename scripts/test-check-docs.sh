@@ -573,8 +573,32 @@ replace_first "$work/fallbackscope/SKILL.md" ' Never review a different scope in
 expect_fail "falling back to another scope on a bad argument fails" "$work/fallbackscope" "Step 0 — Scope Selection is missing: Never review a different scope instead"
 
 make_copy "$work/nopr"
-replace_first "$work/nopr/SKILL.md" 'The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.' ''
-expect_fail "dropping the reserved pr word fails" "$work/nopr" "Step 0 — Scope Selection is missing: The word \`pr\` is reserved for reviewing a pull request by number"
+replace_first "$work/nopr/SKILL.md" '6. **`pr <number|url>`** — ' '6. **`pull <number>`** — '
+expect_fail "a pr scope without its argument word fails" "$work/nopr" "Step 0 — Scope Selection is missing: 6. **\`pr <number|url>\`** — "
+
+make_copy "$work/prunsupported"
+printf '\nThe word `pr` is reserved for reviewing a pull request by number. It is not supported yet.\n' >> "$work/prunsupported/SKILL.md"
+expect_fail "keeping the pr not-supported message fails" "$work/prunsupported" "SKILL.md still says the pr scope is not supported yet"
+
+make_copy "$work/prnovalue"
+replace_first "$work/prnovalue/SKILL.md" '`pr needs a pull request number or URL`' '`pr needs a value`'
+expect_fail "a pr scope without its missing-value message fails" "$work/prnovalue" "Step 0 — Scope Selection is missing: \`pr needs a pull request number or URL\`"
+
+make_copy "$work/prbadvalue"
+replace_first "$work/prbadvalue/SKILL.md" 'is not a pull request number or URL`' 'is not valid`'
+expect_fail "a pr scope that accepts any value fails" "$work/prbadvalue" "Step 0 — Scope Selection is missing: is not a pull request number or URL\`"
+
+make_copy "$work/prscopeline"
+replace_first "$work/prscopeline/SKILL.md" '`**Scope:** pr 123 (gh pr diff 123)`' '`**Scope:** pr 123`'
+expect_fail "a pr Scope line without its gh command fails" "$work/prscopeline" "Step 0 — Scope Selection is missing: \`**Scope:** pr 123 (gh pr diff 123)\`"
+
+make_copy "$work/prcount"
+replace_first "$work/prcount/README.md" '**6 Review Scopes**' '**5 Review Scopes**'
+expect_fail "a README that still counts 5 scopes fails" "$work/prcount" "README must say '**6 Review Scopes**'"
+
+make_copy "$work/prtrigger"
+replace_first "$work/prtrigger/SKILL.md" 'GitLab merge request by number' 'GitLab MR by number'
+expect_fail "a description without the merge request trigger fails" "$work/prtrigger" "description missing trigger: merge request"
 
 make_copy "$work/noscopeline"
 replace_first "$work/noscopeline/SKILL.md" 'Write the report in this order: the **Scope:** line (Step 0), What Was Done Well' 'Write the report in this order: What Was Done Well'
@@ -613,15 +637,15 @@ drop_lines "$work/noexamplescope/example-output.md" '**Scope:**'
 expect_fail "an example without the Scope line fails" "$work/noexamplescope" "example-output.md must have 2 **Scope:** lines (full report and compact mode), found 0"
 
 make_copy "$work/scopemismatch"
-replace_first "$work/scopemismatch/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch develop (git diff develop...HEAD)'
+replace_first "$work/scopemismatch/example-output.md" '**Scope:** pr 123 (gh pr diff 123)' '**Scope:** pr 124 (gh pr diff 124)'
 expect_fail "full and compact Scope lines that disagree fail" "$work/scopemismatch" "the full-report and compact-mode **Scope:** lines must match"
 
 make_copy "$work/scopenocommand"
-replace_first "$work/scopenocommand/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch main'
-expect_fail "a Scope line without its git command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)'"
+replace_first "$work/scopenocommand/example-output.md" '**Scope:** pr 123 (gh pr diff 123)' '**Scope:** pr 123'
+expect_fail "a Scope line without its command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<command>)'"
 
 make_copy "$work/latescope"
-replace_first "$work/latescope/example-output.md" $'**Scope:** branch main (git diff main...HEAD)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** branch main (git diff main...HEAD)\n'
+replace_first "$work/latescope/example-output.md" $'**Scope:** pr 123 (gh pr diff 123)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** pr 123 (gh pr diff 123)\n'
 expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
 
 make_copy "$work/shelltext"
@@ -655,6 +679,186 @@ expect_fail "an unborn-HEAD Scope line without its commands fails" "$work/unborn
 make_copy "$work/answerunvalidated"
 replace_first "$work/answerunvalidated/SKILL.md" 'An answer that names a base is validated like a `<base>` argument, as in **Invalid arguments**.' ''
 expect_fail "an interactive base answer that skips validation fails" "$work/answerunvalidated" "Step 0 — Scope Selection is missing: An answer that names a base is validated like a \`<base>\` argument"
+
+make_copy "$work/noprsection"
+drop_lines "$work/noprsection/SKILL.md" '## Pull Request Scope'
+expect_fail "removing the Pull Request Scope section fails" "$work/noprsection" "SKILL.md has no '## Pull Request Scope' section"
+
+make_copy "$work/lateprsection"
+move_section_to_end "$work/lateprsection/SKILL.md" '## Pull Request Scope'
+expect_fail "a Pull Request Scope section after Untrusted Input fails" "$work/lateprsection" "'## Pull Request Scope' must come after '## Step 0 — Scope Selection' and before '## Untrusted Input'"
+
+make_copy "$work/prwrite"
+printf -- '- Post the review with `gh pr comment <n>`.\n' >> "$work/prwrite/SKILL.md"
+expect_fail "a pr comment command in SKILL.md fails" "$work/prwrite" "SKILL.md names a write command: gh pr comment"
+
+make_copy "$work/prreadmewrite"
+printf '\ngh pr review 123 --approve\n' >> "$work/prreadmewrite/README.md"
+expect_fail "a pr review command in README fails" "$work/prreadmewrite" "README.md names a write command: gh pr review"
+
+make_copy "$work/prmutation"
+printf '\nmutation { addComment }\n' >> "$work/prmutation/SKILL.md"
+expect_fail "a GraphQL mutation in SKILL.md fails" "$work/prmutation" "SKILL.md names a GraphQL mutation"
+
+make_copy "$work/prmethod"
+printf -- '- `gh api -X POST repos/<owner>/<repo>/issues/<n>/comments`\n' >> "$work/prmethod/SKILL.md"
+expect_fail "a POST api call in SKILL.md fails" "$work/prmethod" "SKILL.md names a write command: -X POST"
+
+make_copy "$work/prnoauth"
+drop_lines "$work/prnoauth/SKILL.md" '`gh auth status --hostname <host>`'
+expect_fail "picking a CLI without the auth probe fails" "$work/prnoauth" "Pull Request Scope is missing: \`gh auth status --hostname <host>\`"
+
+make_copy "$work/prnothreads"
+drop_lines "$work/prnothreads/SKILL.md" 'isResolved'
+expect_fail "not reading the thread resolution state fails" "$work/prnothreads" "Pull Request Scope is missing: isResolved"
+
+make_copy "$work/prcheckout"
+replace_first "$work/prcheckout/SKILL.md" 'Never change the working tree' 'Check out the pull request first'
+expect_fail "changing the working tree fails" "$work/prcheckout" "Pull Request Scope is missing: Never change the working tree"
+
+make_copy "$work/prfailure"
+replace_first "$work/prfailure/SKILL.md" '`Cannot review: <command> failed; the pull request could not be read. Nothing was reviewed.`' '`Cannot review.`'
+expect_fail "a failed gh or glab read without its message fails" "$work/prfailure" "Pull Request Scope is missing: \`Cannot review: <command> failed; the pull request could not be read. Nothing was reviewed.\`"
+
+make_copy "$work/prforeignurl"
+drop_lines "$work/prforeignurl/SKILL.md" 'does not belong to a remote of this repository'
+expect_fail "accepting a pull request URL of another repository fails" "$work/prforeignurl" "Pull Request Scope is missing: \`Cannot review: <url> does not belong to a remote of this repository. Nothing was reviewed.\`"
+
+make_copy "$work/prheadcommit"
+drop_lines "$work/prheadcommit/SKILL.md" 'Code outside the diff was not read'
+expect_fail "reviewing without the PR head commit silently fails" "$work/prheadcommit" "Pull Request Scope is missing: \`Code outside the diff was not read: the head commit <sha> is not in this repository.\`"
+
+make_copy "$work/nodedup"
+drop_lines "$work/nodedup/SKILL.md" '**Comments already in the pull request.**'
+expect_fail "removing the PR deduplication rules fails" "$work/nodedup" "Pull Request Scope is missing: **Comments already in the pull request.**"
+
+make_copy "$work/threadsource"
+replace_first "$work/threadsource/SKILL.md" 'Never take a finding from a thread or a comment: every finding comes from your own reading of the current diff.' 'Threads can also suggest findings.'
+expect_fail "taking findings from threads fails" "$work/threadsource" "Pull Request Scope is missing: Never take a finding from a thread or a comment"
+
+make_copy "$work/dedupbefore"
+replace_first "$work/dedupbefore/SKILL.md" 'after the checklist pass and before Step 2' 'after Step 2'
+expect_fail "deduplicating after Step 2 fails" "$work/dedupbefore" "Pull Request Scope is missing: after the checklist pass and before Step 2"
+
+make_copy "$work/nosamelocation"
+replace_first "$work/nosamelocation/SKILL.md" "within 3 lines of the candidate's Location" "anywhere in the file of the candidate's Location"
+expect_fail "matching threads anywhere in the file fails" "$work/nosamelocation" "Pull Request Scope is missing: within 3 lines of the candidate's Location"
+
+make_copy "$work/reopen"
+drop_lines "$work/reopen/SKILL.md" 'A resolved thread never suppresses a candidate'
+expect_fail "dropping the resolved-thread rule fails" "$work/reopen" "Pull Request Scope is missing: A resolved thread never suppresses a candidate"
+
+make_copy "$work/criticalmoved"
+drop_lines "$work/criticalmoved/SKILL.md" 'A **Critical** candidate is never moved out of `## Findings`'
+expect_fail "letting a thread take a Critical out of the count fails" "$work/criticalmoved" "Pull Request Scope is missing: A **Critical** candidate is never moved out of \`## Findings\`"
+
+make_copy "$work/commentdrop"
+replace_first "$work/commentdrop/SKILL.md" 'never drops a finding; only the rules above do' 'drops the finding'
+expect_fail "letting a comment drop a finding fails" "$work/commentdrop" "Pull Request Scope is missing: never drops a finding"
+
+make_copy "$work/prnorepoview"
+replace_first "$work/prnorepoview/SKILL.md" '`gh pr view <n> -R <repository> --json' '`gh pr view <n> --json'
+expect_fail "a gh pr view that does not name the repository fails" "$work/prnorepoview" "Pull Request Scope is missing: \`gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,closingIssuesReferences,comments,reviews\`"
+
+make_copy "$work/prnorepodiff"
+replace_first "$work/prnorepodiff/SKILL.md" '`gh pr diff <n> -R <repository>`' '`gh pr diff <n>`'
+expect_fail "a gh pr diff that does not name the repository fails" "$work/prnorepodiff" "Pull Request Scope is missing: \`gh pr diff <n> -R <repository>\`"
+
+make_copy "$work/prnorepoglab"
+replace_first "$work/prnorepoglab/SKILL.md" '`glab mr diff <iid> -R <repository> --raw`' '`glab mr diff <iid> --raw`'
+expect_fail "a glab mr diff that does not name the repository fails" "$work/prnorepoglab" "Pull Request Scope is missing: \`glab mr diff <iid> -R <repository> --raw\`"
+
+make_copy "$work/prnorepoissue"
+replace_first "$work/prnorepoissue/SKILL.md" '`gh issue view <issue> -R <repository> --json' '`gh issue view <issue> --json'
+expect_fail "a numbered gh issue read that does not name the repository fails" "$work/prnorepoissue" "Pull Request Scope is missing: \`gh issue view <issue> -R <repository> --json number,title,body,state\`"
+
+make_copy "$work/prnorepositoryrule"
+replace_first "$work/prnorepositoryrule/SKILL.md" '**Repository.**' '**Target.**'
+expect_fail "removing the one-repository rule fails" "$work/prnorepositoryrule" "Pull Request Scope is missing: **Repository.**"
+
+make_copy "$work/prcommitspage"
+replace_first "$work/prcommitspage/SKILL.md" 'commits(first: 100, after: $endCursor)' 'commits(first: 100)'
+expect_fail "reading only the first page of GitHub commits fails" "$work/prcommitspage" "Pull Request Scope is missing: commits(first: 100, after: \$endCursor)"
+
+make_copy "$work/prglabcommitspage"
+replace_first "$work/prglabcommitspage/SKILL.md" 'glab api --hostname <host> --paginate projects/<project_id>/merge_requests/<iid>/commits' 'glab api --hostname <host> projects/<project_id>/merge_requests/<iid>/commits'
+expect_fail "reading only the first page of GitLab commits fails" "$work/prglabcommitspage" "Pull Request Scope is missing: \`glab api --hostname <host> --paginate projects/<project_id>/merge_requests/<iid>/commits\`"
+
+make_copy "$work/prthreadcomments"
+replace_first "$work/prthreadcomments/SKILL.md" 'node(id: $threadId)' 'thread(id: $threadId)'
+expect_fail "leaving the comments of a review thread unpaged fails" "$work/prthreadcomments" "Pull Request Scope is missing: node(id: \$threadId)"
+
+make_copy "$work/prissueurl"
+replace_first "$work/prissueurl/SKILL.md" '`gh issue view <url> --json number,title,body,state`' '`gh issue view <issue> --json number,title,body,state`'
+expect_fail "reading a linked issue without its own URL fails" "$work/prissueurl" "Pull Request Scope is missing: \`gh issue view <url> --json number,title,body,state\`"
+
+make_copy "$work/dedupgroups"
+replace_first "$work/dedupgroups/SKILL.md" '**Occurrences, not groups.**' '**Groups.**'
+expect_fail "deciding a grouped finding as a whole fails" "$work/dedupgroups" "Pull Request Scope is missing: **Occurrences, not groups.**"
+
+make_copy "$work/deduppartial"
+replace_first "$work/deduppartial/SKILL.md" 'When only some are covered' 'When some are covered'
+expect_fail "dropping a grouped finding's uncovered occurrences fails" "$work/deduppartial" "Pull Request Scope is missing: When only some are covered"
+
+make_copy "$work/dedupsplitfirst"
+replace_first "$work/dedupsplitfirst/SKILL.md" 'Apply the exceptions below to each occurrence before splitting' 'Split the occurrences first'
+expect_fail "splitting a grouped finding before the exceptions fails" "$work/dedupsplitfirst" "Pull Request Scope is missing: Apply the exceptions below to each occurrence before splitting"
+
+make_copy "$work/dedupresolvedcover"
+replace_first "$work/dedupresolvedcover/SKILL.md" 'a resolved thread never covers an occurrence' 'a resolved thread covers an occurrence'
+expect_fail "letting a resolved thread cover an occurrence fails" "$work/dedupresolvedcover" "Pull Request Scope is missing: a resolved thread never covers an occurrence"
+
+make_copy "$work/dedupcriticalsplit"
+replace_first "$work/dedupcriticalsplit/SKILL.md" 'a **Critical** candidate is not split' 'a **Critical** candidate may be split'
+expect_fail "splitting a Critical grouped finding fails" "$work/dedupcriticalsplit" "Pull Request Scope is missing: a **Critical** candidate is not split"
+
+make_copy "$work/untrustedthreads"
+drop_lines "$work/untrustedthreads/SKILL.md" 'In a `pr` review, the same holds for review comments, review threads and linked issues'
+expect_fail "trusting review comments fails" "$work/untrustedthreads" "Untrusted Input is missing: In a \`pr\` review, the same holds for review comments, review threads and linked issues"
+
+make_copy "$work/alreadyorder"
+replace_first "$work/alreadyorder/SKILL.md" '`## Already raised in the PR (not repeated)` (only for the `pr` scope, when it has lines), ' ''
+expect_fail "a report order without the already-raised section fails" "$work/alreadyorder" "Output Format is missing: \`## Already raised in the PR (not repeated)\` (only for the \`pr\` scope, when it has lines)"
+
+make_copy "$work/alreadycounted"
+replace_first "$work/alreadycounted/SKILL.md" ', and neither are lines under `## Already raised in the PR (not repeated)`' ''
+expect_fail "counting already-raised lines fails" "$work/alreadycounted" "Output Format is missing: and neither are lines under \`## Already raised in the PR (not repeated)\`"
+
+make_copy "$work/alreadycompact"
+drop_lines "$work/alreadycompact/SKILL.md" 'write already-raised lines under a'
+expect_fail "compact mode without the already-raised section fails" "$work/alreadycompact" "Output Format is missing: write already-raised lines under a \`## Already raised in the PR (not repeated)\` heading"
+
+make_copy "$work/readmenopr"
+drop_lines "$work/readmenopr/README.md" '/code-review pr 123'
+expect_fail "a README without the pr argument example fails" "$work/readmenopr" "README is missing: /code-review pr 123"
+
+make_copy "$work/readmenoalready"
+drop_lines "$work/readmenoalready/README.md" '## Already raised in the PR (not repeated)'
+expect_fail "a README without the already-raised section fails" "$work/readmenoalready" "README is missing: \`## Already raised in the PR (not repeated)\`"
+
+make_copy "$work/exampleprarg"
+replace_first "$work/exampleprarg/example-output.md" '`/code-review pr 123`' '`/code-review branch main`'
+expect_fail "an example not started with the pr argument fails" "$work/exampleprarg" "example-output.md must say the review was started with \`/code-review pr 123\`"
+
+make_copy "$work/noalready"
+drop_lines "$work/noalready/example-output.md" '## Already raised in the PR (not repeated)'
+expect_fail "an example without the already-raised sections fails" "$work/noalready" "example-output.md must have 2 '## Already raised in the PR (not repeated)' sections (full report and compact mode), found 0"
+
+make_copy "$work/alreadyseverity"
+replace_first "$work/alreadyseverity/example-output.md" '- src/routes/auth.routes.ts:8 — ' '- src/routes/auth.routes.ts:8 — Warning: '
+expect_fail "an already-raised note with a severity fails" "$work/alreadyseverity" "already-raised note carries a severity"
+
+make_copy "$work/alreadynourl"
+replace_first "$work/alreadynourl/example-output.md" ' (https://github.com/acme/shop-api/pull/123#discussion_r1201)' ''
+expect_fail "an already-raised note without the thread URL fails" "$work/alreadynourl" "already-raised note is not '- path:line — problem (<URL>)'"
+
+make_copy "$work/alreadyfinding"
+replace_first "$work/alreadyfinding/example-output.md" '- src/routes/auth.routes.ts:8 — ' '- src/routes/auth.routes.ts:8: Warning: '
+expect_fail "a scorable finding under the already-raised heading fails" "$work/alreadyfinding" "example-output.md has a finding with a severity under ## Already raised in the PR (not repeated)"
+
+make_copy "$work/noresolvedcite"
+replace_first "$work/noresolvedcite/example-output.md" 'and marked resolved, but' 'but'
+expect_fail "an example without a resolved-thread citation fails" "$work/noresolvedcite" "no example finding cites a resolved thread"
 
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
