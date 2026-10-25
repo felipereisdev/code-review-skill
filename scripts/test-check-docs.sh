@@ -1077,6 +1077,26 @@ make_copy "$work/verdictraised"
 replace_first "$work/verdictraised/SKILL.md" 'change the verdict only through row 6 of Step 3' 'do not change the verdict'
 expect_fail "already-raised Warnings that never reach the verdict fail" "$work/verdictraised" "SKILL.md still says: already-raised lines do not change the verdict"
 
+make_copy "$work/apitoolname"
+printf -- '- Validate APIs with `mcp__plugin_context7_context7__query-docs`.\n' >> "$work/apitoolname/SKILL.md"
+expect_fail "naming an MCP tool literally fails" "$work/apitoolname" "a Markdown file names an agent-specific MCP tool"
+
+make_copy "$work/apinofallback"
+replace_first "$work/apinofallback/SKILL.md" 'do not report a finding that depends on it' 'report it anyway'
+expect_fail "reporting an unvalidated API claim fails" "$work/apinofallback" "SKILL.md is missing: do not report a finding that depends on it"
+
+make_copy "$work/apiblanket"
+replace_first "$work/apiblanket/SKILL.md" 'A bug whose Evidence follows from code you read needs no documentation' 'Every finding needs documentation'
+expect_fail "requiring documentation for code-local bugs fails" "$work/apiblanket" "SKILL.md is missing: A bug whose Evidence follows from code you read needs no documentation"
+
+make_copy "$work/apialwaysminor"
+replace_first "$work/apialwaysminor/SKILL.md" 'mark it `material` when a changed behavior depends on the claim' 'always mark it `not material`'
+expect_fail "an unvalidated API claim that is never material fails" "$work/apialwaysminor" "SKILL.md is missing: mark it \`material\` when a changed behavior depends on the claim"
+
+make_copy "$work/readmeapi"
+replace_first "$work/readmeapi/README.md" 'with any documentation tool the agent has' 'with the Context7 plugin'
+expect_fail "a README that needs the Context7 plugin fails" "$work/readmeapi" "README.md is missing: with any documentation tool the agent has"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}

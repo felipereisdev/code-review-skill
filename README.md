@@ -14,7 +14,7 @@
 
 - **Automatic Stack Detection** - Identifies project technology from config files
 - **Consistency-First Review** - Checks existing project conventions before flagging violations (Step 1.5)
-- **API Validation** - Validates library usage against live documentation to reduce false positives
+- **API Validation** - Checks a claim about a library API against the documentation of the version in use, with any documentation tool the agent has (for example the Context7 MCP server) or the official documentation; a claim it cannot check is never reported and is listed as `API not validated` in the Audit, which blocks the merge only when a changed behavior depends on it
 - **Multi-Stack Support** - 20 technology stacks covered
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels

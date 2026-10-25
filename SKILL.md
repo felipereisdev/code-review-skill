@@ -298,7 +298,7 @@ Before reviewing anything, identify the project's stack by inspecting the follow
 
 Based on what you find, load and apply **only** the stack and pattern files that match this project. Do not evaluate or report on technologies not present.
 
-> **API Validation:** Before flagging a misuse of a library API, validate the syntax and best practice against live docs using `mcp__plugin_context7_context7__query-docs` for the version detected in `package.json` or `composer.json`. Avoids false positives from outdated training data.
+> **API Validation:** Before you report a misuse of a library API, check the claim against the documentation of the version the project uses, as its manifest or lock file shows (for example `package.json` or `composer.json`). Use a documentation tool your agent has, for example the Context7 MCP server; without one, read the library's official documentation by whatever means your agent has. When neither is available, or the documentation does not settle the claim, do not report a finding that depends on it: list it in the Audit as `API not validated` (see Step 3), and mark it `material` when a changed behavior depends on the claim. This covers only claims about how an API behaves in a version, such as its signature, defaults, deprecation or recommended usage. A bug whose Evidence follows from code you read needs no documentation, for example a null dereference or an off-by-one. This avoids false positives from outdated training data.
 
 **Stack files to load if relevant:**
 

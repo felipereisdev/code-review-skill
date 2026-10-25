@@ -1444,6 +1444,39 @@ PY
   fi
 }
 
+check_api_validation() {
+  local missing=0 s rc
+  git grep -n 'mcp__' -- '*.md'; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    printf '  a Markdown file names an agent-specific MCP tool (lines above)\n'
+    missing=$((missing + 1))
+  elif [ "$rc" -ne 1 ]; then
+    printf '  git grep failed (run the script inside a git checkout)\n'
+    missing=$((missing + 1))
+  fi
+  for s in \
+    'Use a documentation tool your agent has, for example the Context7 MCP server' \
+    "read the library's official documentation" \
+    'do not report a finding that depends on it' \
+    'A bug whose Evidence follows from code you read needs no documentation' \
+    'list it in the Audit as `API not validated`' \
+    'mark it `material` when a changed behavior depends on the claim'; do
+    if ! grep -qF -- "$s" SKILL.md; then
+      printf '  SKILL.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if ! grep -qF -- 'with any documentation tool the agent has' README.md; then
+    printf '  README.md is missing: with any documentation tool the agent has\n'
+    missing=$((missing + 1))
+  fi
+  if [ "$missing" -eq 0 ]; then
+    pass "API validation names no agent-specific tool, falls back to the official documentation and never reports an unvalidated API claim"
+  else
+    fail "API validation portability (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -1461,6 +1494,7 @@ check_skill_pr_dedup
 check_skill_publishing
 check_skill_configuration
 check_skill_triage_audit
+check_api_validation
 check_stack_precedents
 check_readme_counts
 check_example_output
