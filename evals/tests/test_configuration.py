@@ -101,7 +101,12 @@ SEVERITY_REASON = "severity must be one of Critical, Warning, Suggestion"
 NEEDS_EXAMPLES = "it needs a ## Bad section and a ## Good section, each with a fenced code block"
 LINK = "Cannot review: {} is a symbolic link; configuration files must be regular files. Nothing was reviewed."
 NOT_RULE = "Cannot review: {} is not a rule file; .code-review/rules/ holds only .md files. Nothing was reviewed."
+NOT_FILE = ("Cannot review: {} is not a regular file; configuration files must be regular files. Nothing was "
+            "reviewed.")
+NOT_DIRECTORY = "Cannot review: {} is not a directory. Nothing was reviewed."
+NOT_UTF8 = "it is not UTF-8 text"
 INVALID = "Cannot review: {} is invalid: {}. Nothing was reviewed."
+FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 NOT_VERIFIED = ("**Configuration:** not verified, because the head commit is not in this repository; the settings and "
                 "rules in `.code-review/` were not read, and the review used the defaults.")
 
@@ -167,7 +172,11 @@ def load_mapping(text, invalid, not_mapping, noun):
         raise ConfigError(STRUCTURE)
     if not documents:
         return None
-    node = yaml.compose(text, Loader=yaml.SafeLoader)
+    try:
+        node = yaml.compose(text, Loader=yaml.SafeLoader)
+        data = yaml.safe_load(text)
+    except (yaml.YAMLError, ValueError):
+        raise ConfigError(invalid)  # a scalar such as 2024-13-45 is not a valid YAML value
     if not isinstance(node, yaml.MappingNode) or any(not isinstance(key, yaml.ScalarNode) for key, _ in node.value):
         raise ConfigError(not_mapping)
     seen = set()
@@ -175,7 +184,15 @@ def load_mapping(text, invalid, not_mapping, noun):
         if key.value in seen:
             raise ConfigError(f'duplicate {noun} "{key.value}"')
         seen.add(key.value)
-    return yaml.safe_load(text)
+    return data
+
+
+def read_text(tree, rel):
+    """The text of a file in the tree; ConfigError when it is not UTF-8."""
+    try:
+        return tree.read(rel)
+    except UnicodeDecodeError:
+        raise ConfigError(NOT_UTF8)
 
 
 def load_config(text):
@@ -208,6 +225,27 @@ def load_config(text):
     return settings
 
 
+def fence_lines(lines, start):
+    """(index, kind) for lines[start:]: 'text' outside fenced code blocks, otherwise 'open', 'body' or 'close'.
+    A fence is three or more backticks or tildes at the start of a line, indented by up to three spaces. It is closed
+    by a line of the same character, at least as long, with nothing after it. A block that is never closed runs to
+    the end of the file, as in CommonMark."""
+    fence = None
+    for i in range(start, len(lines)):
+        m = FENCE.match(lines[i])
+        if fence is None:
+            if m:
+                fence = m.group(1)
+                yield i, "open"
+            else:
+                yield i, "text"
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not lines[i][m.end():].strip():
+            fence = None
+            yield i, "close"
+        else:
+            yield i, "body"
+
+
 def load_rule(text):
     """The paths, severity and rule-text lines of a rule file."""
     lines = text.splitlines()
@@ -230,13 +268,15 @@ def load_rule(text):
     severity = front.get("severity")
     if severity not in SEVERITIES:
         raise ConfigError(SEVERITY_REASON)
-    b = next((i for i in range(j + 1, len(lines)) if lines[i].rstrip() == "## Bad"), None)
-    g = None if b is None else next((i for i in range(b + 1, len(lines)) if lines[i].rstrip() == "## Good"), None)
+    kinds = list(fence_lines(lines, j + 1))
+    headings = [i for i, kind in kinds if kind == "text" and lines[i].startswith("## ")]
+    b = next((i for i in headings if lines[i].rstrip() == "## Bad"), None)
+    g = next((i for i in headings if b is not None and i > b and lines[i].rstrip() == "## Good"), None)
     if b is None or g is None:
         raise ConfigError(NEEDS_EXAMPLES)
-    end = next((i for i in range(g + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
-    for section in (lines[b + 1:g], lines[g + 1:end]):
-        if not any(line.startswith("```") for line in section):
+    end = next((i for i in headings if i > g), len(lines))
+    for start, stop in ((b, g), (g, end)):
+        if "close" not in [kind for i, kind in kinds if start < i < stop]:
             raise ConfigError(NEEDS_EXAMPLES)
     rule_text = [i for i in range(j + 1, b) if lines[i].strip()]
     if not rule_text:
@@ -261,7 +301,7 @@ class WorkingTree:
             return "dir"
         if os.path.isfile(path):
             return "file"
-        return None
+        return "other" if os.path.lexists(path) else None
 
     def listdir(self, rel):
         return sorted(os.listdir(self._path(rel)))
@@ -316,22 +356,31 @@ def snapshot_source(scope, head_sha, checkout_sha, clean, sha_in_repo):
 def read_configuration(tree):
     """The configuration of the repository root, None when there is none, or ConfigError for the first problem."""
     base = ".code-review"
-    if tree.kind(base) == "link":
-        raise ConfigError(LINK.format(base))
-    if tree.kind(base) != "dir":
+    base_kind = tree.kind(base)
+    if base_kind is None:
         return None
+    if base_kind == "link":
+        raise ConfigError(LINK.format(base))
+    if base_kind != "dir":
+        raise ConfigError(NOT_DIRECTORY.format(base))
     config_rel = base + "/config.yml"
     rules_rel = base + "/rules"
     for rel in (config_rel, rules_rel):
         if tree.kind(rel) == "link":
             raise ConfigError(LINK.format(rel))
-    has_config = tree.kind(config_rel) == "file"
-    has_rules_dir = tree.kind(rules_rel) == "dir"
+    config_kind = tree.kind(config_rel)
+    rules_kind = tree.kind(rules_rel)
+    if config_kind not in (None, "file"):
+        raise ConfigError(NOT_FILE.format(config_rel))
+    if rules_kind not in (None, "dir"):
+        raise ConfigError(NOT_DIRECTORY.format(rules_rel))
+    has_config = config_kind == "file"
+    has_rules_dir = rules_kind == "dir"
     if not has_config and not has_rules_dir:
         return None
     if has_config:
         try:
-            settings = load_config(tree.read(config_rel))
+            settings = load_config(read_text(tree, config_rel))
         except ConfigError as error:
             raise ConfigError(INVALID.format(config_rel, error))
     else:
@@ -346,7 +395,7 @@ def read_configuration(tree):
             if kind != "file" or not name.endswith(".md"):
                 raise ConfigError(NOT_RULE.format(rel))
             try:
-                rule = load_rule(tree.read(rel))
+                rule = load_rule(read_text(tree, rel))
             except ConfigError as error:
                 raise ConfigError(INVALID.format(rel, error))
             rules.append(dict(rule, path=rel))
@@ -513,6 +562,7 @@ class ConfigTests(unittest.TestCase):
             ('ignore_paths: ["../shared/**"]\n', PATTERN_REASON.format("../shared/**", "it must not contain . or .. segments")),
             ("min_severity: warning\n", "min_severity must be one of Critical, Warning, Suggestion"),
             ("min_severity:\n", "min_severity must be one of Critical, Warning, Suggestion"),
+            ("min_severity: 2024-13-45\n", "it is not valid YAML"),
             ("max_findings_per_file: 0\n", whole),
             ("max_findings_per_file: -2\n", whole),
             ("max_findings_per_file: 2.5\n", whole),
@@ -533,6 +583,15 @@ class RuleTests(unittest.TestCase):
     def test_valid_rule(self):
         self.assertEqual(load_rule(VALID_RULE),
                          {"paths": ["src/api/**/*.ts"], "severity": "Warning", "rule_lines": (7, 8)})
+
+    def test_valid_rule_accepts_tilde_fences_and_headings_inside_examples(self):
+        self.assertEqual(load_rule(VALID_RULE.replace("```", "~~~"))["rule_lines"], (7, 8))
+        shown_in_code = ('---\npaths:\n  - "src/**"\nseverity: Warning\n---\n\nRule text.\n\n## Bad\n\n```md\n## Good\n```\n'
+                         "\n## Good\n\n```ts\ngood()\n```\n")
+        self.assertEqual(load_rule(shown_in_code)["rule_lines"], (7, 7))
+        longer_fence = ('---\npaths:\n  - "src/**"\nseverity: Warning\n---\n\nRule text.\n\n## Bad\n\n````md\n```ts\n'
+                        "## Good\n```\n````\n\n## Good\n\n```ts\ngood()\n```\n")
+        self.assertEqual(load_rule(longer_fence)["rule_lines"], (7, 7))
 
     def test_invalid_rules(self):
         front = '---\npaths:\n  - "src/**"\nseverity: Warning\n---\n'
@@ -563,6 +622,12 @@ class RuleTests(unittest.TestCase):
             (front + "\nRule text.\n\n## Bad\n\nbad()\n" + good, NEEDS_EXAMPLES),
             (front + "\nRule text.\n" + good + bad, NEEDS_EXAMPLES),
             (front + bad + good, "it has no rule text before ## Bad"),
+            (front.replace("severity: Warning", "severity: 2024-13-45") + body, "its frontmatter is not valid YAML"),
+            (front + "\nRule text.\n## Bad\n```ts\nbad()\n## Good\n```ts\ngood()\n", NEEDS_EXAMPLES),
+            ("---\npaths:\n  - \"src/api/**/*.ts\"\nseverity: Warning\n---\nRule text.\n## Bad\n```ts\nbad()\n## Good\n"
+             "```ts\ngood()\n", NEEDS_EXAMPLES),
+            (front + "\nRule text.\n\n## Bad\n\n```ts\nbad()\n```\n\n## Good\n\n~~~ts\ngood()\n", NEEDS_EXAMPLES),
+            (front + "\nRule text.\n\n## Bad\n\n```md\n## Good\n```\n", NEEDS_EXAMPLES),
         ]
         for text, reason in cases:
             with self.subTest(text=text):
@@ -663,6 +728,49 @@ class ReadConfigurationTests(unittest.TestCase):
         os.symlink(os.path.join(outside, "rules", "a.md"), os.path.join(base, "rules", "a.md"))
         self.assertStops(link.format(".code-review/rules/a.md"))
 
+    def write_bytes(self, rel, data):
+        path = os.path.join(self.root, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+
+    def test_one_bad_source_stops_the_whole_configuration(self):
+        self.write(".code-review/config.yml", VALID_CONFIG)
+        self.write(".code-review/rules", "not a directory\n")
+        self.assertStops("Cannot review: .code-review/rules is not a directory. Nothing was reviewed.")
+        os.remove(os.path.join(self.root, ".code-review", "rules"))
+        self.write(".code-review/rules/valid.md", VALID_RULE)
+        self.write(".code-review/config.yml", "comment: true\n")
+        self.assertStops('Cannot review: .code-review/config.yml is invalid: unknown setting "comment". '
+                         "Nothing was reviewed.")
+        self.write(".code-review/config.yml", VALID_CONFIG)
+        self.write(".code-review/rules/broken.md", "no frontmatter\n")
+        self.assertStops("Cannot review: .code-review/rules/broken.md is invalid: it must start with a frontmatter "
+                         "block between --- lines. Nothing was reviewed.")
+
+    def test_yaml_construction_and_text_errors_stop_the_run(self):
+        self.write(".code-review/config.yml", "min_severity: 2024-13-45\n")
+        self.assertStops("Cannot review: .code-review/config.yml is invalid: it is not valid YAML. Nothing was reviewed.")
+        self.write_bytes(".code-review/config.yml", b"min_severity: \xff\n")
+        self.assertStops("Cannot review: .code-review/config.yml is invalid: it is not UTF-8 text. Nothing was reviewed.")
+        os.remove(os.path.join(self.root, ".code-review", "config.yml"))
+        self.write(".code-review/rules/a.md", VALID_RULE.replace("severity: Warning", "severity: 2024-13-45"))
+        self.assertStops("Cannot review: .code-review/rules/a.md is invalid: its frontmatter is not valid YAML. "
+                         "Nothing was reviewed.")
+        self.write_bytes(".code-review/rules/a.md", VALID_RULE.encode("utf-8").replace(b"Every", b"Ev\xffry"))
+        self.assertStops("Cannot review: .code-review/rules/a.md is invalid: it is not UTF-8 text. Nothing was reviewed.")
+
+    def test_reserved_paths_of_the_wrong_kind_stop_the_run(self):
+        self.write(".code-review", "not a directory\n")
+        self.assertStops("Cannot review: .code-review is not a directory. Nothing was reviewed.")
+        os.remove(os.path.join(self.root, ".code-review"))
+        os.makedirs(os.path.join(self.root, ".code-review", "config.yml"))
+        self.assertStops("Cannot review: .code-review/config.yml is not a regular file; configuration files must be "
+                         "regular files. Nothing was reviewed.")
+        os.rmdir(os.path.join(self.root, ".code-review", "config.yml"))
+        self.write(".code-review/rules", "not a directory\n")
+        self.assertStops("Cannot review: .code-review/rules is not a directory. Nothing was reviewed.")
+
 
 def git(repo, *args):
     """Runs git with fixed arguments in a temporary test repository and returns its stdout."""
@@ -739,6 +847,45 @@ class SnapshotTests(unittest.TestCase):
         with self.assertRaises(ConfigError) as caught:
             read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
         self.assertEqual(str(caught.exception), NOT_RULE.format(".code-review/rules/api"))
+
+    def test_non_utf8_file_at_the_commit_stops(self):
+        with open(os.path.join(self.repo, ".code-review", "config.yml"), "wb") as f:
+            f.write(b"min_severity: \xff\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "bytes")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
+        self.assertEqual(str(caught.exception), "Cannot review: .code-review/config.yml is invalid: it is not UTF-8 "
+                                                "text. Nothing was reviewed.")
+
+    def test_directory_named_like_the_config_at_the_commit_stops(self):
+        os.remove(os.path.join(self.repo, ".code-review", "config.yml"))
+        self.put(".code-review/config.yml/nested.yml", "")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "directory")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
+        self.assertEqual(str(caught.exception), "Cannot review: .code-review/config.yml is not a regular file; "
+                                                "configuration files must be regular files. Nothing was reviewed.")
+
+    def test_rules_path_that_is_a_file_at_the_commit_stops_without_applying_the_config(self):
+        git(self.repo, "rm", "-q", "-r", ".code-review")
+        self.put(".code-review/config.yml", VALID_CONFIG)
+        self.put(".code-review/rules", "not a directory\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "rules as a file")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
+        self.assertEqual(str(caught.exception), "Cannot review: .code-review/rules is not a directory. Nothing was reviewed.")
+
+    def test_code_review_that_is_a_file_at_the_commit_stops(self):
+        git(self.repo, "rm", "-q", "-r", ".code-review")
+        self.put(".code-review", "not a directory\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "base as a file")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
+        self.assertEqual(str(caught.exception), "Cannot review: .code-review is not a directory. Nothing was reviewed.")
 
     def change(self, rel, text):
         """Commits a change to one file on top of the base commit and returns the new head sha."""
@@ -1004,10 +1151,13 @@ class ReferenceTests(unittest.TestCase):
             self.assertIn("`" + template.format("<path>") + "`", self.text)
         self.assertIn("`" + INVALID.format(".code-review/config.yml", "<reason>") + "`", self.text)
         self.assertIn("`" + INVALID.format("<path>", "<reason>") + "`", self.text)
+        self.assertIn("`Cannot review: <path> is not a regular file; configuration files must be regular files. "
+                      "Nothing was reviewed.`", self.text)
+        self.assertIn("`Cannot review: <path> is not a directory. Nothing was reviewed.`", self.text)
         for reason in ("it must start with a frontmatter block between --- lines", "its frontmatter is not valid YAML",
                        "its frontmatter must be a mapping with paths and severity", "unknown frontmatter key",
                        "duplicate frontmatter key", STRUCTURE, "paths must be a non-empty list of path patterns",
-                       SEVERITY_REASON, NEEDS_EXAMPLES, "it has no rule text before ## Bad"):
+                       SEVERITY_REASON, NEEDS_EXAMPLES, "it has no rule text before ## Bad", "it is not UTF-8 text"):
             self.assertIn(reason, self.text)
 
 
