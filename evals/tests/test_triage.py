@@ -1,6 +1,7 @@
 """Offline checks of the triage, verdict and audit contract in SKILL.md Step 3 against handwritten reports; they do not measure what an agent writes."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -62,6 +63,12 @@ def read(name):
 
 
 FIXTURE = read("fixtures/triage/report.md")
+EXAMPLE = read(os.path.join("..", "..", "example-output.md"))
+REPORT_END = "The report ends with the Audit above."
+
+
+def example_full():
+    return EXAMPLE[EXAMPLE.index("## Code Review Report"):EXAMPLE.index(REPORT_END)]
 
 
 def plural(n, word):
@@ -887,6 +894,53 @@ class SummaryTests(Base):
                          "summary misses the audit line")
         self.assertTrue(inline_has_triage(body))
         self.assertFalse(inline_has_triage("**Issue:** x"))
+
+
+class ExampleOutputTests(Base):
+    def test_full_report(self):
+        full = example_full()
+        self.assertEqual(check_report(full), [])
+        self.assertEqual(line_of(full, "Ready to merge"),
+                         "**Ready to merge:** No — 2 Critical findings must be fixed before merging.")
+        self.assertEqual(parse_audit(full)["raised"], [("src/routes/auth.routes.ts:8", "Security")])
+
+    def test_action_items_are_outside_the_report(self):
+        self.assertLess(EXAMPLE.index("## Audit"), EXAMPLE.index(REPORT_END))
+        self.assertLess(EXAMPLE.index(REPORT_END), EXAMPLE.index("## Action Items"))
+
+    def test_compact_mode(self):
+        full = example_full()
+        compact = EXAMPLE[EXAMPLE.index("## Compact Mode"):EXAMPLE.index("## Coverage Limits")]
+        lines = compact.split("\n")
+        self.assertEqual(triage_lines(compact), triage_lines(full))
+        self.assertEqual([line for line in lines if line.startswith("**Audit:** ")],
+                         [compact_audit_line(parse_audit(full))])
+        self.assertNotIn("## Audit", lines)
+        self.assertGreater(find_line(lines, "**Review effort:** "), find_line(lines, "**Verification:**"))
+
+    def test_coverage_limits(self):
+        section = EXAMPLE[EXAMPLE.index("## Coverage Limits"):EXAMPLE.index("## Repository Configuration")]
+        blocks = re.findall(r"```markdown\n(.*?)```", section, re.S)
+        combined = "\n\n".join(blocks)
+        self.assertEqual(check_report(combined), [])
+        self.assertTrue(line_of(combined, "Ready to merge").startswith(
+            "**Ready to merge:** No — not fully reviewed (not read): `src/legacy/report.ts` lines 1201-2310."))
+        items = parse_audit(combined)["items"]
+        self.assertIn("material", [weight for _what, _tag, weight, _detail in items])
+        self.assertIn("not material", [weight for _what, _tag, weight, _detail in items])
+        self.assertIn("tests not verified", [tag for _what, tag, _weight, _detail in items])
+
+    def test_dry_run_summary(self):
+        full = example_full()
+        compact = compact_audit_line(parse_audit(full))
+        dry = EXAMPLE[EXAMPLE.index("## Dry run — nothing was published"):]
+        payloads = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", dry, re.S)]
+        summaries = [p["body"] for p in payloads if p["body"].startswith("<!-- code-review-skill:summary -->")]
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(check_summary_triage(summaries[0], full, compact), [])
+        for payload in payloads:
+            for comment in payload.get("comments", []):
+                self.assertIs(inline_has_triage(comment["body"]), False)
 
 
 class ToolTests(Base):
