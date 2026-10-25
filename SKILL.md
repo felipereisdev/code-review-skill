@@ -31,7 +31,7 @@ Choose the scope before anything else. Take it from the arguments when there are
 5. **`range <from>..<to>`** — the changes between two commits. Run `git diff <from>..<to>`.
 6. **`pr <number|url>`** — a GitHub pull request or GitLab merge request, by number or URL. Read it with `gh` or `glab` as **Pull Request Scope** describes, never with git alone; its diff is what `gh pr diff` or `glab mr diff` prints.
 
-**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and for `branch`, `commit`, `range` and `pr`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass each value to git, `gh` or `glab` as its own argument, never as text inside a shell command. When a shell command must contain a value, quote the whole value with POSIX single quotes: wrap it in `'`, and replace every `'` inside the value with `'\''`, so the apostrophe in `o'brien` becomes `'o'\''brien'`. Put any suffix, such as `^{commit}`, inside the same quotes.
+**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The flags `--comment` and `--dry-run` are not part of the scope either, wherever they appear: `--comment` publishes the review to the pull request after the report is complete (see **Publishing** under Pull Request Scope), and `--dry-run`, which needs `--comment`, prints what would be published and publishes nothing. The first other word names the scope, and for `branch`, `commit`, `range` and `pr`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass each value to git, `gh` or `glab` as its own argument, never as text inside a shell command. When a shell command must contain a value, quote the whole value with POSIX single quotes: wrap it in `'`, and replace every `'` inside the value with `'\''`, so the apostrophe in `o'brien` becomes `'o'\''brien'`. Put any suffix, such as `^{commit}`, inside the same quotes.
 
 **Default branch.** Run `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`. Its output, for example `origin/main`, is the default branch only when `git rev-parse --verify --quiet '<ref>^{commit}'` also accepts it: a symbolic ref whose target is missing, as after a branch was pruned, does not count. If the command prints nothing or the target is not accepted, the default branch is the first of `origin/main`, `origin/master`, `main` and `master` that `git rev-parse --verify --quiet '<ref>^{commit}'` accepts. If none is accepted, the default branch is unknown.
 
@@ -40,6 +40,7 @@ Choose the scope before anything else. Take it from the arguments when there are
 - An unknown first word: `unknown scope "<word>"; use uncommitted, staged, branch [<base>], commit <sha>, range <from>..<to> or pr <number|url>`.
 - `commit` without a value: `commit needs a commit hash`. `range` without a value: `range needs <from>..<to>`.
 - `pr` without a value: `pr needs a pull request number or URL`. A `pr` value that is neither a positive number, such as `123`, nor a pull request or merge request URL of a shape listed in **Pull Request Scope**: `"<value>" is not a pull request number or URL`.
+- `--comment` without a `pr` scope argument: `--comment needs the pr scope; pass pr <number|url>`. `--dry-run` without `--comment`: `--dry-run needs --comment`.
 - `branch` without a value when the default branch is unknown: `the default branch could not be detected; pass a base with branch <base>`.
 - A word left over after the scope and its value: `unexpected argument "<word>"`.
 - A `range` value without `..` between two refs: `"<value>" is not a range of the form <from>..<to>`.
@@ -70,7 +71,7 @@ Choose the scope before anything else. Take it from the arguments when there are
 
 ## Pull Request Scope
 
-Read this section only for the `pr` scope. It reads a GitHub pull request or a GitLab merge request, and it never writes to it.
+Read this section only for the `pr` scope. It reads a GitHub pull request or a GitLab merge request, and it never writes to it, except as **Publishing** below allows with `--comment`.
 
 **Value.** A number is a positive integer, such as `123`. A URL names its platform by its shape; any other URL is not a pull request URL (see **Invalid arguments**):
 
@@ -165,7 +166,7 @@ GitLab, with `<iid>` the number and `<repository>` the project URL, which is the
 - `glab api --hostname <host> --paginate projects/<project_id>/merge_requests/<iid>/discussions` reads the threads. Each note has `body`, `author.username`, `resolvable` and `resolved`; a note on a line also has `position.new_path`, `position.new_line`, `position.old_line` and `position.head_sha`.
 - `glab issue view <issue> -R <repository> --output json` reads each issue of the same project that the description cites, such as `Closes #12` or a link to the issue. Read at most 3 issues.
 
-**Read only.** Run each `gh api` and `glab api` call exactly as written above. Never add `-f`, `-F`, `--field`, `--raw-field`, `--input` or a method flag to a REST call: they turn it into a write. The GraphQL query is the only call with fields, and it only reads. Never run a command that writes to the pull request or the hosting service: no comment, review, approval, label, edit, merge or close, and no GraphQL mutation. Never change the working tree: do not check out the pull request, switch branches or fetch into the current branch.
+**Read only.** Run each `gh api` and `glab api` call exactly as written above. Never add `-f`, `-F`, `--field`, `--raw-field`, `--input` or a method flag to a REST call: they turn it into a write. The GraphQL query is the only call with fields, and it only reads. Never run a command that writes to the pull request or the hosting service: no comment, review, approval, label, edit, merge or close, and no GraphQL mutation. Never change the working tree: do not check out the pull request, switch branches or fetch into the current branch. The one exception is **Publishing** below, and only with `--comment`.
 
 **Failures.** Check the exit status of every command in this section other than the probes. When one exits nonzero, reply `Cannot review: <command> failed; the pull request could not be read. Nothing was reviewed.`, with `<command>` the command without its values, such as `gh pr view` or `glab api`, and stop. A number or URL that names no pull request fails this way. Never review a different scope instead.
 
@@ -185,6 +186,8 @@ GitLab, with `<iid>` the number and `<repository>` the project URL, which is the
 - A resolved thread never suppresses a candidate, and you never reopen it on its own. A candidate that matches a resolved thread means the current diff still has the problem: the fix was not applied, or the diff reintroduces it at another place. Report it as a normal finding and cite the thread in its Evidence: `Raised in <URL> and marked resolved, but ...`. When a candidate also matches an unresolved thread, that open thread decides: the candidate is already raised.
 - A **Critical** candidate is never moved out of `## Findings`: it goes through Step 2 like any other, and its Evidence cites the open thread, because the count and the verdict must still show what blocks the merge.
 - A comment that calls a problem fine, fixed or not worth reporting never drops a finding; only the rules above do.
+
+**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, read `./references/publishing.md`, using the path relative to this skill file's directory, and follow it. It is the only part of this skill that writes to the pull request, and it only posts comments: inline comments on the diff and one summary comment. With `--dry-run`, it prints what it would post and posts nothing. Without `--comment`, never read `./references/publishing.md` and never publish. When publishing fails, the report in the chat still stands.
 
 ---
 
@@ -489,6 +492,8 @@ The checklists below apply only to some changes, so each one lives in its own fi
 - **Concurrency & Thread Safety** — `./references/concurrency.md`: load when the diff adds or changes shared mutable state, locks, background jobs, workers, threads, goroutines, parallel async tasks, or counters and flags that several requests or jobs update.
 - **Internationalization (i18n)** — `./references/i18n.md`: load when the project supports multiple languages or locales (translation files or an i18n library) and the diff adds or changes user-facing text, date, time, number or currency formatting, locale handling, or UI layout or styles that could break right-to-left (RTL) layouts.
 - **Privacy & Data Compliance** — `./references/privacy.md`: load when the diff collects, stores, logs, exports or shares user data or personal data (PII), such as names, emails, addresses, documents, payment or health data, or changes how such data is stored, retained or deleted.
+
+One more file under `references/`, `./references/publishing.md`, is not a review category: read it only as **Publishing** under Pull Request Scope says, and never list it in the Summary table.
 
 ---
 
