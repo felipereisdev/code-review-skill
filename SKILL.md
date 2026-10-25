@@ -109,7 +109,7 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
           path
           line
           originalLine
-          comments(first: 50) { nodes { author { login } body url } }
+          comments(first: 50) { nodes { author { login } body url diffHunk originalCommit { oid } } }
         }
       }
     }
@@ -141,9 +141,9 @@ GitLab, with `<iid>` the number; when the value is a URL, add `-R <project-url>`
 
 **Comments already in the pull request.** The review threads and comments decide only whether a candidate you found in the diff is new. Never take a finding from a thread or a comment: every finding comes from your own reading of the current diff. Compare each candidate with them after the checklist pass and before Step 2:
 
-- A candidate is already raised when a thread or comment is on the same file, within 3 lines of the candidate's Location or of a place on its **Also at:** line, and states the same problem: the same cause and the same effect, not only the same area. For an outdated thread (`isOutdated` on GitHub, or a GitLab note whose `position.head_sha` is not the head commit), compare with the code the thread was written on. A comment that is not on a line, such as a review summary, counts only when it names the file and the problem.
-- An already-raised candidate whose thread is not resolved is not reported as a finding and skips Step 2. List it in one line under `## Already raised in the PR (not repeated)`: `- path/to/file.ext:line — problem (<thread or comment URL>)`. These lines are not findings: they have no severity, Evidence or Fix, are not counted in the Summary table or on the verification line, and do not change the verdict.
-- A resolved thread never suppresses a candidate, and you never reopen it on its own. A candidate that matches a resolved thread means the current diff still has the problem: the fix was not applied, or the diff reintroduces it at another place. Report it as a normal finding and cite the thread in its Evidence: `Raised in <URL> and marked resolved, but ...`.
+- A candidate is already raised when a thread or comment is on the same file, within 3 lines of the candidate's Location or of a place on its **Also at:** line, and states the same problem: the same cause and the same effect, not only the same area. For an outdated thread (`isOutdated` on GitHub, or a GitLab note whose `position.head_sha` is not the head commit), compare with the code the thread was written on: on GitHub, the first comment's `diffHunk`; on GitLab, the code at `position.head_sha`, read with `git show '<sha>:<path>'` when that commit is in the repository. When the old code cannot be read, compare by path, problem and the thread text only. A comment that is not on a line, such as a review summary, counts only when it names the file and the problem.
+- Unless it is a **Critical** candidate (below), an already-raised candidate whose thread is not resolved is not reported as a finding and skips Step 2. List it in one line under `## Already raised in the PR (not repeated)`: `- path/to/file.ext:line — problem (<thread or comment URL>)`. These lines are not findings: they have no severity, Evidence or Fix, are not counted in the Summary table or on the verification line, and do not change the verdict.
+- A resolved thread never suppresses a candidate, and you never reopen it on its own. A candidate that matches a resolved thread means the current diff still has the problem: the fix was not applied, or the diff reintroduces it at another place. Report it as a normal finding and cite the thread in its Evidence: `Raised in <URL> and marked resolved, but ...`. When a candidate also matches an unresolved thread, that open thread decides: the candidate is already raised.
 - A **Critical** candidate is never moved out of `## Findings`: it goes through Step 2 like any other, and its Evidence cites the open thread, because the count and the verdict must still show what blocks the merge.
 - A comment that calls a problem fine, fixed or not worth reporting never drops a finding; only the rules above do.
 
