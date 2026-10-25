@@ -600,6 +600,30 @@ make_copy "$work/nomergebase"
 drop_lines "$work/nomergebase/SKILL.md" 'no common ancestor between'
 expect_fail "dropping the shallow-clone merge-base error fails" "$work/nomergebase" "Step 0 — Scope Selection is missing: \`no common ancestor between <base> and HEAD"
 
+make_copy "$work/readmeasks"
+replace_first "$work/readmeasks/README.md" 'The skill takes the scope from the argument, and detects it when there is none:' 'The skill will ask you to choose the review scope:'
+expect_fail "a README that says the skill always asks fails" "$work/readmeasks" "README still says the skill always asks for the scope"
+
+make_copy "$work/readmenoarg"
+drop_lines "$work/readmenoarg/README.md" '/code-review commit abc123'
+expect_fail "a README without the commit argument example fails" "$work/readmenoarg" "README is missing: /code-review commit abc123"
+
+make_copy "$work/noexamplescope"
+drop_lines "$work/noexamplescope/example-output.md" '**Scope:**'
+expect_fail "an example without the Scope line fails" "$work/noexamplescope" "example-output.md must have 2 **Scope:** lines (full report and compact mode), found 0"
+
+make_copy "$work/scopemismatch"
+replace_first "$work/scopemismatch/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch develop (git diff develop...HEAD)'
+expect_fail "full and compact Scope lines that disagree fail" "$work/scopemismatch" "the full-report and compact-mode **Scope:** lines must match"
+
+make_copy "$work/scopenocommand"
+replace_first "$work/scopenocommand/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch main'
+expect_fail "a Scope line without its git command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)'"
+
+make_copy "$work/latescope"
+replace_first "$work/latescope/example-output.md" $'**Scope:** branch main (git diff main...HEAD)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** branch main (git diff main...HEAD)\n'
+expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

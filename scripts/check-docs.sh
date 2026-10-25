@@ -665,6 +665,54 @@ PY
   fi
 }
 
+check_docs_scope_usage() {
+  if python3 - <<'PY'
+import re, sys
+
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("/code-review uncommitted", "/code-review staged", "/code-review branch main",
+          "/code-review commit abc123", "/code-review range ", "`Cannot review: ... Nothing was reviewed.`",
+          "`**Scope:** branch main (git diff main...HEAD)`"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+if "The skill will ask you to choose the review scope" in readme:
+    errors.append("README still says the skill always asks for the scope")
+text = open("example-output.md", encoding="utf-8").read()
+lines = text.splitlines()
+if "`/code-review branch main`" not in text:
+    errors.append("example-output.md must say the review was started with `/code-review branch main`")
+SCOPE = re.compile(r"^\*\*Scope:\*\* (uncommitted|staged|branch \S+|commit \S+|range \S+\.\.\S+)"
+                   r"(, auto-detected)? \(git [^()]+\)$")
+scopes = [i for i, line in enumerate(lines) if line.startswith("**Scope:**")]
+if len(scopes) != 2:
+    errors.append("example-output.md must have 2 **Scope:** lines (full report and compact mode), "
+                  f"found {len(scopes)}")
+else:
+    for i in scopes:
+        if not SCOPE.match(lines[i]):
+            errors.append(f"example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)': {lines[i][:60]}")
+    if lines[scopes[0]] != lines[scopes[1]]:
+        errors.append("the full-report and compact-mode **Scope:** lines must match")
+    done_well = next((i for i, line in enumerate(lines) if line == "### What Was Done Well"), None)
+    compact = next((i for i, line in enumerate(lines) if line == "## Compact Mode"), None)
+    first_line = next((i for i, line in enumerate(lines)
+                       if compact is not None and i > compact and re.match(r"^- \S+:\d+", line)), None)
+    if done_well is None or not scopes[0] < done_well:
+        errors.append("the full-report **Scope:** line must come before ### What Was Done Well")
+    if compact is None or first_line is None or not compact < scopes[1] < first_line:
+        errors.append("the compact-mode **Scope:** line must come after ## Compact Mode and before the first compact line")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show scope arguments and the Scope line"
+  else
+    fail "README and example-output.md scope usage (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -858,6 +906,7 @@ check_stack_precedents
 check_readme_counts
 check_example_output
 check_example_findings
+check_docs_scope_usage
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"
