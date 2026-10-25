@@ -46,6 +46,12 @@ API_MATERIAL = ("- `pg` query options in `src/orders.js` — API not validated, 
 TNV_ITEM = "- relevant tests — tests not verified, not material: `tests/orders.test.js` could not be opened."
 CHECKED = "**Checked with no findings:** Architecture, Code & File Size."
 ALREADY = "**Already raised, not verified:** `src/orders.js:40` (Potential Bugs)."
+HEADLINE_PASSED = "Code review passed — no issues found."
+HEADLINE_INCOMPLETE = "Review incomplete or pending — no confirmed findings in the code inspected."
+NO_FINDINGS_SHOWN = ("**No findings shown:** the configuration omitted every finding; see the Omitted by "
+                     "configuration line.")
+ROUTES_LIMIT = ("`src/routes.js` lines 40-90", "not read")
+ROUTES_ITEM = "- `src/routes.js` lines 40-90 — not read, material: the diff output was cut off."
 COMPACT_FIXTURE = ("**Audit:** 2 of 2 changed files reviewed; 2 files read for context; no findings in Architecture, "
                    "Code & File Size; not verified: `pg` query options in `src/orders.js` (API not validated, not material).")
 L = ("`src/a.js` lines 10-90", "not read")
@@ -395,6 +401,7 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0):
         if any(line.startswith("#") for line in lines[audit_at + 1:]):
             errors.append("## Audit must be the last section of the report")
 
+    errors += headline_errors(text, omitted_warning + omitted_needs)
     try:
         audit = parse_audit(text)
     except ValueError as error:
@@ -418,6 +425,31 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0):
     got = triage["Ready to merge"]
     if got and got != want:
         errors.append(f"Ready to merge line is {got!r}, expected {want!r}")
+    return errors
+
+
+def headline_errors(text, omitted=0):
+    """Errors for the headline of a report, in full or compact form: the passed sentence only for Ready to merge Yes
+    and no listed finding; the incomplete sentence never beside Yes; a headline never beside listed findings; and
+    when a filter omitted findings and none is listed, the No findings shown line in place of the headline."""
+    lines = text.split("\n")
+    at = find_line(lines, "**Ready to merge:** ")
+    ready = lines[at] if at is not None else ""
+    findings = [f for f in parse_findings(text) if not (f["pre_existing"] or f["already_raised"])]
+    listed = [f for f in findings if not f["needs_verification"]]
+    found = [h for h in map(headline_of, lines) if h is not None]
+    notice = [h for h in found if h.lstrip("*").startswith("No findings shown:")]
+    errors = []
+    if listed and found:
+        errors.append(f"headline {found[0]!r} contradicts the findings listed in the report")
+    elif omitted and not findings and not notice:
+        errors.append("findings were omitted by configuration: the headline must be the No findings shown line")
+    if len(found) > 1:
+        errors.append("the report has more than one headline")
+    elif found and found[0] == HEADLINE_PASSED and ready and not ready.startswith("**Ready to merge:** Yes — "):
+        errors.append(f"headline {HEADLINE_PASSED!r} needs Ready to merge: Yes")
+    elif found and found[0] == HEADLINE_INCOMPLETE and ready.startswith("**Ready to merge:** Yes — "):
+        errors.append("the incomplete headline contradicts Ready to merge: Yes")
     return errors
 
 
@@ -486,6 +518,27 @@ def no_findings(text):
     return text
 
 
+def clean_report(text):
+    """The fixture without any finding block or finding heading."""
+    text = drop_heading(no_findings(text), "## Findings")
+    return drop_heading(text, "## Needs human verification")
+
+
+def unreviewed(text):
+    """The fixture after no changed file could be read."""
+    text = no_findings(text)
+    text = set_line(text, "Files reviewed", "**Files reviewed:** 0 of 2 changed files.")
+    text = set_line(text, "Checked with no findings", "**Checked with no findings:** none.")
+    text = set_line(text, "Look first", "**Look first:** no reviewed file.")
+    text = set_line(text, "Relevant tests", "**Relevant tests:** not verified — no changed file could be read. "
+                    "Execution: not run.")
+    return with_items(
+        text,
+        "- `src/orders.js` (whole file) — not read, material: it could not be opened.",
+        "- `src/routes.js` (whole file) — not read, material: it could not be opened.",
+        "- relevant tests — tests not verified, not material: no changed file could be read.")
+
+
 def as_pr(text):
     text = set_line(text, "Scope", "**Scope:** pr 7 (gh pr diff 7)")
     text = replace_once(text, "## Summary\n", RAISED_HEADING + "\n\n"
@@ -504,6 +557,43 @@ def wide(text, listed):
 
 def triage_block(text):
     return "\n".join(line for line in triage_lines(text) if line is not None)
+
+
+def headline_of(line):
+    """The headline of a line: a passed or incomplete sentence without its bold markers, or the whole No findings shown line."""
+    norm = line.strip().strip("*").strip()
+    if norm in (HEADLINE_PASSED, HEADLINE_INCOMPLETE):
+        return norm
+    if line.strip().lstrip("*").startswith("No findings shown:"):
+        return line.strip()
+    return None
+
+
+def headlines(text):
+    return [h for h in map(headline_of, text.split("\n")) if h is not None]
+
+
+def compact_form(text):
+    """The report in compact mode: the same lines, with one **Audit:** line in place of ## Audit."""
+    audit = compact_audit_line(parse_audit(text))
+    return drop_block(text, "## Audit").rstrip("\n") + "\n" + audit + "\n"
+
+
+def after_first_bullet(text, line):
+    return replace_once(text, "- The new handler validates its input with the route schema.\n",
+                        "- The new handler validates its input with the route schema.\n\n" + line + "\n")
+
+
+def summary_of(text, headline):
+    """A published summary as publishing.md writes it: the headline in place of the list, then the triage lines."""
+    return ("<!-- code-review-skill:summary -->\n## Code review\n\n## Findings\n\n" + headline + "\n\n"
+            + triage_block(text) + "\n" + compact_audit_line(parse_audit(text)) + "\n")
+
+
+def check_summary_headline(body, report):
+    """Errors when a published summary's headline differs from the report's."""
+    want, got = headlines(report), headlines(body)
+    return [] if got == want else [f"summary headline is {got!r}, report has {want!r}"]
 
 
 class Base(unittest.TestCase):
@@ -529,7 +619,7 @@ class ReportTests(Base):
         self.assertEqual(check_report(with_verdict(text, needs=1)), [])
 
     def test_omitted_warning_still_counts(self):
-        text = with_verdict(no_findings(FIXTURE), warning=1, omitted_warning=1)
+        text = after_first_bullet(with_verdict(no_findings(FIXTURE), warning=1, omitted_warning=1), NO_FINDINGS_SHOWN)
         self.assertEqual(check_report(text, omitted_warning=1), [])
         self.assertError(check_report(text), "Ready to merge line is")
 
@@ -546,17 +636,7 @@ class ReportTests(Base):
         self.assertError(check_report(wrong, omitted_needs=1), "Ready to merge line is")
 
     def test_nothing_reviewed_is_never_yes(self):
-        text = no_findings(FIXTURE)
-        text = set_line(text, "Files reviewed", "**Files reviewed:** 0 of 2 changed files.")
-        text = set_line(text, "Checked with no findings", "**Checked with no findings:** none.")
-        text = set_line(text, "Look first", "**Look first:** no reviewed file.")
-        text = set_line(text, "Relevant tests", "**Relevant tests:** not verified — no changed file could be read. "
-                        "Execution: not run.")
-        text = with_items(
-            text,
-            "- `src/orders.js` (whole file) — not read, material: it could not be opened.",
-            "- `src/routes.js` (whole file) — not read, material: it could not be opened.",
-            "- relevant tests — tests not verified, not material: no changed file could be read.")
+        text = unreviewed(FIXTURE)
         self.assertError(check_report(set_line(text, "Ready to merge", verdict_line())), "Ready to merge line is")
         self.assertEqual(check_report(with_verdict(text, reviewed=0)), [])
 
@@ -799,6 +879,56 @@ class ReportTests(Base):
         self.assertIsNotNone(COMPACT_AUDIT.match(COMPACT_FIXTURE))
         self.assertIn("; already raised, not verified: 1 Warning candidate; not verified: ",
                       compact_audit_line(parse_audit(as_pr(no_findings(FIXTURE)))))
+
+
+class HeadlineTests(Base):
+    """The headline of a report with no listed finding follows Ready to merge, in full, compact and summary forms."""
+    def cases(self):
+        clean = clean_report(FIXTURE)
+        return {
+            "material-unread": (with_verdict(with_items(clean, ROUTES_ITEM), material=[ROUTES_LIMIT]),
+                                HEADLINE_INCOMPLETE, [HEADLINE_PASSED], 0),
+            "zero-reviewed": (with_verdict(unreviewed(clean), reviewed=0), HEADLINE_INCOMPLETE, [HEADLINE_PASSED], 0),
+            "needs-only": (with_verdict(drop_block(drop_block(FIXTURE, FINDING_BLOCKS[0]), FINDING_BLOCKS[1]), needs=1),
+                           HEADLINE_INCOMPLETE, [HEADLINE_PASSED], 0),
+            "already-raised-only": (with_verdict(as_pr(clean), raised=1), HEADLINE_INCOMPLETE, [HEADLINE_PASSED], 0),
+            "clean": (with_verdict(clean), HEADLINE_PASSED, [HEADLINE_INCOMPLETE], 0),
+            "filtered-main-warning": (with_verdict(no_findings(FIXTURE), warning=1, omitted_warning=1),
+                                      NO_FINDINGS_SHOWN, [HEADLINE_PASSED, HEADLINE_INCOMPLETE], 1),
+        }
+
+    def test_each_case_carries_its_headline_in_every_form(self):
+        for name, (base, want, _wrong, omitted) in self.cases().items():
+            text = after_first_bullet(base, want)
+            with self.subTest(case=name, form="full"):
+                self.assertEqual(check_report(text, omitted_warning=omitted), [])
+                self.assertEqual(headlines(text), [want])
+            with self.subTest(case=name, form="compact"):
+                compact = compact_form(text)
+                self.assertEqual(headline_errors(compact, omitted), [])
+                self.assertEqual(headlines(compact), [want])
+            with self.subTest(case=name, form="summary"):
+                self.assertEqual(check_summary_headline(summary_of(text, want), text), [])
+
+    def test_a_wrong_headline_is_rejected_in_every_form(self):
+        for name, (base, want, wrong, omitted) in self.cases().items():
+            right = after_first_bullet(base, want)
+            for headline in wrong:
+                text = after_first_bullet(base, headline)
+                with self.subTest(case=name, form="full", headline=headline):
+                    self.assertTrue(check_report(text, omitted_warning=omitted))
+                with self.subTest(case=name, form="compact", headline=headline):
+                    self.assertTrue(headline_errors(compact_form(text), omitted))
+                with self.subTest(case=name, form="summary", headline=headline):
+                    self.assertTrue(check_summary_headline(summary_of(text, headline), right))
+
+    def test_headline_beside_listed_findings_is_rejected(self):
+        self.assertError(headline_errors(after_first_bullet(FIXTURE, HEADLINE_PASSED)), "contradicts the findings")
+        self.assertError(headline_errors(after_first_bullet(FIXTURE, HEADLINE_INCOMPLETE)), "contradicts the findings")
+
+    def test_two_headlines_are_rejected(self):
+        text = after_first_bullet(with_verdict(clean_report(FIXTURE)), HEADLINE_PASSED)
+        self.assertError(headline_errors(after_first_bullet(text, HEADLINE_PASSED)), "more than one headline")
 
 
 class MatrixTests(Base):

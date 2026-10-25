@@ -29,6 +29,13 @@ PASSED_LINE = re.compile(
     r"^[\s*_\"'>]*code review passed\s*[—–-]{1,2}\s*no issues found\.?[\s*_\"']*$",
     re.I,
 )
+# The headline of a report with no listed finding whose Ready to merge is not Yes (SKILL.md Step 3).
+INCOMPLETE_LINE = re.compile(
+    r"^[\s*_\"'>]*review incomplete or pending\s*[—–-]{1,2}\s*no confirmed findings in the code inspected\.?[\s*_\"']*$",
+    re.I,
+)
+_READY_LINE_RE = re.compile(r"^[\s*_\"'>]*ready to merge:[\s*_\"']*(yes|no|with fixes)\b", re.I)
+_AUDIT_LINE_RE = re.compile(r"^(?:#{1,6}\s*audit\s*#*\s*$|[\s*_\"'>]*audit:)", re.I)
 
 _NORMALIZED_SEVERITY = {
     "critical": "Critical",
@@ -188,12 +195,24 @@ def looks_like_report(report: str) -> bool:
         return True
 
     fence = None
+    outside = []
     for line in report.splitlines():
         in_fence = fence is not None
         fence = _active_fence(line, fence)
-        if not in_fence and fence is None and PASSED_LINE.match(line):
+        if in_fence or fence is not None:
+            continue
+        if PASSED_LINE.match(line):
             return True
-    return False
+        outside.append(line)
+    return _incomplete_report(outside)
+
+
+def _incomplete_report(lines: list[str]) -> bool:
+    """Return True for the incomplete headline beside a Ready to merge line that is not Yes, and an Audit."""
+    readiness = {m.group(1).lower() for m in map(_READY_LINE_RE.match, lines) if m}
+    return (any(INCOMPLETE_LINE.match(line) for line in lines)
+            and bool(readiness) and "yes" not in readiness
+            and any(_AUDIT_LINE_RE.match(line) for line in lines))
 
 
 def stack_mentioned(report: str, stack: str) -> bool:

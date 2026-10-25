@@ -20,7 +20,7 @@ The configuration adds these lines to the report, in the full format and in comp
 - **Configuration** comes right after the **Scope:** line, or after the `Code outside the diff was not read` line when there is one. It names what was read, in one of the first three forms: `1 rule file` for one, `<n> rule files` otherwise, and a `.code-review/rules/` directory without rule files counts as `0 rule files`. It is the **not verified** form when the snapshot of a `pr` review is not available (see Reading the configuration).
 - **Excluded by configuration** comes right after the **Configuration** line, only when a file was excluded (see Excluded paths).
 - **Omitted by configuration** comes right after the verification line (see Filters).
-- **No findings shown** replaces **"Code review passed — no issues found."** as Filters says.
+- **No findings shown** replaces the headline of SKILL.md Step 3 (the passed or the incomplete sentence), as Filters says.
 - With `--comment`, the summary comment copies these lines as `references/publishing.md` says.
 
 ## Reading the configuration
@@ -140,7 +140,7 @@ Apply the filters in this order. A finding that one of them omits is counted the
 
 - The report shows only the findings left, in their usual order, and the Summary table counts only those. A disabled category keeps its row, with `off` in its N/A cell.
 - Right after the verification line, write the **Omitted by configuration** line, with one part for each filter that is not at its default, in the order above, and counts that may be 0. List the disabled categories as the file lists them. Write no such line when every filter is at its default.
-- When at least one High-confidence finding existed before the filters and none is left under `## Findings`, write the **No findings shown** line where **"Code review passed — no issues found."** would go, and never write that sentence.
+- When at least one High-confidence finding existed before the filters and none is left under `## Findings`, write the **No findings shown** line where the headline would go, and never write either headline sentence.
 - With `--comment`, only the findings shown are published.
 - The verdict of SKILL.md Step 3 counts the findings before these filters, and its **Ready to merge:** line says how many of the findings it counts were omitted: a filter never turns a verified problem into a clean review.
 

@@ -6,7 +6,7 @@ For each case the runner copies `base/` into a temporary git repo, commits it, s
 
 - **Recall**: bug cases where one finding at `min_severity` or higher matches every pattern, over all bug cases.
 - **False positives**: Critical or Warning findings in clean cases (Suggestions do not count).
-- A run that is not a review report (neither a finding nor the line `Code review passed — no issues found.`; for example the agent asked the Step 0 question) is an error, never a pass.
+- A run that is not a review report (neither a finding nor a headline line, `Code review passed — no issues found.` for Ready to merge Yes or `Review incomplete or pending — no confirmed findings in the code inspected.` beside a Ready to merge line that is not Yes and an Audit; for example the agent asked the Step 0 question) is an error, never a pass.
 
 ## Run
 
