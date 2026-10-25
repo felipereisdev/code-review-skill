@@ -362,7 +362,8 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
         result["findings"] = [
             {"heading": finding["heading"], "severity": finding["severity"],
              "needs_verification": finding["needs_verification"],
-             "pre_existing": finding["pre_existing"]}
+             "pre_existing": finding["pre_existing"],
+             "already_raised": finding["already_raised"]}
             for finding in score.parse_findings(stdout)
         ]
         if case["kind"] == "bug":

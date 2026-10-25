@@ -4,13 +4,13 @@ This is an example of the code review output format. The actual review will vary
 
 ## Scenario
 
-Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The branch also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch. The review was started with `/code-review branch main`.
+Reviewing pull request #123 on GitHub (`https://github.com/acme/shop-api/pull/123`), which adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The pull request also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch. The pull request already has two review threads: an open one on `src/routes/auth.routes.ts:8` saying that `POST /auth/login` has no rate limit, and a resolved one on `src/services/auth.service.ts:45` asking to remove the hard-coded JWT secret. The review was started with `/code-review pr 123`.
 
 ---
 
 ## Code Review Report
 
-**Scope:** branch main (git diff main...HEAD)
+**Scope:** pr 123 (gh pr diff 123)
 
 ### What Was Done Well
 
@@ -27,7 +27,7 @@ Reviewing a feature branch that adds user authentication with JWT to a Node.js/E
 
 **Location:** `src/services/auth.service.ts:45-46`
 **Issue:** The JWT secret falls back to the hard-coded string `'dev-secret'` when `JWT_SECRET` is not set.
-**Evidence:** A deployment without `JWT_SECRET` signs every token with `'dev-secret'` → anyone who reads this repository can forge a token for any user ID and pass `authMiddleware`.
+**Evidence:** A deployment without `JWT_SECRET` signs every token with `'dev-secret'` → anyone who reads this repository can forge a token for any user ID and pass `authMiddleware`. Raised in https://github.com/acme/shop-api/pull/123#discussion_r1188 and marked resolved, but the fallback is still in the current diff.
 **Confidence:** High
 **Fix:** Fail at startup instead of falling back:
 ```typescript
@@ -143,6 +143,12 @@ logger.warn('Authentication failed', {
 
 ---
 
+## Already raised in the PR (not repeated)
+
+- src/routes/auth.routes.ts:8 — `POST /auth/login` has no rate limit, so a password can be guessed without limit (https://github.com/acme/shop-api/pull/123#discussion_r1201)
+
+---
+
 ## Summary
 
 | Category | Critical | Warning | Suggestion | N/A |
@@ -167,7 +173,7 @@ logger.warn('Authentication failed', {
 
 **Verification:** 5 Critical/Warning candidates checked, 1 refuted.
 
-The Medium-confidence finding under Needs human verification is not counted in the table. The refuted candidate is not listed. The pre-existing note is not a finding and is not counted either.
+The Medium-confidence finding under Needs human verification is not counted in the table. The refuted candidate is not listed. The pre-existing note is not a finding and is not counted either. Neither is the already-raised line, which the open review thread already covers.
 
 ---
 
@@ -194,9 +200,9 @@ The Medium-confidence finding under Needs human verification is not counted in t
 
 ## Compact Mode
 
-The same review when the user asks for `/code-review branch main compact`:
+The same review when the user asks for `/code-review pr 123 compact`:
 
-**Scope:** branch main (git diff main...HEAD)
+**Scope:** pr 123 (gh pr diff 123)
 
 - src/services/auth.service.ts:45-46: Critical: the JWT secret falls back to 'dev-secret', so anyone can forge tokens → fail at startup when JWT_SECRET is unset
 - src/services/auth.service.ts:89-97: Critical: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction
@@ -214,6 +220,10 @@ The same review when the user asks for `/code-review branch main compact`:
 ## Pre-existing issues (not counted)
 
 - src/app.ts:5 — the `/health` handler opens a new database connection on every request and never closes it; this branch does not change it.
+
+## Already raised in the PR (not repeated)
+
+- src/routes/auth.routes.ts:8 — `POST /auth/login` has no rate limit, so a password can be guessed without limit (https://github.com/acme/shop-api/pull/123#discussion_r1201)
 
 **Verification:** 5 Critical/Warning candidates checked, 1 refuted.
 
