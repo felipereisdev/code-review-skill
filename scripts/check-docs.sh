@@ -1007,6 +1007,51 @@ PY
   fi
 }
 
+check_docs_publishing() {
+  if python3 - <<'PY'
+import json, re, sys
+
+DRY = "## Dry run — nothing was published"
+MARKER = "<!-- code-review-skill:summary -->"
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("/code-review pr 123 --comment ", "/code-review pr 123 --comment --dry-run", '"event": "COMMENT"',
+          "`" + MARKER + "`", "`[REDACTED]`", "`references/publishing.md`", "`" + DRY + "`"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+if "never comments on, approves or changes the pull request" in readme:
+    errors.append("README still says the skill never comments on the pull request")
+text = open("example-output.md", encoding="utf-8").read()
+for s in ("`/code-review pr 123 --comment --dry-run`", DRY, '"event": "COMMENT"', MARKER,
+          "<!-- code-review-skill:finding -->", "[REDACTED]"):
+    if s not in text:
+        errors.append(f"example-output.md is missing: {s}")
+start = text.find(DRY)
+dry = text[start:] if start != -1 else ""
+if "dev-secret" in dry:
+    errors.append("the example dry run publishes the secret 'dev-secret'")
+payloads = []
+for block in re.findall(r"```json\n(.*?)\n```", dry, re.S):
+    try:
+        payloads.append(json.loads(block))
+    except ValueError as exc:
+        errors.append(f"example dry-run JSON does not parse: {exc}")
+payloads = [p for p in payloads if isinstance(p, dict)]
+if not any(p.get("event") == "COMMENT" for p in payloads):
+    errors.append("example dry run has no review payload with event COMMENT")
+if not any(str(p.get("body", "")).startswith(MARKER + "\n") for p in payloads):
+    errors.append("example dry run has no summary payload that starts with the summary marker")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show --comment, --dry-run and a dry-run printout with event COMMENT, the summary marker and a masked secret"
+  else
+    fail "README and example-output.md publishing (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -1205,6 +1250,7 @@ check_example_output
 check_example_findings
 check_docs_scope_usage
 check_docs_pr_scope
+check_docs_publishing
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

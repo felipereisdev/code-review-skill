@@ -913,6 +913,26 @@ make_copy "$work/pubrepeat"
 replace_first "$work/pubrepeat/references/publishing.md" 'never post a second one' 'post a new one'
 expect_fail "posting a second summary comment fails" "$work/pubrepeat" "Publishing is missing: never post a second one"
 
+make_copy "$work/readmenodryrun"
+drop_lines "$work/readmenodryrun/README.md" '/code-review pr 123 --comment --dry-run'
+expect_fail "a README without the dry-run example fails" "$work/readmenodryrun" "README is missing: /code-review pr 123 --comment --dry-run"
+
+make_copy "$work/readmeneverwrites"
+replace_first "$work/readmeneverwrites/README.md" 'and never writes to the pull request unless you pass `--comment`;' 'and never comments on, approves or changes the pull request;'
+expect_fail "a README that still denies publishing fails" "$work/readmeneverwrites" "README still says the skill never comments on the pull request"
+
+make_copy "$work/exampleleak"
+replace_first "$work/exampleleak/example-output.md" 'falls back to `[REDACTED]`' "falls back to \`'dev-secret'\`"
+expect_fail "an example dry run that publishes the secret fails" "$work/exampleleak" "the example dry run publishes the secret 'dev-secret'"
+
+make_copy "$work/examplenomarker"
+replace_first "$work/examplenomarker/example-output.md" '"body": "<!-- code-review-skill:summary -->\n' '"body": "'
+expect_fail "an example summary payload without the marker fails" "$work/examplenomarker" "example dry run has no summary payload that starts with the summary marker"
+
+make_copy "$work/exampleapprove"
+replace_first "$work/exampleapprove/example-output.md" '"event": "COMMENT"' '"event": "APPROVE"'
+expect_fail "an example review payload that approves fails" "$work/exampleapprove" "example dry run has no review payload with event COMMENT"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}

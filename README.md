@@ -22,7 +22,8 @@
 - **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
-- **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and never comments on, approves or changes the pull request; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
+- **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and never writes to the pull request unless you pass `--comment`; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
+- **Publishing to the Pull Request** - `/code-review pr 123 --comment` posts each finding that sits on a line of the diff as an inline comment, in one review submitted only as a comment (never an approval), with a `suggestion` block only for a complete fix, plus one summary comment that later runs edit instead of repeating; `--dry-run` prints the exact `gh` or `glab` commands and payloads and posts nothing
 - **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
 - **6 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>`, `range <from>..<to>` or `pr <number|url>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and the command that produced the diff
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
@@ -137,6 +138,32 @@ In a run with no user to answer, such as CI or `claude -p`, pass the scope so th
 claude -p "/code-review branch origin/main"
 ```
 
+### Publishing to the pull request
+
+```
+/code-review pr 123 --comment             # post the review to the pull request or merge request
+/code-review pr 123 --comment --dry-run   # print what would be posted and post nothing
+```
+
+With `--comment`, the skill first writes the whole report in the chat, then posts it with `gh` or `glab`:
+
+- Each finding under `## Findings` whose location is on a line of the diff becomes an inline comment. On GitHub they go out in one review submitted only as a comment (`"event": "COMMENT"`); the skill never approves a pull request or requests changes. A `suggestion` block is added only when the fix replaces exactly the commented lines.
+- One summary comment, which starts with `<!-- code-review-skill:summary -->`, lists every finding. Later runs edit that comment instead of adding another, and never repeat a finding the skill already commented on at the same place.
+- Findings under Needs human verification appear only in the summary comment; pre-existing and already-raised lines are never posted. Secrets are replaced with `[REDACTED]`. If a command fails, the skill says so, and the report in the chat is still complete.
+
+`--comment` works only with the `pr` scope: with another scope, or `--dry-run` without `--comment`, the skill stops with `Cannot review: ... Nothing was reviewed.`. The rules live in `references/publishing.md`, which the skill reads only when `--comment` is given. `--dry-run` prints each command and its JSON payload under `## Dry run — nothing was published`, for example this review payload, shortened to one inline comment (see [example-output.md](example-output.md) for the full printout):
+
+```json
+{
+  "commit_id": "9c1e4b7a2f3d5e6c8b0a1d2e3f4a5b6c7d8e9f01",
+  "event": "COMMENT",
+  "body": "Inline comments from code-review-skill: 8. The summary comment lists every finding.",
+  "comments": [
+    {"path": "src/controllers/auth.controller.ts", "start_line": 23, "start_side": "RIGHT", "line": 27, "side": "RIGHT", "body": "**Warning — Security** · `src/controllers/auth.controller.ts:23-27` ..."}
+  ]
+}
+```
+
 ## 📋 Review Process
 
 The skill takes the scope from the argument, and detects it when there is none:
@@ -150,7 +177,7 @@ The skill takes the scope from the argument, and detects it when there is none:
 
 Without an argument, the skill reviews the uncommitted changes if there are any; otherwise, a branch with commits ahead of the default branch (from `origin/HEAD`, falling back to `main` or `master`) is reviewed against it; otherwise it says there is nothing to review. It asks only in an interactive run whose detection is ambiguous, and never in a headless run. An invalid argument, such as an unknown commit or base, stops with `Cannot review: ... Nothing was reviewed.` instead of reviewing another scope. The report starts with the scope and its git command, for example `**Scope:** branch main (git diff main...HEAD)`.
 
-A `pr` review picks `gh` or `glab` from the URL or from the `origin` remote; that CLI must be installed and logged in, or the skill stops with `Cannot review: ... Nothing was reviewed.`. It reads the diff, title, description, commits, linked issues and review threads, never writes to the pull request, and starts the report with, for example, `**Scope:** pr 123 (gh pr diff 123)`. A problem that an open review thread already raises at the same place is listed, one line each with the thread's URL, under `## Already raised in the PR (not repeated)` instead of being reported again. A Critical problem stays a finding, and a resolved thread is never reopened: a finding that matches one is reported only because the current diff still has the problem, and it cites the thread.
+A `pr` review picks `gh` or `glab` from the URL or from the `origin` remote; that CLI must be installed and logged in, or the skill stops with `Cannot review: ... Nothing was reviewed.`. It reads the diff, title, description, commits, linked issues and review threads, never writes to the pull request unless you pass `--comment` (see Publishing to the pull request), and starts the report with, for example, `**Scope:** pr 123 (gh pr diff 123)`. A problem that an open review thread already raises at the same place is listed, one line each with the thread's URL, under `## Already raised in the PR (not repeated)` instead of being reported again. A Critical problem stays a finding, and a resolved thread is never reopened: a finding that matches one is reported only because the current diff still has the problem, and it cites the thread.
 
 ## 🛡️ Review Categories
 
@@ -284,7 +311,7 @@ code-review-skill/
 │   ├── baseline.json    # Baseline metrics of the skill before review-behavior changes
 │   ├── baseline/        # Baseline summary.md and raw reports
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
-│   └── tests/           # Offline tests for the runner and scorer
+│   └── tests/           # Offline tests for the runner, the scorer and the --comment dry-run payloads
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md
