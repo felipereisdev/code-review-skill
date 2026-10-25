@@ -680,6 +680,54 @@ make_copy "$work/answerunvalidated"
 replace_first "$work/answerunvalidated/SKILL.md" 'An answer that names a base is validated like a `<base>` argument, as in **Invalid arguments**.' ''
 expect_fail "an interactive base answer that skips validation fails" "$work/answerunvalidated" "Step 0 — Scope Selection is missing: An answer that names a base is validated like a \`<base>\` argument"
 
+make_copy "$work/noprsection"
+drop_lines "$work/noprsection/SKILL.md" '## Pull Request Scope'
+expect_fail "removing the Pull Request Scope section fails" "$work/noprsection" "SKILL.md has no '## Pull Request Scope' section"
+
+make_copy "$work/lateprsection"
+move_section_to_end "$work/lateprsection/SKILL.md" '## Pull Request Scope'
+expect_fail "a Pull Request Scope section after Untrusted Input fails" "$work/lateprsection" "'## Pull Request Scope' must come after '## Step 0 — Scope Selection' and before '## Untrusted Input'"
+
+make_copy "$work/prwrite"
+printf -- '- Post the review with `gh pr comment <n>`.\n' >> "$work/prwrite/SKILL.md"
+expect_fail "a pr comment command in SKILL.md fails" "$work/prwrite" "SKILL.md names a write command: gh pr comment"
+
+make_copy "$work/prreadmewrite"
+printf '\ngh pr review 123 --approve\n' >> "$work/prreadmewrite/README.md"
+expect_fail "a pr review command in README fails" "$work/prreadmewrite" "README.md names a write command: gh pr review"
+
+make_copy "$work/prmutation"
+printf '\nmutation { addComment }\n' >> "$work/prmutation/SKILL.md"
+expect_fail "a GraphQL mutation in SKILL.md fails" "$work/prmutation" "SKILL.md names a GraphQL mutation"
+
+make_copy "$work/prmethod"
+printf -- '- `gh api -X POST repos/<owner>/<repo>/issues/<n>/comments`\n' >> "$work/prmethod/SKILL.md"
+expect_fail "a POST api call in SKILL.md fails" "$work/prmethod" "SKILL.md names a write command: -X POST"
+
+make_copy "$work/prnoauth"
+drop_lines "$work/prnoauth/SKILL.md" '`gh auth status --hostname <host>`'
+expect_fail "picking a CLI without the auth probe fails" "$work/prnoauth" "Pull Request Scope is missing: \`gh auth status --hostname <host>\`"
+
+make_copy "$work/prnothreads"
+drop_lines "$work/prnothreads/SKILL.md" 'isResolved'
+expect_fail "not reading the thread resolution state fails" "$work/prnothreads" "Pull Request Scope is missing: isResolved"
+
+make_copy "$work/prcheckout"
+replace_first "$work/prcheckout/SKILL.md" 'Never change the working tree' 'Check out the pull request first'
+expect_fail "changing the working tree fails" "$work/prcheckout" "Pull Request Scope is missing: Never change the working tree"
+
+make_copy "$work/prfailure"
+replace_first "$work/prfailure/SKILL.md" '`Cannot review: <command> failed; the pull request could not be read. Nothing was reviewed.`' '`Cannot review.`'
+expect_fail "a failed gh or glab read without its message fails" "$work/prfailure" "Pull Request Scope is missing: \`Cannot review: <command> failed; the pull request could not be read. Nothing was reviewed.\`"
+
+make_copy "$work/prforeignurl"
+drop_lines "$work/prforeignurl/SKILL.md" 'does not belong to a remote of this repository'
+expect_fail "accepting a pull request URL of another repository fails" "$work/prforeignurl" "Pull Request Scope is missing: \`Cannot review: <url> does not belong to a remote of this repository. Nothing was reviewed.\`"
+
+make_copy "$work/prheadcommit"
+drop_lines "$work/prheadcommit/SKILL.md" 'Code outside the diff was not read'
+expect_fail "reviewing without the PR head commit silently fails" "$work/prheadcommit" "Pull Request Scope is missing: \`Code outside the diff was not read: the head commit <sha> is not in this repository.\`"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}

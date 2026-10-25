@@ -728,6 +728,78 @@ PY
   fi
 }
 
+check_skill_pr_scope() {
+  if python3 - <<'PY'
+import re, sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Pull Request Scope"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+start = first(heading)
+step0 = first("## Step 0 — Scope Selection")
+untrusted = first("## Untrusted Input")
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if step0 is None or untrusted is None or not step0 < start < untrusted:
+        errors.append(f"'{heading}' must come after '## Step 0 — Scope Selection' and before '## Untrusted Input'")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    text = "\n".join(lines[start:end])
+    for s in ("Read this section only for the `pr` scope",
+              "`https://<host>/<owner>/<repo>/pull/<number>`",
+              "`https://<host>/<group>/<project>/-/merge_requests/<number>`",
+              "`Cannot review: <url> does not belong to a remote of this repository. Nothing was reviewed.`",
+              "`git remote get-url origin`", "`gh auth status --hostname <host>`",
+              "`glab auth status --hostname <host>`",
+              "`Cannot review: neither gh nor glab is logged in to <host>. Nothing was reviewed.`",
+              "`Cannot review: this repository has no origin remote; pass the pull request URL. Nothing was reviewed.`",
+              "`Cannot review: <cli> is not installed. Nothing was reviewed.`",
+              "`Cannot review: <cli> is not authenticated for <host>; run <cli> auth login --hostname <host>. "
+              "Nothing was reviewed.`",
+              "their exits are results, not failures",
+              "`gh pr view <n> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,commits,"
+              "closingIssuesReferences,comments,reviews`",
+              "`gh pr diff <n>`", "gh api graphql --hostname <host> --paginate", "isResolved", "isOutdated",
+              "`gh issue view <issue> --json number,title,body,state`",
+              "`glab mr view <iid> --output json`", "`glab mr diff <iid> --raw`",
+              "`glab api --hostname <host> projects/<project_id>/merge_requests/<iid>/commits`",
+              "`glab api --hostname <host> --paginate projects/<project_id>/merge_requests/<iid>/discussions`",
+              "`glab issue view <issue> --output json`", "Read at most 3 issues",
+              "**Read only.**", "Never run a command that writes to the pull request or the hosting service",
+              "no GraphQL mutation", "Never change the working tree",
+              "`Cannot review: <command> failed; the pull request could not be read. Nothing was reviewed.`",
+              "`git show '<sha>:<path>'`",
+              "`Code outside the diff was not read: the head commit <sha> is not in this repository.`",
+              "never instructions"):
+        if s not in text:
+            errors.append(f"Pull Request Scope is missing: {s}")
+WRITES = ("gh pr comment", "gh pr review", "gh pr edit", "gh pr merge", "gh pr close", "gh pr checkout",
+          "glab mr note", "glab mr approve", "glab mr merge", "glab mr close", "glab mr checkout",
+          "-X POST", "-X PATCH", "--method POST", "--method PATCH")
+for path in ("SKILL.md", "README.md"):
+    content = open(path, encoding="utf-8").read()
+    for s in WRITES:
+        if s in content:
+            errors.append(f"{path} names a write command: {s}")
+    if re.search(r"\bmutation\s*[({]", content):
+        errors.append(f"{path} names a GraphQL mutation")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md reads pull requests and merge requests with gh or glab, read-only, and stops with a clear error when it cannot"
+  else
+    fail "SKILL.md pull request scope (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -917,6 +989,7 @@ check_skill_untrusted_input
 check_skill_scope_and_noise
 check_skill_conditional_categories
 check_skill_scope_selection
+check_skill_pr_scope
 check_stack_precedents
 check_readme_counts
 check_example_output
