@@ -1460,7 +1460,10 @@ check_api_validation() {
     'do not report a finding that depends on it' \
     'A bug whose Evidence follows from code you read needs no documentation' \
     'list it in the Audit as `API not validated`' \
-    'mark it `material` when a changed behavior depends on the claim'; do
+    'Behavior that a loaded stack or pattern file already documents' \
+    'When a claim is version-specific or uncertain' \
+    'mark it `material` when a changed behavior or a contract the change relies on depends on the claim, and `not material` otherwise' \
+    'Do not infer that a value bound through the query builder'; do
     if ! grep -qF -- "$s" SKILL.md; then
       printf '  SKILL.md is missing: %s\n' "$s"
       missing=$((missing + 1))

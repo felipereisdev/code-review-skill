@@ -1090,12 +1090,24 @@ replace_first "$work/apiblanket/SKILL.md" 'A bug whose Evidence follows from cod
 expect_fail "requiring documentation for code-local bugs fails" "$work/apiblanket" "SKILL.md is missing: A bug whose Evidence follows from code you read needs no documentation"
 
 make_copy "$work/apialwaysminor"
-replace_first "$work/apialwaysminor/SKILL.md" 'mark it `material` when a changed behavior depends on the claim' 'always mark it `not material`'
-expect_fail "an unvalidated API claim that is never material fails" "$work/apialwaysminor" "SKILL.md is missing: mark it \`material\` when a changed behavior depends on the claim"
+replace_first "$work/apialwaysminor/SKILL.md" 'mark it `material` when a changed behavior or a contract the change relies on depends on the claim, and `not material` otherwise' 'always mark it `not material`'
+expect_fail "an unvalidated API claim that is never material fails" "$work/apialwaysminor" "SKILL.md is missing: mark it \`material\` when a changed behavior or a contract the change relies on depends on the claim, and \`not material\` otherwise"
 
 make_copy "$work/readmeapi"
 replace_first "$work/readmeapi/README.md" 'with any documentation tool the agent has' 'with the Context7 plugin'
 expect_fail "a README that needs the Context7 plugin fails" "$work/readmeapi" "README.md is missing: with any documentation tool the agent has"
+
+make_copy "$work/apistackblanket"
+replace_first "$work/apistackblanket/SKILL.md" 'Behavior that a loaded stack or pattern file already documents' 'Only the official documentation counts'
+expect_fail "dropping stack-file guidance for stable behavior fails" "$work/apistackblanket" "SKILL.md is missing: Behavior that a loaded stack or pattern file already documents"
+
+make_copy "$work/apiunscoped"
+replace_first "$work/apiunscoped/SKILL.md" 'When a claim is version-specific or uncertain' 'When any API claim is made'
+expect_fail "suppressing every API claim instead of version-specific or uncertain ones fails" "$work/apiunscoped" "SKILL.md is missing: When a claim is version-specific or uncertain"
+
+make_copy "$work/apiinjection"
+replace_first "$work/apiinjection/SKILL.md" 'Do not infer that a value bound through the query builder' 'Report a value bound through the query builder as injectable'
+expect_fail "reporting query-builder bindings as injectable fails" "$work/apiinjection" "SKILL.md is missing: Do not infer that a value bound through the query builder"
 
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {

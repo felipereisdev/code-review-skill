@@ -17,7 +17,7 @@ python3 evals/run.py --jobs 2                      # all 12 cases with `claude -
 python3 evals/run.py --cases 'sqli-laravel/*'      # one pair
 ```
 
-The LLM run needs Claude Code logged in (or `ANTHROPIC_API_KEY`) and is never run in CI. Results go to `evals/results/<timestamp>/` (ignored by git): `results.json`, `summary.md` and one report per case. The default agent runs with `--safe-mode` and no MCP servers, so user settings, hooks and plugins do not affect the score and no documentation tool is available: the skill reports no finding that depends on an API claim it cannot check, and lists the claim as `API not validated` in its Audit.
+The LLM run needs Claude Code logged in (or `ANTHROPIC_API_KEY`) and is never run in CI. Results go to `evals/results/<timestamp>/` (ignored by git): `results.json`, `summary.md` and one report per case. The default agent runs with `--safe-mode` and no MCP servers, so user settings, hooks and plugins do not affect the score. No documentation tool is available: the skill relies on its loaded stack and pattern files, reports no finding that depends on a version-specific or uncertain API claim it cannot check, and lists that claim as `API not validated` in its Audit.
 
 Use another agent CLI with `--agent-cmd` (or `EVAL_AGENT_CMD`) and `--agent-name`. The command runs with `bash -c` in the case repo, gets the prompt on stdin and in the file `$EVAL_PROMPT_FILE`, and must print the report on stdout. `$EVAL_SKILL_DIR` is this checkout and `$EVAL_MODEL` the `--model` value.
 
@@ -28,6 +28,8 @@ Use another agent CLI with `--agent-cmd` (or `EVAL_AGENT_CMD`) and `--agent-name
 ```bash
 python3 evals/run.py --jobs 2 --out-dir evals/baseline --json evals/baseline.json
 ```
+
+The label `MCP/Context7: disabled; API-validation step skipped` in `evals/run.py` and in `baseline/summary.md` is legacy evidence metadata from the run that produced the baseline. It is kept unedited so the recorded evidence stays as it was, and it describes that run, not the current API-validation rule.
 
 ## Add a pair
 
