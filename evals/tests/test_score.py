@@ -372,6 +372,16 @@ class IncompleteReportTest(unittest.TestCase):
         self.assertFalse(looks_like_report(f'Should I write "{self.INCOMPLETE}" here?\n\n{self.NOT_READY}\n\n## Audit\n'))
         self.assertFalse(looks_like_report(f"I would write {self.INCOMPLETE}\n\n{self.NOT_READY}\n\n## Audit\n"))
 
+    def test_blockquoted_template_echo_is_not_a_report(self):
+        template = (
+            "The following is a quoted template, not an issued code review:\n\n"
+            f"> {self.INCOMPLETE}\n> \n"
+            f"> {self.NOT_READY}\n> \n"
+            f"> {self.COMPACT_AUDIT}\n"
+        )
+        self.assertFalse(looks_like_report(template))
+        self.assertFalse(looks_like_report(f"> {self.INCOMPLETE}\n\n{self.NOT_READY}\n\n## Audit\n"))
+
 
 PRE_EXISTING_REPORT = """\
 ## Findings
