@@ -265,7 +265,7 @@ output_start = first("## 7. Output Format")
 output = "\n".join(lines[output_start:]) if output_start is not None else ""
 for s in ("**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.",
           "Do not list refuted findings unless the user asks for them.",
-          "but end with the verification line"):
+          "but keep the verification line"):
     if s not in output:
         errors.append(f"Output Format is missing: {s}")
 for error in errors:
@@ -1358,6 +1358,92 @@ PY
   fi
 }
 
+check_skill_triage_audit() {
+  if python3 - <<'PY'
+import sys
+
+text = open("SKILL.md", encoding="utf-8").read()
+lines = text.splitlines()
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+heading = "## Step 3 — Triage, Verdict and Audit"
+step2, step3, done_well = first("## Step 2 — Verify Findings"), first(heading), first("## 6. What Was Done Well")
+section = ""
+if step3 is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if step2 is None or done_well is None or not step2 < step3 < done_well:
+        errors.append(f"'{heading}' must come after Step 2 and before '## 6. What Was Done Well'")
+    end = next((i for i in range(step3 + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    section = "\n".join(lines[step3:end])
+for s in (
+        "before the filters of `./references/configuration.md`",
+        "**Review effort:** <n>/5 — <lines> changed lines in <files> files; <risk areas, or no risk area>.",
+        "**Relevant tests:** <status> — <tests and what they cover>. Execution: <execution>.",
+        "- `not verified`: you could not check which tests run the changed code",
+        "A status you could not check is never `missing` or `not applicable`.",
+        "this step does not change whether you run tests",
+        "When you ran no test, write `Execution: not run.`",
+        "Execution: partly ran `<command>`; <result>; not run: <what>.",
+        "Never say that a test passes or fails unless you ran it and saw the result",
+        "**Look first:** `<path>` (<reason>), `<path>` (<reason>).",
+        "- `material`: the limit leaves a changed behavior, or a contract the change relies on, that you could not judge.",
+        "The tag does not decide: any limit can be either.",
+        "a finding under `## Needs human verification` never makes a material limit not material",
+        "A limit is never a finding",
+        "Files excluded by configuration are not limits.",
+        "**Ready to merge:** No — not fully reviewed: no changed file was reviewed.",
+        "**Ready to merge:** No — <c> Critical findings must be fixed before merging.",
+        "**Ready to merge:** No — not fully reviewed (<tag>): <what>.",
+        "**Ready to merge:** With fixes — <w> Warning findings should be fixed; none blocks the merge.",
+        "**Ready to merge:** With fixes — a person must check <v> findings under Needs human verification before merging.",
+        "**Ready to merge:** With fixes — <r> Warning candidates already raised in open threads still need verification before merging.",
+        "**Ready to merge:** Yes — no Critical or Warning findings.",
+        "<k> more material limits are in the Audit.",
+        "it neither confirms the problem nor shows that it is still present",
+        "the verdict never calls them confirmed or fixed",
+        "<e> changed files excluded by configuration were not reviewed.",
+        "It never approves, requests changes, blocks or changes the status of a pull request.",
+        "**Files reviewed:** <n> of <m> changed files: `<path>`, `<path>`.",
+        "**Read for context:** <k> files: `<path>`, `<path>`.",
+        "**Already raised, not verified:** `<path>:<line>` (<category>), `<path>:<line>` (<category>).",
+        "- <what> — <tag>, <material or not material>: <detail>",
+        "`` `<path>` (whole file) ``",
+        "List every path on both lines, however many there are.",
+        "`## Audit` is the last section of the report",
+        "never makes its unchanged lines reviewable",
+        "and last `## Audit` (Step 3)",
+        "but keep the verification line",
+        "**Audit:** <n> of <m> changed files reviewed; <k> files read for context; no findings in "
+        "<categories, or no category>; already raised, not verified: <r> Warning candidates; not verified: "
+        "<what> (<tag>, <material or not material>), <what> (<tag>, <material or not material>).",
+        "change the verdict only through row 6 of Step 3"):
+    if s not in text:
+        errors.append(f"Step 3 is missing: {s}")
+for s in ("Never run the tests", "never runs tests", "Not run by this review"):
+    if s in text:
+        errors.append(f"SKILL.md forbids running tests or claims they never run: {s}")
+for s in ("at most 20", "and <k> more"):
+    if s in section:
+        errors.append(f"Step 3 caps the Audit path lists: {s}")
+if "on the verification line, and do not change the verdict" in text:
+    errors.append("SKILL.md still says: already-raised lines do not change the verdict")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Step 3 rates effort, states relevant tests and what ran, names files to look at first, decides the verdict from a fixed table with material limits and ends with a complete audit"
+  else
+    fail "SKILL.md triage, verdict and audit (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -1374,6 +1460,7 @@ check_skill_pr_scope
 check_skill_pr_dedup
 check_skill_publishing
 check_skill_configuration
+check_skill_triage_audit
 check_stack_precedents
 check_readme_counts
 check_example_output

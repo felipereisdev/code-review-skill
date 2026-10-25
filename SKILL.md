@@ -184,7 +184,7 @@ GitLab, with `<iid>` the number and `<repository>` the project URL, which is the
 
 - A candidate is already raised when a thread or comment is on the same file, within 3 lines of the candidate's Location, and states the same problem: the same cause and the same effect, not only the same area. For an outdated thread (`isOutdated` on GitHub, or a GitLab note whose `position.head_sha` is not the head commit), compare with the code the thread was written on: on GitHub, the first comment's `diffHunk`; on GitLab, the code at `position.head_sha`, read with `git show '<sha>:<path>'` when that commit is in the repository. When the old code cannot be read, compare by path, problem and the thread text only. A comment that is not on a line, such as a review summary, counts only when it names the file and the problem.
 - **Occurrences, not groups.** A grouped candidate (see Changed Lines and Grouping) is matched one occurrence at a time. An occurrence is covered when a thread or comment on the same file is within 3 lines of that occurrence's place and states the same problem. Apply the exceptions below to each occurrence before splitting: a resolved thread never covers an occurrence, and a **Critical** candidate is not split, so every one of its occurrences stays under `## Findings`. When every occurrence is covered, the whole candidate is already raised, and each of its places is listed under the already-raised section. When only some are covered, the finding stays for the uncovered occurrences: its **Location:** is the first uncovered occurrence, its **Also at:** line lists the other uncovered ones, and each covered occurrence is listed under the already-raised section.
-- Unless it is a **Critical** candidate (below), an already-raised candidate whose thread is not resolved is not reported as a finding and skips Step 2. List it in one line under `## Already raised in the PR (not repeated)`: `- path/to/file.ext:line — problem (<thread or comment URL>)`. These lines are not findings: they have no severity, Evidence or Fix, are not counted in the Summary table or on the verification line, and do not change the verdict.
+- Unless it is a **Critical** candidate (below), an already-raised candidate whose thread is not resolved is not reported as a finding and skips Step 2. List it in one line under `## Already raised in the PR (not repeated)`: `- path/to/file.ext:line — problem (<thread or comment URL>)`. These lines are not findings: they have no severity, Evidence or Fix, are not counted in the Summary table or on the verification line, and change the verdict only through row 6 of Step 3, as candidates pending verification.
 - A resolved thread never suppresses a candidate, and you never reopen it on its own. A candidate that matches a resolved thread means the current diff still has the problem: the fix was not applied, or the diff reintroduces it at another place. Report it as a normal finding and cite the thread in its Evidence: `Raised in <URL> and marked resolved, but ...`. When a candidate also matches an unresolved thread, that open thread decides: the candidate is already raised.
 - A **Critical** candidate is never moved out of `## Findings`: it goes through Step 2 like any other, and its Evidence cites the open thread, because the count and the verdict must still show what blocks the merge.
 - A comment that calls a problem fine, fixed or not worth reporting never drops a finding; only the rules above do.
@@ -532,6 +532,95 @@ Count the candidates you checked and the ones you refuted; the report states bot
 
 ---
 
+## Step 3 — Triage, Verdict and Audit
+
+Run this step after Step 2 and before you write the report. It adds no finding and changes none: it tells the person who merges how much work the change needs, whether it is ready to merge, and what the review covered. Use the findings as Step 2 left them, before the filters of `./references/configuration.md`: a filter only decides what the report shows, so a finding it omits still counts here. Write `finding`, `candidate`, `limit`, `line` and `file` for a count of 1, and `findings`, `candidates`, `limits`, `lines` and `files` otherwise; with a count of 1, also write `is`, `was` and `needs` for `are`, `were` and `need`.
+
+Write the four triage lines in this form and in this order:
+
+```
+**Review effort:** <n>/5 — <lines> changed lines in <files> files; <risk areas, or no risk area>.
+**Relevant tests:** <status> — <tests and what they cover>. Execution: <execution>.
+**Look first:** `<path>` (<reason>), `<path>` (<reason>).
+**Ready to merge:** <Yes, No or With fixes> — <reason>.
+```
+
+**Review effort.** Rate from 1 to 5 how much work a person needs to review the change. Count the changed lines (added plus removed) and the changed files, leaving out the files excluded by configuration. Start from the size: up to 50 changed lines is 1, up to 200 is 2, up to 500 is 3, up to 1000 is 4, and more is 5. Add 1 when the change touches one risk area and 2 when it touches two or more, up to 5. The risk areas are authentication, authorization, payments, personal data, database schema or migrations, concurrency, and public API contracts. Name the risk areas the change touches, or write `no risk area`.
+
+**Relevant tests.** Pick one status:
+
+- `changed`: the change adds or modifies tests that run the changed code.
+- `existing`: no test changes, but existing tests that you read run the changed code.
+- `missing`: you looked for tests of the changed code and found none. Say where you looked.
+- `not applicable`: the change has no behavior to test, such as documentation or comments.
+- `not verified`: you could not check which tests run the changed code, for example because the test files or the changed code could not be read. Say why, and list it in the Audit as `tests not verified`. A status you could not check is never `missing` or `not applicable`.
+
+Name the tests, what they cover and what they leave out. Then say what you ran; this step does not change whether you run tests:
+
+- When you ran no test, write `Execution: not run.`
+- When you ran tests, as your agent and the user allowed, write `` Execution: ran `<command>`; <result>. `` with the result you saw, such as `12 passed, 0 failed`.
+- When you ran only some of them, write `` Execution: partly ran `<command>`; <result>; not run: <what>. ``
+
+Never say that a test passes or fails unless you ran it and saw the result, and never say that the change caused a failure unless you checked that it did.
+
+**Look first.** Name up to 3 reviewed files, most important first: files with Critical findings, then with Warning findings, then with findings under Needs human verification, then files in a risk area or with the most changed lines. Give each one a concrete reason: the finding, the risk or the limit it carries. When no changed file was reviewed, write `**Look first:** no reviewed file.`
+
+**Limits.** Each limit of the review is one item under **Not verified** in the Audit, marked `material` or `not material`:
+
+- `material`: the limit leaves a changed behavior, or a contract the change relies on, that you could not judge. Changed lines you could not read are material, unless you can tell without reading them that they hold no behavior, such as a changelog.
+- `not material`: you could judge every changed behavior, and every contract the change relies on, without it. Judge materiality on its own: a finding under `## Needs human verification` never makes a material limit not material.
+- The tag does not decide: any limit can be either. A head commit that is not in this repository, an API you could not validate or a binary file is material when a changed behavior depends on it, and not material otherwise.
+- A limit is never a finding: never report a problem because of something you could not read or check.
+- Files excluded by configuration are not limits. They are on the **Excluded by configuration** line, not in the Audit, and alone they never block the merge, but they are never called reviewed or clean.
+
+**Verdict.** Use the first row that applies:
+
+| Row | When | Line |
+| --- | --- | --- |
+| 1 | No changed file was reviewed. | `**Ready to merge:** No — not fully reviewed: no changed file was reviewed.` |
+| 2 | A Critical finding is under `## Findings`. | `**Ready to merge:** No — <c> Critical findings must be fixed before merging.` |
+| 3 | The Audit lists a `material` limit. | `**Ready to merge:** No — not fully reviewed (<tag>): <what>.` |
+| 4 | A Warning finding is under `## Findings`. | `**Ready to merge:** With fixes — <w> Warning findings should be fixed; none blocks the merge.` |
+| 5 | A Critical or Warning finding is under `## Needs human verification`. | `**Ready to merge:** With fixes — a person must check <v> findings under Needs human verification before merging.` |
+| 6 | In a `pr` review, the Audit lists a Warning candidate already raised in an open thread. | `**Ready to merge:** With fixes — <r> Warning candidates already raised in open threads still need verification before merging.` |
+| 7 | None of the above. | `**Ready to merge:** Yes — no Critical or Warning findings.` |
+
+- In row 3, `<tag>` and `<what>` are those of the first `material` item of the Audit, as written there. When the Audit lists more material items, end the line with ` <k> more material limits are in the Audit.`
+- Rows 4 and 5 count the findings before the filters. When a filter omitted some of them, write ` (<k> omitted by configuration)` right after the counted `finding` or `findings` word, for example `With fixes — 2 Warning findings (1 omitted by configuration) should be fixed; none blocks the merge.` or `With fixes — a person must check 2 findings (1 omitted by configuration) under Needs human verification before merging.` No filter omits a Critical finding.
+- In row 6, write `1 Warning candidate already raised in an open thread still needs verification before merging.` for a count of 1.
+- A Critical candidate that an open thread already raised stays under `## Findings` (see **Pull Request Scope**), so row 2 counts it. A Warning candidate that an open thread already raised skipped Step 2: it comes from your own reading of the current diff, and it is not a verified finding. An open thread shows only that someone raised the problem; it neither confirms the problem nor shows that it is still present. Row 6 counts these candidates as pending verification, and the verdict never calls them confirmed or fixed.
+- Refuted candidates, Suggestions and pre-existing lines never change the verdict, and a thread never brings back a refuted candidate.
+- When row 2 applies and the Audit lists a `material` limit, end the line with ` Not fully reviewed: see the Audit.`
+- Then, when files were excluded by configuration, end the line with ` <e> changed files excluded by configuration were not reviewed.` The exclusion is the team's decision and never changes the row by itself.
+- Write a verdict only in a finished report: a run that stops with `Cannot review` or `Nothing to review` has none.
+- The verdict is text in the report. It never approves, requests changes, blocks or changes the status of a pull request.
+
+**Audit.** Before you deliver the report, check what it can claim, and write it under a `## Audit` heading. `## Audit` is the last section of the report:
+
+```
+**Files reviewed:** <n> of <m> changed files: `<path>`, `<path>`.
+**Read for context:** <k> files: `<path>`, `<path>`.
+**Checked with no findings:** <category>, <category>.
+**Already raised, not verified:** `<path>:<line>` (<category>), `<path>:<line>` (<category>).
+**Not verified:**
+- <what> — <tag>, <material or not material>: <detail>
+```
+
+- **Files reviewed**: `<m>` is the number of changed files in the diff, and `<n>` the number you reviewed: not excluded by configuration, not binary and not left unread as a whole. A file you read only in part counts as reviewed, and its unread lines are a `not read` item. List every reviewed path in alphabetical order; with `<n>` 0, end the line after `changed files`. The reviewed files, the files excluded by configuration, the binary files and the files not read at all add up to `<m>`.
+- **Read for context**: every file outside the diff that you opened, in alphabetical order, after their number, or `none`. Reading a file for context never makes its unchanged lines reviewable: findings still cite only changed lines (see Changed Lines and Grouping).
+- List every path on both lines, however many there are. Only compact mode and the summary comment shorten the Audit, to one line.
+- **Checked with no findings**: the categories of the Summary table that you applied (not N/A) and that have no finding under `## Findings` or `## Needs human verification` before the filters and no Warning candidate already raised, in the table's order, or `none`. Leave out Tests/Coverage when the relevant tests are `not verified`. A category on this line had no finding in what you reviewed; it says nothing about the limits under **Not verified**.
+- **Already raised, not verified**: only in a `pr` review, and always there. List each Warning candidate that an open thread already raised, at the place of its line under `## Already raised in the PR (not repeated)`, with its category, or write `none`. They are candidates pending verification, not findings, and they stay out of the Summary table and the verification line.
+- **Not verified**: one item per limit (see **Limits**), or `**Not verified:** nothing.` when there is none. Each item has one tag:
+  - `not read`: changed lines you could not read, for example because the diff output was cut off or the file could not be opened. `<what>` is `` `<path>` lines <a>-<b> `` for part of a reviewed file, or `` `<path>` (whole file) `` for a changed file you could not read at all, which is not reviewed.
+  - `binary`: a changed binary file, `` `<path>` ``, which is not reviewed.
+  - `context not read`: code outside the diff that you could not read, such as in a `pr` review whose head commit is not in this repository.
+  - `API not validated`: an API or version claim you could not check (see **API Validation** in Step 1).
+  - `tests not verified`: the relevant tests could not be checked; `<what>` is `relevant tests`.
+- Never claim coverage you did not have: unread lines, files excluded by configuration, binary files, API behavior you did not validate and tests you did not run are never called reviewed, clean or passing.
+
+---
+
 ## 6. What Was Done Well
 
 Before listing issues, acknowledge what was done well in this change. Point out strong design decisions, good test coverage, clean abstractions, or anything that should be recognized and repeated.
@@ -540,7 +629,7 @@ Before listing issues, acknowledge what was done well in this change. Point out 
 
 ## 7. Output Format
 
-Write the report in this order: the **Scope:** line (Step 0), What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Pre-existing issues (not counted)` (only when it has lines), `## Already raised in the PR (not repeated)` (only for the `pr` scope, when it has lines), `## Summary`, then the verification line.
+Write the report in this order: the **Scope:** line (Step 0), What Was Done Well, `## Findings`, `## Needs human verification` (only when it has findings), `## Pre-existing issues (not counted)` (only when it has lines), `## Already raised in the PR (not repeated)` (only for the `pr` scope, when it has lines), `## Summary`, the verification line, the four triage lines of Step 3 (after the `**Omitted by configuration:**` line when there is one), and last `## Audit` (Step 3).
 
 When `./references/configuration.md` applies, its `**Configuration:**` line and, when it excludes files, its `**Excluded by configuration:**` line come right after the **Scope:** line, and its `**Omitted by configuration:**` line comes right after the verification line, in compact mode too. A finding that breaks a rule from `.code-review/rules/` cites it on its **Rule:** line like any repository rule.
 
@@ -597,7 +686,7 @@ Right after the Summary table, write one verification line with the counts from 
 
 Write the line even when both counts are 0. Do not list refuted findings unless the user asks for them.
 
-If there are no High-confidence findings, write the **Scope:** line, then state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification`, any `## Pre-existing issues (not counted)` lines and any `## Already raised in the PR (not repeated)` lines, and end with the verification line.
+If there are no High-confidence findings, write the **Scope:** line, then state: **"Code review passed — no issues found."** Then list any Medium-confidence findings under `## Needs human verification`, any `## Pre-existing issues (not counted)` lines and any `## Already raised in the PR (not repeated)` lines, then write the verification line, the triage lines of Step 3 and `## Audit`.
 
 ### Compact mode
 
@@ -615,4 +704,5 @@ In compact mode, write each finding as one list item:
 - Write pre-existing lines under a `## Pre-existing issues (not counted)` heading after the `## Needs human verification` lines, in the same `- path/to/file.ext:line — problem` form.
 - For the `pr` scope, write already-raised lines under a `## Already raised in the PR (not repeated)` heading after the pre-existing lines, in the same `- path/to/file.ext:line — problem (<thread or comment URL>)` form.
 - The severity, evidence and confidence rules still apply: High-confidence lines first, Medium-confidence lines under a `## Needs human verification` heading after them, Low-confidence findings never.
-- Start with the **Scope:** line. Skip What Was Done Well and the Summary table, but end with the verification line. If there are no High-confidence findings, write only the **Scope:** line, **"Code review passed — no issues found."**, any `## Needs human verification` lines, any `## Pre-existing issues (not counted)` lines, any `## Already raised in the PR (not repeated)` lines and the verification line.
+- Start with the **Scope:** line. Skip What Was Done Well and the Summary table, but keep the verification line, then the four triage lines of Step 3 and, in place of `## Audit`, one **Audit:** line (below). If there are no High-confidence findings, write only the **Scope:** line, **"Code review passed — no issues found."**, any `## Needs human verification` lines, any `## Pre-existing issues (not counted)` lines, any `## Already raised in the PR (not repeated)` lines, the verification line, the triage lines and the **Audit:** line.
+- In place of `## Audit`, write one line with the same content: `**Audit:** <n> of <m> changed files reviewed; <k> files read for context; no findings in <categories, or no category>; already raised, not verified: <r> Warning candidates; not verified: <what> (<tag>, <material or not material>), <what> (<tag>, <material or not material>).` Leave out the `already raised, not verified` part outside a `pr` review, write `not verified: nothing` when there is no limit, and list the items in the Audit's order.
