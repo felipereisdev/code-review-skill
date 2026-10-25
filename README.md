@@ -299,6 +299,7 @@ code-review-skill/
 │   ├── i18n.md
 │   ├── observability.md
 │   ├── privacy.md
+│   ├── publishing.md    # Publishing rules for --comment (not a review category)
 │   └── resilience.md
 └── stacks/              # Technology-specific rules
     ├── angular.md
