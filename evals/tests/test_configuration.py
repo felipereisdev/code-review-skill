@@ -328,6 +328,78 @@ def configuration_line(conf):
     return "**Configuration:** " + " and ".join(sources) + "."
 
 
+NOTHING_TO_REVIEW = "Nothing to review: every changed file matches ignore_paths."
+NO_FINDINGS_SHOWN = ("**No findings shown:** the configuration omitted every finding; see the Omitted by configuration "
+                     "line.")
+RANK = {s: i for i, s in enumerate(SEVERITIES)}  # Critical 0, Warning 1, Suggestion 2
+
+
+def is_excluded(old, new, patterns):
+    paths = [p for p in (old, new) if p is not None]
+    return bool(patterns) and all(any(match_path(pattern, p) for pattern in patterns) for p in paths)
+
+
+def excluded_paths(changes, patterns):
+    return [new if new is not None else old for old, new in changes if is_excluded(old, new, patterns)]
+
+
+def excluded_line(paths):
+    if not paths:
+        return None
+    listing = ", ".join(f"`{p}`" for p in sorted(paths)[:20])
+    if len(paths) > 20:
+        listing += f", and {len(paths) - 20} more"
+    if len(paths) == 1:
+        return ("**Excluded by configuration:** 1 changed file matches ignore_paths and was not reviewed: "
+                + listing + ".")
+    return (f"**Excluded by configuration:** {len(paths)} changed files match ignore_paths and were not reviewed: "
+            + listing + ".")
+
+
+def apply_filters(findings, settings):
+    """Presentation filters after Step 2: min_severity, then disabled_categories, then max_findings_per_file."""
+    omitted = {"min_severity": 0, "disabled_categories": 0, "max_findings_per_file": 0}
+    left = []
+    for f in findings:
+        critical = f["severity"] == "Critical"
+        if not critical and RANK[f["severity"]] > RANK[settings["min_severity"]]:
+            omitted["min_severity"] += 1
+        elif not critical and f["category"] in settings["disabled_categories"]:
+            omitted["disabled_categories"] += 1
+        else:
+            left.append(f)
+    limit = settings["max_findings_per_file"]
+    if limit is None:
+        return left, omitted
+    keep = set()
+    for path in sorted({f["path"] for f in left}):
+        ranked = sorted((f for f in left if f["path"] == path),
+                        key=lambda f: (RANK[f["severity"]], f["start"], f["end"], f["category"]))
+        kept = 0
+        for f in ranked:
+            if f["severity"] == "Critical" or kept < limit:
+                keep.add(id(f))
+                kept += 1
+            else:
+                omitted["max_findings_per_file"] += 1
+    return [f for f in left if id(f) in keep], omitted
+
+
+def omitted_line(settings, omitted):
+    parts = []
+    if settings["min_severity"] != "Suggestion":
+        parts.append(f"min_severity {settings['min_severity']}: {omitted['min_severity']} omitted")
+    if settings["disabled_categories"]:
+        parts.append(f"disabled categories {', '.join(settings['disabled_categories'])}: "
+                     f"{omitted['disabled_categories']} omitted")
+    if settings["max_findings_per_file"] is not None:
+        parts.append(f"max_findings_per_file {settings['max_findings_per_file']}: "
+                     f"{omitted['max_findings_per_file']} omitted")
+    if not parts:
+        return None
+    return "**Omitted by configuration:** " + "; ".join(parts) + "."
+
+
 class PatternTests(unittest.TestCase):
     def test_glob_semantics(self):
         cases = [
@@ -674,3 +746,143 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(NOT_VERIFIED, "**Configuration:** not verified, because the head commit is not in this "
                                        "repository; the settings and rules in `.code-review/` were not read, and the "
                                        "review used the defaults.")
+
+
+def finding(category, severity, path, start, end=None):
+    return {"category": category, "severity": severity, "path": path, "start": start, "end": end or start}
+
+
+ZERO = {"min_severity": 0, "disabled_categories": 0, "max_findings_per_file": 0}
+
+
+class ScopeTests(unittest.TestCase):
+    def test_ignore_everything_is_an_ordinary_declared_exclusion(self):
+        changes = [(None, ".code-review/config.yml"), ("src/a.ts", "src/a.ts"), ("docs/old.md", None)]
+        self.assertEqual(excluded_paths(changes, ["**"]), [".code-review/config.yml", "src/a.ts", "docs/old.md"])
+        self.assertEqual(excluded_line(excluded_paths(changes, ["**"])), "**Excluded by configuration:** 3 changed "
+                         "files match ignore_paths and were not reviewed: `.code-review/config.yml`, `docs/old.md`, "
+                         "`src/a.ts`.")
+        self.assertEqual(NOTHING_TO_REVIEW, "Nothing to review: every changed file matches ignore_paths.")
+        self.assertEqual(excluded_paths(changes, ["src/**"]), ["src/a.ts"])
+        self.assertEqual(excluded_paths(changes, ["src/generated/**"]), [])
+
+    def test_renames_and_deletions(self):
+        patterns = ["src/generated/**", "docs/"]
+        cases = [
+            (("src/generated/a.ts", "src/generated/a.ts"), True),
+            ((None, "docs/new.md"), True),
+            (("docs/old.md", None), True),
+            (("src/generated/a.ts", "src/generated/b.ts"), True),
+            (("src/a.ts", "src/generated/a.ts"), False),
+            (("src/generated/a.ts", "src/a.ts"), False),
+            (("src/app.ts", "src/app.ts"), False),
+        ]
+        for (old, new), expected in cases:
+            with self.subTest(old=old, new=new):
+                self.assertIs(is_excluded(old, new, patterns), expected)
+        self.assertFalse(is_excluded("docs/a.md", "docs/a.md", []))
+
+    def test_excluded_line(self):
+        self.assertIsNone(excluded_line([]))
+        self.assertEqual(excluded_line(["docs/a.md"]), "**Excluded by configuration:** 1 changed file matches "
+                         "ignore_paths and was not reviewed: `docs/a.md`.")
+        self.assertEqual(excluded_line(["src/generated/b.ts", "docs/a.md"]), "**Excluded by configuration:** 2 changed "
+                         "files match ignore_paths and were not reviewed: `docs/a.md`, `src/generated/b.ts`.")
+        line = excluded_line(["gen/f%02d.ts" % i for i in range(22)])
+        self.assertTrue(line.startswith("**Excluded by configuration:** 22 changed files match ignore_paths and were "
+                                        "not reviewed: `gen/f00.ts`, `gen/f01.ts`, "))
+        self.assertTrue(line.endswith(", `gen/f19.ts`, and 2 more."))
+
+    def test_hostile_pattern_is_only_compared(self):
+        pattern = "$(touch pwned)"
+        self.assertFalse(is_excluded("src/a.ts", "src/a.ts", [pattern]))
+        self.assertTrue(is_excluded(None, "$(touch pwned)", [pattern]))
+        self.assertFalse(os.path.exists("pwned"))
+
+
+class FilterTests(unittest.TestCase):
+    def settings(self, **changes):
+        s = copy.deepcopy(DEFAULTS)
+        s.update(changes)
+        return s
+
+    def test_defaults_show_everything(self):
+        findings = [finding("Performance", "Suggestion", "a.ts", 3), finding("Security", "Warning", "a.ts", 1)]
+        shown, omitted = apply_filters(findings, self.settings())
+        self.assertEqual(shown, findings)
+        self.assertEqual(omitted, ZERO)
+        self.assertIsNone(omitted_line(self.settings(), omitted))
+
+    def test_min_severity_omits_lower_levels_only(self):
+        findings = [finding("Performance", "Suggestion", "a.ts", 1), finding("Potential Bugs", "Warning", "a.ts", 2),
+                    finding("Security", "Critical", "a.ts", 3)]
+        shown, omitted = apply_filters(findings, self.settings(min_severity="Critical"))
+        self.assertEqual(shown, [findings[2]])
+        self.assertEqual(omitted, dict(ZERO, min_severity=2))
+
+    def test_disabled_categories_never_hide_critical(self):
+        findings = [
+            finding("Security", "Critical", "src/api/users.ts", 14, 15),
+            finding("Security", "Warning", "src/api/users.ts", 30),
+            finding("Potential Bugs", "Critical", "src/api/users.ts", 50),
+            finding("Accessibility", "Suggestion", "src/ui/form.vue", 8),
+        ]
+        settings = self.settings(disabled_categories=["Security", "Potential Bugs", "Accessibility"])
+        shown, omitted = apply_filters(findings, settings)
+        self.assertEqual(shown, [findings[0], findings[2]])
+        self.assertEqual(omitted, dict(ZERO, disabled_categories=2))
+
+    def test_limit_ranks_by_severity_then_location(self):
+        findings = [
+            finding("Performance", "Suggestion", "a.ts", 1),
+            finding("Potential Bugs", "Warning", "a.ts", 40),
+            finding("Architecture", "Warning", "a.ts", 12),
+            finding("Tests/Coverage", "Warning", "a.ts", 12, 20),
+            finding("Potential Bugs", "Warning", "b.ts", 99),
+        ]
+        shown, omitted = apply_filters(findings, self.settings(max_findings_per_file=2))
+        self.assertEqual(shown, [findings[2], findings[3], findings[4]])
+        self.assertEqual(omitted, dict(ZERO, max_findings_per_file=2))
+
+    def test_ties_break_by_last_line_then_category(self):
+        findings = [finding("Tests/Coverage", "Warning", "c.ts", 5), finding("Architecture", "Warning", "c.ts", 5),
+                    finding("API Design", "Warning", "c.ts", 5, 9)]
+        shown, _ = apply_filters(findings, self.settings(max_findings_per_file=1))
+        self.assertEqual(shown, [findings[1]])
+
+    def test_critical_exceeds_the_limit_and_counts_toward_it(self):
+        findings = [
+            finding("Potential Bugs", "Warning", "users.ts", 22),
+            finding("Security", "Critical", "users.ts", 14, 15),
+            finding("Potential Bugs", "Critical", "users.ts", 50),
+            finding("Potential Bugs", "Warning", "users.ts", 40),
+        ]
+        shown, omitted = apply_filters(findings, self.settings(max_findings_per_file=1))
+        self.assertEqual(shown, [findings[1], findings[2]])
+        self.assertEqual(omitted, dict(ZERO, max_findings_per_file=2))
+
+    def test_each_omitted_finding_counts_once_in_filter_order(self):
+        findings = [finding("Architecture", "Suggestion", "a.ts", 1), finding("Architecture", "Warning", "a.ts", 2),
+                    finding("Performance", "Warning", "a.ts", 3), finding("Performance", "Warning", "a.ts", 4)]
+        settings = self.settings(min_severity="Warning", disabled_categories=["Architecture"], max_findings_per_file=1)
+        shown, omitted = apply_filters(findings, settings)
+        self.assertEqual(shown, [findings[2]])
+        self.assertEqual(omitted, {"min_severity": 1, "disabled_categories": 1, "max_findings_per_file": 1})
+        self.assertEqual(omitted_line(settings, omitted), "**Omitted by configuration:** min_severity Warning: 1 "
+                         "omitted; disabled categories Architecture: 1 omitted; max_findings_per_file 1: 1 omitted.")
+
+    def test_filters_never_change_a_finding(self):
+        findings = [dict(finding("Security", "Critical", "a.ts", 1), confidence="High", evidence="x → y"),
+                    dict(finding("Performance", "Warning", "a.ts", 2), confidence="Medium", evidence="p → q")]
+        snapshot = copy.deepcopy(findings)
+        shown, _ = apply_filters(findings, self.settings(min_severity="Critical", max_findings_per_file=1))
+        self.assertEqual(findings, snapshot)
+        self.assertEqual(shown, [snapshot[0]])
+
+    def test_omitted_line_names_only_filters_that_are_set(self):
+        self.assertEqual(omitted_line(self.settings(disabled_categories=["Accessibility", "i18n"]), ZERO),
+                         "**Omitted by configuration:** disabled categories Accessibility, i18n: 0 omitted.")
+        self.assertIsNone(omitted_line(self.settings(min_severity="Suggestion"), ZERO))
+        self.assertEqual(NO_FINDINGS_SHOWN, "**No findings shown:** the configuration omitted every finding; see the "
+                                            "Omitted by configuration line.")
+
