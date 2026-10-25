@@ -65,6 +65,8 @@ def read(name):
 FIXTURE = read("fixtures/triage/report.md")
 EXAMPLE = read(os.path.join("..", "..", "example-output.md"))
 REPORT_END = "The report ends with the Audit above."
+CRITICAL_VERDICT = ("**Ready to merge:** No — 2 Critical findings must be fixed before merging. "
+                    "Not fully reviewed: see the Audit.")
 
 
 def example_full():
@@ -900,9 +902,17 @@ class ExampleOutputTests(Base):
     def test_full_report(self):
         full = example_full()
         self.assertEqual(check_report(full), [])
-        self.assertEqual(line_of(full, "Ready to merge"),
-                         "**Ready to merge:** No — 2 Critical findings must be fixed before merging.")
+        self.assertEqual(line_of(full, "Ready to merge"), CRITICAL_VERDICT)
         self.assertEqual(parse_audit(full)["raised"], [("src/routes/auth.routes.ts:8", "Security")])
+
+    def test_limit_weights_follow_their_dependencies(self):
+        full = example_full()
+        items = parse_audit(full)["items"]
+        self.assertEqual([what for what, _tag, weight, _detail in items if weight == "material"],
+                         ["gateway configuration"])
+        gateway = [detail for what, _tag, _weight, detail in items if what == "gateway configuration"]
+        self.assertIn("serializes requests per user", gateway[0])
+        self.assertNotIn("jwt.sign", "\n".join(audit_lines(full)))
 
     def test_action_items_are_outside_the_report(self):
         self.assertLess(EXAMPLE.index("## Audit"), EXAMPLE.index(REPORT_END))
@@ -913,6 +923,7 @@ class ExampleOutputTests(Base):
         compact = EXAMPLE[EXAMPLE.index("## Compact Mode"):EXAMPLE.index("## Coverage Limits")]
         lines = compact.split("\n")
         self.assertEqual(triage_lines(compact), triage_lines(full))
+        self.assertEqual(line_of(compact, "Ready to merge"), CRITICAL_VERDICT)
         self.assertEqual([line for line in lines if line.startswith("**Audit:** ")],
                          [compact_audit_line(parse_audit(full))])
         self.assertNotIn("## Audit", lines)
@@ -929,6 +940,9 @@ class ExampleOutputTests(Base):
         self.assertIn("material", [weight for _what, _tag, weight, _detail in items])
         self.assertIn("not material", [weight for _what, _tag, weight, _detail in items])
         self.assertIn("tests not verified", [tag for _what, tag, _weight, _detail in items])
+        tests = [(weight, detail) for _what, tag, weight, detail in items if tag == "tests not verified"]
+        self.assertEqual(tests[0][0], "not material")
+        self.assertIn("judged from the code", tests[0][1])
 
     def test_dry_run_summary(self):
         full = example_full()
@@ -937,6 +951,7 @@ class ExampleOutputTests(Base):
         payloads = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", dry, re.S)]
         summaries = [p["body"] for p in payloads if p["body"].startswith("<!-- code-review-skill:summary -->")]
         self.assertEqual(len(summaries), 1)
+        self.assertIn(CRITICAL_VERDICT, summaries[0].split("\n"))
         self.assertEqual(check_summary_triage(summaries[0], full, compact), [])
         for payload in payloads:
             for comment in payload.get("comments", []):
