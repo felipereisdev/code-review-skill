@@ -56,6 +56,7 @@ Read this file only when the arguments include `--comment` and the scope is `pr`
 - The counts are those of the Summary table; `<k>` is the number of inline comments this run posts.
 - Write one line per finding under `## Findings`, in report order, in the compact-mode form, ending with its tag: `(inline)`, `(already commented)` or `(not on a diff line)`. When there is none, write `Code review passed — no issues found.` instead of the list.
 - Leave out the **Needs human verification** part when that section of the report is empty. Copy the verification line from the report.
+- When the report has **Configuration:**, **Excluded by configuration:** or **Omitted by configuration:** lines (see `references/configuration.md`), copy each one unchanged into the summary: the first two right after the **Scope:** line, the last right after the verification line. When the report has the **No findings shown:** line, write it instead of `Code review passed — no issues found.`. Only the findings the report shows are published.
 - Keep the body under 60,000 characters: when the list is longer, stop it and add the line `- … <n> more findings in the chat report`.
 
 ## GitHub

@@ -1,0 +1,7 @@
+[
+  {"old": "src/api/users.ts", "new": "src/api/users.ts"},
+  {"old": "src/api/orders.ts", "new": "src/api/orders.ts"},
+  {"old": null, "new": "docs/setup.md"},
+  {"old": "src/generated/client.ts", "new": "src/generated/client.ts"},
+  {"old": "src/legacy/report.ts", "new": "src/generated/report.ts"}
+]
