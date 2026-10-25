@@ -6,13 +6,19 @@ Passing these tests shows that the contract, the fixtures and the reports agree.
 these files in a real review; only the LLM evals can measure that.
 """
 import copy
+import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 
 import yaml
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
+from score import parse_findings  # noqa: E402
 
 SEVERITIES = ("Critical", "Warning", "Suggestion")  # highest first
 CATEGORIES = ("Security", "Performance", "Tests/Coverage", "Architecture", "Code & File Size", "Potential Bugs",
@@ -1003,4 +1009,115 @@ class ReferenceTests(unittest.TestCase):
                        "duplicate frontmatter key", STRUCTURE, "paths must be a non-empty list of path patterns",
                        SEVERITY_REASON, NEEDS_EXAMPLES, "it has no rule text before ## Bad"):
             self.assertIn(reason, self.text)
+
+
+FIXTURES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "fixtures", "configuration")
+FINDING_HEADING = re.compile(r"^### (?P<category>.+) — (?P<severity>Critical|Warning|Suggestion)$")
+FINDING_LOCATION = re.compile(r"^\*\*Location:\*\* `(?P<path>[^`:]+):(?P<start>\d+)(?:-(?P<end>\d+))?`$", re.M)
+
+
+def report_findings(text):
+    """The full-format findings of a report, in report order, as apply_filters input plus their text."""
+    out = []
+    for f in parse_findings(text):
+        if f["compact"] or f["pre_existing"]:
+            continue
+        head = FINDING_HEADING.match(f["text"].splitlines()[0])
+        loc = FINDING_LOCATION.search(f["text"])
+        out.append({"category": head.group("category"), "severity": head.group("severity"),
+                    "path": loc.group("path"), "start": int(loc.group("start")),
+                    "end": int(loc.group("end") or loc.group("start")),
+                    "needs_verification": f["needs_verification"], "text": f["text"].rstrip()})
+    return out
+
+
+def summary_rows(text):
+    """Category name → cells of the ## Summary table, without the header, separator and Total rows."""
+    lines = text.splitlines()
+    start = lines.index("## Summary")
+    rows = {}
+    for line in lines[start + 1:]:
+        if line.startswith("| ") and not line.startswith(("| Category", "| **Total**")):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            rows[cells[0]] = cells[1:]
+        elif rows and not line.startswith("|"):
+            break
+    return rows
+
+
+class FixtureReportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.conf = read_configuration(WorkingTree(os.path.join(FIXTURES, "repo")))
+        with open(os.path.join(FIXTURES, "report-unfiltered.md"), encoding="utf-8") as f:
+            cls.before = f.read()
+        with open(os.path.join(FIXTURES, "report-filtered.md"), encoding="utf-8") as f:
+            cls.after = f.read()
+        with open(os.path.join(FIXTURES, "changes.json"), encoding="utf-8") as f:
+            cls.changes = [(c["old"], c["new"]) for c in json.load(f)]
+
+    def test_fixture_configuration_is_valid(self):
+        self.assertEqual(self.conf["settings"], {"ignore_paths": ["src/generated/**", "docs/"],
+                                                 "min_severity": "Warning", "max_findings_per_file": 2,
+                                                 "disabled_categories": ["Security", "Architecture"]})
+        self.assertEqual([r["path"] for r in self.conf["rules"]],
+                         [".code-review/rules/hostile.md", ".code-review/rules/validate-request-bodies.md"])
+
+    def test_header_lines(self):
+        excluded = excluded_paths(self.changes, self.conf["settings"]["ignore_paths"])
+        self.assertEqual(sorted(excluded), ["docs/setup.md", "src/generated/client.ts"])
+        for text in (self.before, self.after):
+            lines = [line for line in text.splitlines() if line.strip()]
+            self.assertEqual(lines[0], "**Scope:** branch origin/main (git diff origin/main...HEAD)")
+            self.assertEqual(lines[1], configuration_line(self.conf))
+            self.assertEqual(lines[2], excluded_line(excluded))
+
+    def test_filters_turn_the_report_into_the_filtered_one(self):
+        before, after = report_findings(self.before), report_findings(self.after)
+        shown, omitted = apply_filters(before, self.conf["settings"])
+        self.assertEqual([f["text"] for f in shown], [f["text"] for f in after])
+        self.assertEqual([f["needs_verification"] for f in shown], [f["needs_verification"] for f in after])
+        self.assertEqual(omitted, {"min_severity": 1, "disabled_categories": 2, "max_findings_per_file": 3})
+        lines = [line for line in self.after.splitlines() if line.strip()]
+        i = next(i for i, line in enumerate(lines) if line.startswith("**Verification:**"))
+        self.assertEqual(lines[i + 1], omitted_line(self.conf["settings"], omitted))
+        self.assertEqual([line for line in self.before.splitlines() if line.startswith("**Verification:**")],
+                         [lines[i]])
+        self.assertNotIn("**Omitted by configuration:**", self.before)
+
+    def test_critical_security_finding_survives_a_disabled_security_category(self):
+        self.assertIn("Security", self.conf["settings"]["disabled_categories"])
+        shown = [(f["category"], f["severity"]) for f in report_findings(self.after)]
+        self.assertIn(("Security", "Critical"), shown)
+        self.assertNotIn(("Security", "Warning"), shown)
+
+    def test_summary_counts_only_the_shown_findings(self):
+        for text, off in ((self.before, set()), (self.after, {"Security", "Architecture"})):
+            with self.subTest(report="filtered" if off else "unfiltered"):
+                listed = [f for f in report_findings(text) if not f["needs_verification"]]
+                total = re.search(r"^\| \*\*Total\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|", text, re.M)
+                self.assertEqual([int(n) for n in total.groups()],
+                                 [sum(f["severity"] == s for f in listed) for s in SEVERITIES])
+                rows = summary_rows(text)
+                self.assertEqual(tuple(rows), CATEGORIES)
+                self.assertEqual({name for name, cells in rows.items() if cells[-1] == "off"}, off)
+
+    def test_rule_citations_point_to_applicable_rule_text(self):
+        rules = {r["path"]: r for r in self.conf["rules"]}
+        cited = 0
+        for f in report_findings(self.after):
+            for m in re.finditer(r"^\*\*Rule:\*\* `([^`:]+):L(\d+)-L(\d+)`$", f["text"], re.M):
+                rule = rules[m.group(1)]
+                self.assertEqual((int(m.group(2)), int(m.group(3))), rule["rule_lines"])
+                self.assertTrue(any(match_path(p, f["path"]) for p in rule["paths"]))
+                cited += 1
+        self.assertEqual(cited, 1)
+
+    def test_hostile_rule_is_only_data(self):
+        hostile = next(r for r in self.conf["rules"] if r["path"].endswith("/hostile.md"))
+        self.assertEqual(hostile["severity"], "Critical")
+        for text in (self.before, self.after):
+            self.assertNotIn("hostile.md", text)
+            self.assertNotIn("attacker.example", text)
+        self.assertEqual(self.conf["settings"]["min_severity"], "Warning")
 
