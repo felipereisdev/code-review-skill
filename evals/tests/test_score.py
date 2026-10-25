@@ -446,5 +446,81 @@ class PreExistingTest(unittest.TestCase):
         self.assertEqual(score_clean(report), {"false_positives": 0})
 
 
+ALREADY_RAISED_REPORT = """\
+## Findings
+
+### Potential Bugs — Warning
+
+**Location:** `src/labels.js:13-14`
+**Issue:** The gift recipient lookup can return undefined.
+**Evidence:** `giftRecipientId: 99` is not in the map → `recipient.name` throws a TypeError.
+**Confidence:** High
+**Fix:** Restore the guard.
+
+## Already raised in the PR (not repeated)
+
+- src/routes.js:8 — the login route has no rate limit (https://github.com/acme/shop-api/pull/123#discussion_r1201)
+
+### Security — Critical
+
+**Location:** `src/db.js:40`
+**Issue:** SQL injection in the legacy export.
+**Evidence:** `?sort=name;DROP TABLE users` reaches the raw query → the table is dropped.
+**Confidence:** High
+**Fix:** Bind parameters.
+
+- src/db.js:52: Critical: SQL injection in the legacy report → bind parameters
+
+## Summary
+
+| Category | Critical | Warning | Suggestion | N/A |
+|----------|----------|---------|------------|-----|
+| Potential Bugs | 0 | 1 | 0 |  |
+"""
+
+
+class AlreadyRaisedTest(unittest.TestCase):
+    def test_already_raised_findings_are_flagged(self):
+        self.assertEqual([(f["severity"], f["compact"], f["already_raised"], f["pre_existing"])
+                          for f in parse_findings(ALREADY_RAISED_REPORT)],
+                         [("Warning", False, False, False), ("Critical", False, True, False),
+                          ("Critical", True, True, False)])
+
+    def test_already_raised_note_is_not_a_finding(self):
+        self.assertFalse(any("rate limit" in f["text"] for f in parse_findings(ALREADY_RAISED_REPORT)))
+
+    def test_already_raised_findings_do_not_count_for_recall(self):
+        self.assertEqual(score_bug(ALREADY_RAISED_REPORT, ["SQL injection"], "Suggestion"),
+                         {"detected": False, "matched_finding": None})
+
+    def test_already_raised_findings_are_not_false_positives(self):
+        self.assertEqual(score_clean(ALREADY_RAISED_REPORT), {"false_positives": 1})
+
+    def test_already_raised_heading_variants_are_recognized(self):
+        for heading in ("## Already raised in the PR (not repeated)", "### Already raised in the MR",
+                        "## Already Raised", "## **Already raised in the pull request**"):
+            with self.subTest(heading=heading):
+                report = heading + "\n\n#### Security — Critical\n**Location:** `a.js:1`\n**Issue:** x\n"
+                self.assertEqual([f["already_raised"] for f in parse_findings(report)], [True])
+
+    def test_already_raised_flag_resets_at_sibling_section(self):
+        report = ("## Already raised in the PR (not repeated)\n\n### A — Warning\n**Location:** `a.js:1`\n**Issue:** x\n\n"
+                  "## Findings\n\n### B — Warning\n**Location:** `b.js:1`\n**Issue:** y\n")
+        self.assertEqual([(f["heading"], f["already_raised"]) for f in parse_findings(report)],
+                         [("A — Warning", True), ("B — Warning", False)])
+
+    def test_other_sections_are_not_already_raised(self):
+        for report in (NEW_FORMAT, COMPACT_FORMAT, PRE_EXISTING_REPORT):
+            with self.subTest(report=report[:30]):
+                self.assertFalse(any(f["already_raised"] for f in parse_findings(report)))
+
+    def test_finding_title_that_mentions_already_raised_is_not_the_section(self):
+        report = ("## Findings\n\n### Security — Warning: already raised in a resolved thread\n\n"
+                  "**Location:** `src/a.py:12`\n**Issue:** The empty ID check is still missing.\n")
+        self.assertEqual([f["already_raised"] for f in parse_findings(report)], [False])
+        self.assertEqual(score_bug(report, ["empty ID"], "Warning"),
+                         {"detected": True, "matched_finding": "Security — Warning: already raised in a resolved thread"})
+
+
 if __name__ == "__main__":
     unittest.main()
