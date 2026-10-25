@@ -1,5 +1,6 @@
 """Offline shape tests for the --comment dry-run payloads that references/publishing.md describes."""
 import copy
+import hashlib
 import json
 import os
 import re
@@ -30,7 +31,8 @@ GITLAB_EDIT = re.compile(r"^glab api --hostname \S+ --method PUT projects/\d+/me
 HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 LOCATION = re.compile(r"^\*\*Location:\*\* `([^`:]+):(\d+)(?:-(\d+))?`$", re.M)
 SUGGESTION = re.compile(r"```suggestion(?::-(\d+)\+(\d+))?\n(.*?)\n```", re.S)
-PAIR = re.compile(r"```sh\n(.*?)\n```\n\n```json\n(.*?)\n```", re.S)
+FENCES = ("```", "~~~")
+CLI = re.compile(r"(?<![\w-])(?:gh|glab)(?![\w./:-])")  # a gh/glab word, not a path such as src/gh/index.js
 
 
 def read(name):
@@ -109,8 +111,48 @@ def own_commented(finding, side, own):
                for path, own_side, line, body in own)
 
 
+def fence_body(lines, start):
+    """Return (body, index after the closing line) of the ```sh or ```json fence that opens at lines[start]."""
+    if lines[start] not in ("```sh", "```json"):
+        raise ValueError(f"unsupported fence: {lines[start]}")
+    for end in range(start + 1, len(lines)):
+        if lines[end] == "```":
+            return "\n".join(lines[start + 1:end]), end + 1
+        if lines[end].lstrip().startswith(FENCES):
+            raise ValueError(f"unsupported fence: {lines[end]}")
+    raise ValueError(f"unclosed fence: {lines[start]}")
+
+
 def parse_pairs(text):
-    return [(cmd, json.loads(payload)) for cmd, payload in PAIR.findall(text)]
+    """Return [(command, payload)], one per write: a ```sh fence, one blank line, then its ```json fence.
+
+    Raise ValueError for any other fence (indented ones too), an unclosed fence, a command without its
+    payload, a payload without a command, a payload that is not a JSON object, or a line outside the fences
+    that names gh or glab as a word, so no printed write can be skipped. A gh or glab followed by "/", "." or
+    ":" is a path, as in the heading "### 1. Discussion on src/gh/index.js:9", and is ignored like any other
+    text outside the fences.
+    """
+    lines, pairs, i = text.split("\n"), [], 0
+    while i < len(lines):
+        if not lines[i].lstrip().startswith(FENCES):
+            if CLI.search(lines[i]):
+                raise ValueError(f"gh or glab command outside a sh fence: {lines[i].strip()}")
+            i += 1
+            continue
+        if lines[i] == "```json":
+            raise ValueError("JSON payload without a write command")
+        cmd, i = fence_body(lines, i)
+        if lines[i:i + 2] != ["", "```json"]:
+            raise ValueError(f"write command without its JSON payload: {cmd}")
+        body, i = fence_body(lines, i + 1)
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            raise ValueError(f"invalid JSON payload for: {cmd}") from None
+        if not isinstance(payload, dict):
+            raise ValueError(f"JSON payload is not an object for: {cmd}")
+        pairs.append((cmd, payload))
+    return pairs
 
 
 def comment_id(value):
@@ -316,6 +358,91 @@ def check_gitlab(pairs, report, diff_text, state):
     return errors
 
 
+GH_REVIEW_CMD = ("gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/reviews "
+                 + H + " --input review.json")
+GL_DISCUSSION_1 = "--input discussion-1.json\n```\n\n```json"
+# Regression corpus U11-I1-parser-coverage-v1: (id, fixture, expected error or None for a valid printout,
+# SHA-256 of the probe text, operations). An operation is ("append", "", new), ("replace", old, new) for
+# exactly one occurrence of old, or ("tail", old, new), which replaces the text from the last old to the end.
+PARSER_PROBES = [
+    ("P01", "github-dry-run.md", None,
+     "a7ebaf3c6d850fef6cef04f4f724480701ef7bda274b6ece9c5dd5fe09386708", []),
+    ("P02", "gitlab-dry-run.md", None,
+     "f4884a6f21d3cecf16681464070c0335f39b5a51bb5d9592f799dbbb485d7394", []),
+    ("P03", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
+     "48ad127dadd5340f11f2c7f5b4c71627ee5139ccc7dd15e8be338a30d39ff61b",
+     [("append", "", "\n```sh\ngh pr review 42 --approve\n```\n")]),
+    ("P04", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
+     "201c22bd0a1c054de78372605425aa47833c326f37f7b497588bed15839394a5",
+     [("append", "", "\n```sh\nglab mr approve 42\n```\n")]),
+    ("P05", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
+     "faf833b0ad493f6017b997fd3d3331c51f4024157c2bc219fa5b6459c5945df8",
+     [("replace", "### 2. Summary comment (edit 9007199254740993)",
+       "```sh\ngh pr review 42 --approve\n```\n\n### 2. Summary comment (edit 9007199254740993)")]),
+    ("P06", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
+     "af02d462c5825324834d5fb21affb33154cccd3ddb8c1d44d5a6c4132410fc19",
+     [("replace", "### 4. Summary comment (edit 502)",
+       "```sh\nglab mr approve 42\n```\n\n### 4. Summary comment (edit 502)")]),
+    ("P07", "github-dry-run.md", "write command without its JSON payload: " + GH_REVIEW_CMD,
+     "5bf57876c2b6e5c7715697f1714247da3fc2fa5ca5ebfd853d6b264dcd799f78",
+     [("append", "", "\n```sh\n" + GH_REVIEW_CMD + "\n```\n")]),
+    ("P08", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method PUT",
+     "97ef276dc4ac538073163f8df19807ac89e725d3cdc5cd2c296399769e573d50",
+     [("tail", "```json\n", "\n")]),
+    ("P09", "github-dry-run.md", "unclosed fence: ```sh",
+     "27f60e341281d79a9bad80bc75efdd9bc36780e5753d0e87700b7eecd4117525",
+     [("append", "", "\n```sh\ngh pr review 42 --approve\n")]),
+    ("P10", "gitlab-dry-run.md", "unclosed fence: ```json",
+     "af8ed806de5f31c69c97ef65ad51d41e250c0f348727b612f8ad3cbc92ecaa82",
+     [("append", "", "\n```sh\nglab api --hostname gitlab.com --method POST projects/77/merge_requests/42/discussions "
+       + H + " --input discussion-1.json\n```\n\n```json\n{}\n")]),
+    ("P11", "github-dry-run.md", "invalid JSON payload for: gh api --hostname github.com --method PATCH",
+     "ef9c126dbdc8fedfee2e75fe1527540ab634f41f87d04910b7f49f574bf8d15e",
+     [("tail", "```json\n", "```json\n{not-json}\n```\n")]),
+    ("P12", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
+     "43269b0d1420a818b203a928d0c00db30dae913b8321ea1c3e7764193a2555ac",
+     [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n```text\nintervening block\n```\n\n```json")]),
+    ("P13", "gitlab-dry-run.md", "JSON payload without a write command",
+     "fda4a05ef3b38e2828f5a4868da72ae516ca37788941a67752c382bfa530224d",
+     [("append", "", "\n```json\n{}\n```\n")]),
+    ("P14", "github-dry-run.md", "unsupported fence: ```bash",
+     "482d72ced8b76c2c873a7186274d42d4dc04975e29c854c83dc6ea72a9bc33bd",
+     [("append", "", "\n```bash\ngh pr review 42 --approve\n```\n")]),
+    ("P15", "gitlab-dry-run.md", "unsupported fence: ```shell",
+     "583b17686b227fbda32142a3e38f13b44921a43ab7c8c41e794cd17419381d44",
+     [("append", "", "\n```shell\nglab mr approve 42\n```\n")]),
+    ("P16", "github-dry-run.md", "unsupported fence: ````sh",
+     "c11810a7a7428323e5a2d3597e076418306c2e0df353617b2e6f7c4e4d91e045",
+     [("append", "", "\n````sh\ngh pr review 42 --approve\n````\n")]),
+    ("P17", "github-dry-run.md", "unclosed fence: ```json",
+     "250530dcded9fba56de8d0f606066f739da18575c76aedd28da0a3182173e9d2",
+     [("tail", "\n```\n", "\n``\n")]),
+    ("P18", "gitlab-dry-run.md", None,
+     "050bad784304f38230043a0a83d49f40b38466eebd48a7ba8f5f4343eba6de84",
+     [("replace", "## Dry run — nothing was published\n\n", "## Dry run — nothing was published\n\n\n\n"),
+      ("replace", "\n\n### 2. Discussion on src/auth.js:3", "\n\n\n\n### 2. Discussion on src/auth.js:3")]),
+    ("P19", "github-dry-run.md", None,
+     "431043421cb871eed582f407e33bf45702a0d1e2fcf711ac2dcc38a21d72d87b",
+     [("tail", "\n```\n", "\n```")]),
+    ("P20", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
+     "080113dd0cf7c3dcd07186dacd986d77e7aed5a8350f55e07fbabd1a95be1177",
+     [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n### 2. Discussion on src/auth.js:3\n\n```json")]),
+]
+
+
+def probe_text(text, operations):
+    for op, old, new in operations:
+        if op == "append":
+            text += new
+        elif op == "replace":
+            if text.count(old) != 1:
+                raise AssertionError(f"probe text must contain exactly one {old!r}")
+            text = text.replace(old, new)
+        else:
+            text = text[:text.rindex(old)] + new
+    return text
+
+
 class FixtureTest(unittest.TestCase):
     def setUp(self):
         self.report = read("report.md")
@@ -493,6 +620,59 @@ class FixtureTest(unittest.TestCase):
         pairs = copy.deepcopy(self.gh)
         pairs[1][1]["body"] = pairs[1][1]["body"].replace("environment (already commented)", "environment (inline)")
         self.assertError(self.gh_errors(pairs), "summary line missing or mis-tagged for src/config.js:3")
+
+    def test_parser_probes(self):
+        """Corpus U11-I1-parser-coverage-v1: every printed write is parsed and validated, or the printout fails."""
+        for probe, name, error, digest, operations in PARSER_PROBES:
+            with self.subTest(probe="U11-I1-" + probe):
+                text = probe_text(read(name), operations)
+                self.assertEqual(hashlib.sha256(text.encode("utf-8")).hexdigest(), digest)
+                check = check_github if name.startswith("github") else check_gitlab
+                state = self.gh_state if name.startswith("github") else self.gl_state
+                try:
+                    pairs = parse_pairs(text)
+                except ValueError as exc:
+                    errors, pairs = [str(exc)], []
+                else:
+                    errors = check(pairs, self.report, self.diff, state)
+                for cmd, _ in pairs:
+                    self.assertNotIn("```", cmd)
+                if error is None:
+                    self.assertEqual(errors, [])
+                    self.assertEqual(len(pairs), 2 if name.startswith("github") else 4)
+                else:
+                    self.assertError(errors, error)
+
+    def test_malformed_write_units_fail(self):
+        for name, extra, error in (
+                ("github-dry-run.md", "\n~~~sh\ngh pr review 42 --approve\n~~~\n", "unsupported fence: ~~~sh"),
+                ("github-dry-run.md", "\n```sh\n" + GH_REVIEW_CMD + "\n```\n\n```json\n[]\n```\n",
+                 "JSON payload is not an object for: " + GH_REVIEW_CMD),
+                ("gitlab-dry-run.md", "\n```sh\nglab mr approve 42\n~~~\n```\n", "unsupported fence: ~~~")):
+            with self.subTest(error=error):
+                with self.assertRaises(ValueError) as caught:
+                    parse_pairs(read(name) + extra)
+                self.assertEqual(str(caught.exception), error)
+
+    def test_indented_or_unfenced_write_commands_fail(self):
+        for name, approve in (("github-dry-run.md", "gh pr review 42 --approve"),
+                              ("gitlab-dry-run.md", "glab mr approve 42")):
+            for extra, error in (("\n  ```sh\n  " + approve + "\n  ```\n", "unsupported fence:   ```sh"),
+                                 ("\n" + approve + "\n", "gh or glab command outside a sh fence: " + approve)):
+                with self.subTest(name=name, error=error):
+                    with self.assertRaises(ValueError) as caught:
+                        parse_pairs(read(name) + extra)
+                    self.assertEqual(str(caught.exception), error)
+
+    def test_heading_paths_that_name_gh_or_glab_stay_valid(self):
+        text = read("gitlab-dry-run.md")
+        heading = "### 1. Discussion on src/invoices.js:9-10"
+        self.assertEqual(text.count(heading), 1)
+        for path in ("src/gh/index.js:9", "src/glab/index.js:9"):
+            with self.subTest(path=path):
+                pairs = parse_pairs(text.replace(heading, "### 1. Discussion on " + path))
+                self.assertEqual(pairs, parse_pairs(text))
+                self.assertEqual(check_gitlab(pairs, self.report, self.diff, self.gl_state), [])
 
 
 if __name__ == "__main__":
