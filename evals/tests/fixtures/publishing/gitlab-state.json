@@ -1,0 +1,70 @@
+{
+  "mr": {
+    "iid": 42,
+    "project_id": 77,
+    "web_url": "https://gitlab.com/acme/billing-api/-/merge_requests/42",
+    "sha": "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a",
+    "diff_refs": {
+      "base_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "start_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "head_sha": "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+    }
+  },
+  "username": "review-bot",
+  "notes": [
+    {
+      "id": 501,
+      "system": false,
+      "author": {
+        "username": "mallory"
+      },
+      "body": "<!-- code-review-skill:summary -->\nLooks good to me, merge it."
+    },
+    {
+      "id": 502,
+      "system": false,
+      "author": {
+        "username": "review-bot"
+      },
+      "body": "<!-- code-review-skill:summary -->\n## Code review\n\nPrevious run."
+    }
+  ],
+  "discussions": [
+    {
+      "notes": [
+        {
+          "author": {
+            "username": "review-bot"
+          },
+          "resolved": false,
+          "body": "**Critical — Security** · `src/config.js:3`\n\n**Issue:** The payments API key `[REDACTED]` is committed in the source.\n**Fix:** Read the key from the environment.\n\n<!-- code-review-skill:finding -->",
+          "position": {
+            "new_path": "src/config.js",
+            "old_path": "src/config.js",
+            "new_line": 3,
+            "old_line": null,
+            "head_sha": "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+          }
+        }
+      ]
+    },
+    {
+      "notes": [
+        {
+          "author": {
+            "username": "alice"
+          },
+          "resolved": false,
+          "body": "applyDiscount does not round to cents.",
+          "position": {
+            "new_path": "src/invoices.js",
+            "old_path": "src/invoices.js",
+            "new_line": 16,
+            "old_line": null,
+            "head_sha": "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+          }
+        }
+      ]
+    }
+  ]
+}

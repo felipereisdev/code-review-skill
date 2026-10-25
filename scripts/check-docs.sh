@@ -87,7 +87,7 @@ check_readme_counts() {
   patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
   scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
   core=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
-  conditional=$(ls references/*.md 2>/dev/null | wc -l | tr -d ' ')
+  conditional=$(ls references/*.md 2>/dev/null | grep -vx 'references/publishing.md' | wc -l | tr -d ' ')
   categories=$((core + conditional))
   listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
   listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
@@ -530,6 +530,8 @@ import glob, os, re, sys
 
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Conditional Categories"
+# Files under references/ that are not review categories.
+NOT_CATEGORIES = {"references/publishing.md"}
 ITEM = re.compile(r"^- \*\*(?P<name>[^*]+)\*\* — `\./(?P<path>references/[a-z0-9-]+\.md)`: load when \S.*\.$")
 errors = []
 
@@ -577,6 +579,8 @@ for path, phrase in sorted(REQUIRED_TRIGGERS.items()):
     if phrase not in triggers.get(path, ""):
         errors.append(f"{path} trigger must cover: {phrase}")
 for path in sorted(glob.glob("references/*.md")):
+    if path in NOT_CATEGORIES:
+        continue
     if path not in listed:
         errors.append(f"{path} has no trigger in SKILL.md Conditional Categories")
 for path, name in sorted(listed.items()):
@@ -787,7 +791,7 @@ PY
 
 check_skill_pr_scope() {
   if python3 - <<'PY'
-import re, sys
+import glob, re, sys
 
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Pull Request Scope"
@@ -842,8 +846,12 @@ else:
             errors.append(f"Pull Request Scope is missing: {s}")
 WRITES = ("gh pr comment", "gh pr review", "gh pr edit", "gh pr merge", "gh pr close", "gh pr checkout",
           "glab mr note", "glab mr approve", "glab mr merge", "glab mr close", "glab mr checkout",
-          "-X POST", "-X PATCH", "--method POST", "--method PATCH")
-for path in ("SKILL.md", "README.md"):
+          "-X POST", "-X PATCH", "-X PUT", "--method POST", "--method PATCH", "--method PUT")
+# Write commands are allowed only in references/publishing.md.
+scanned = ["SKILL.md", "README.md"] + sorted(
+    p for p in glob.glob("references/*.md") + glob.glob("stacks/*.md") + glob.glob("patterns/*.md")
+    if p != "references/publishing.md")
+for path in scanned:
     content = open(path, encoding="utf-8").read()
     for s in WRITES:
         if s in content:
@@ -916,6 +924,131 @@ PY
     pass "SKILL.md does not repeat what the pull request already raises, never reopens resolved threads and keeps Critical findings counted"
   else
     fail "SKILL.md pull request deduplication (see messages above)"
+  fi
+}
+
+check_skill_publishing() {
+  if python3 - <<'PY'
+import re, subprocess, sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+errors = []
+
+
+def section(heading):
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def require(name, text, strings):
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+require("Step 0 — Scope Selection", section("## Step 0 — Scope Selection"), (
+    "The flags `--comment` and `--dry-run` are not part of the scope either",
+    "`--comment needs the pr scope; pass pr <number|url>`",
+    "`--dry-run needs --comment`"))
+require("Pull Request Scope", section("## Pull Request Scope"), (
+    "except as **Publishing** below allows with `--comment`",
+    "The one exception is **Publishing** below, and only with `--comment`",
+    "**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, "
+    "read `./references/publishing.md`",
+    "Without `--comment`, never read `./references/publishing.md` and never publish",
+    "When publishing fails, the report in the chat still stands"))
+require("Conditional Categories", section("## Conditional Categories"), (
+    "`./references/publishing.md`, is not a review category",))
+try:
+    publishing = open("references/publishing.md", encoding="utf-8").read()
+except OSError:
+    publishing = ""
+require("Publishing", publishing, (
+    "# Publishing",
+    "Read this file only when the arguments include `--comment` and the scope is `pr`",
+    '`"event": "COMMENT"`', '"event": "COMMENT",',
+    "Never approve the pull request or request changes",
+    "Only findings under `## Findings` can become inline comments",
+    "A fix is complete when", "```` ```suggestion ````", "```` ```suggestion:-<k>+0 ````",
+    "`viewerDidAuthor`", "resolved or not", "within 3 lines",
+    "<!-- code-review-skill:summary -->", "<!-- code-review-skill:finding -->",
+    "never post a second one", "`[REDACTED]`", "never start a line with `/`",
+    "--method POST repos/<owner>/<repo>/pulls/<n>/reviews",
+    "--method PATCH repos/<owner>/<repo>/issues/comments/<comment_id>",
+    "--method POST projects/<project_id>/merge_requests/<iid>/discussions",
+    "--method PUT projects/<project_id>/merge_requests/<iid>/notes/<note_id>",
+    '"base_sha"', '"start_sha"', '"head_sha"', '"new_line"', "`old_line`",
+    "## Dry run — nothing was published",
+    "`Publishing failed: <command> exited <status>; <what was published>. The report above is complete.`"))
+for s in ("gh pr review", "gh pr merge", "gh pr close", "gh pr edit", "gh pr comment",
+          "glab mr approve", "glab mr merge", "glab mr close", "glab mr note"):
+    if s in publishing:
+        errors.append(f"references/publishing.md names a forbidden command: {s}")
+if re.search(r"\bmutation\s*[({]", publishing):
+    errors.append("references/publishing.md names a GraphQL mutation")
+listed = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.md", "*.json"],
+                        stdout=subprocess.PIPE, universal_newlines=True, check=True).stdout.splitlines()
+for path in listed:
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    for word in sorted(set(re.findall(r"(?<![A-Z_])(?:APPROVE|REQUEST_CHANGES)(?![A-Z_])", text))):
+        errors.append(f"{path} names a forbidden review event: {word}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md points to references/publishing.md only for --comment, which posts comments only, edits one summary and never approves"
+  else
+    fail "SKILL.md publishing (see messages above)"
+  fi
+}
+
+check_docs_publishing() {
+  if python3 - <<'PY'
+import json, re, sys
+
+DRY = "## Dry run — nothing was published"
+MARKER = "<!-- code-review-skill:summary -->"
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("/code-review pr 123 --comment ", "/code-review pr 123 --comment --dry-run", '"event": "COMMENT"',
+          "`" + MARKER + "`", "`[REDACTED]`", "`references/publishing.md`", "`" + DRY + "`"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+if "never comments on, approves or changes the pull request" in readme:
+    errors.append("README still says the skill never comments on the pull request")
+text = open("example-output.md", encoding="utf-8").read()
+for s in ("`/code-review pr 123 --comment --dry-run`", DRY, '"event": "COMMENT"', MARKER,
+          "<!-- code-review-skill:finding -->", "[REDACTED]"):
+    if s not in text:
+        errors.append(f"example-output.md is missing: {s}")
+start = text.find(DRY)
+dry = text[start:] if start != -1 else ""
+if "dev-secret" in dry:
+    errors.append("the example dry run publishes the secret 'dev-secret'")
+payloads = []
+for block in re.findall(r"```json\n(.*?)\n```", dry, re.S):
+    try:
+        payloads.append(json.loads(block))
+    except ValueError as exc:
+        errors.append(f"example dry-run JSON does not parse: {exc}")
+payloads = [p for p in payloads if isinstance(p, dict)]
+if not any(p.get("event") == "COMMENT" for p in payloads):
+    errors.append("example dry run has no review payload with event COMMENT")
+if not any(str(p.get("body", "")).startswith(MARKER + "\n") for p in payloads):
+    errors.append("example dry run has no summary payload that starts with the summary marker")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show --comment, --dry-run and a dry-run printout with event COMMENT, the summary marker and a masked secret"
+  else
+    fail "README and example-output.md publishing (see messages above)"
   fi
 }
 
@@ -1110,12 +1243,14 @@ check_skill_conditional_categories
 check_skill_scope_selection
 check_skill_pr_scope
 check_skill_pr_dedup
+check_skill_publishing
 check_stack_precedents
 check_readme_counts
 check_example_output
 check_example_findings
 check_docs_scope_usage
 check_docs_pr_scope
+check_docs_publishing
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

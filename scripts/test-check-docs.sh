@@ -860,6 +860,79 @@ make_copy "$work/noresolvedcite"
 replace_first "$work/noresolvedcite/example-output.md" 'and marked resolved, but' 'but'
 expect_fail "an example without a resolved-thread citation fails" "$work/noresolvedcite" "no example finding cites a resolved thread"
 
+make_copy "$work/pubcategory"
+printf '# Extra\n' > "$work/pubcategory/references/extra.md"
+printf -- '- `./references/extra.md`\n' >> "$work/pubcategory/SKILL.md"
+expect_fail "only publishing.md is exempt from the category index" "$work/pubcategory" "references/extra.md has no trigger in SKILL.md Conditional Categories"
+
+make_copy "$work/pubwriteref"
+printf -- '- `gh api --method POST repos/<owner>/<repo>/issues/<n>/comments`\n' >> "$work/pubwriteref/references/api-design.md"
+expect_fail "a write command in another references file fails" "$work/pubwriteref" "references/api-design.md names a write command: --method POST"
+
+make_copy "$work/pubwritestack"
+printf -- '- `glab api -X PUT projects/<id>/merge_requests/<iid>/notes/<note_id>`\n' >> "$work/pubwritestack/stacks/go.md"
+expect_fail "a write command in a stack file fails" "$work/pubwritestack" "stacks/go.md names a write command: -X PUT"
+
+make_copy "$work/pubapprove"
+printf '\n"event": "APPROVE"\n' >> "$work/pubapprove/references/publishing.md"
+expect_fail "an APPROVE event in the publishing rules fails" "$work/pubapprove" "references/publishing.md names a forbidden review event: APPROVE"
+
+make_copy "$work/pubrequestchanges"
+printf '\nThe review uses REQUEST_CHANGES for Critical findings.\n' >> "$work/pubrequestchanges/README.md"
+expect_fail "REQUEST_CHANGES anywhere fails" "$work/pubrequestchanges" "README.md names a forbidden review event: REQUEST_CHANGES"
+
+make_copy "$work/pubapprovecmd"
+printf -- '- Approve a clean pull request with `glab mr approve <iid>`.\n' >> "$work/pubapprovecmd/references/publishing.md"
+expect_fail "an approve command in the publishing rules fails" "$work/pubapprovecmd" "references/publishing.md names a forbidden command: glab mr approve"
+
+make_copy "$work/pubnomarker"
+drop_lines "$work/pubnomarker/references/publishing.md" '<!-- code-review-skill:summary -->'
+expect_fail "publishing rules without the summary marker fail" "$work/pubnomarker" "Publishing is missing: <!-- code-review-skill:summary -->"
+
+make_copy "$work/pubnoevent"
+drop_lines "$work/pubnoevent/references/publishing.md" '"event": "COMMENT"'
+expect_fail "publishing rules without event COMMENT fail" "$work/pubnoevent" "Publishing is missing: \`\"event\": \"COMMENT\"\`"
+
+make_copy "$work/pubnofile"
+rm "$work/pubnofile/references/publishing.md"
+expect_fail "deleting the publishing rules fails" "$work/pubnofile" "SKILL.md cites missing file: references/publishing.md"
+
+make_copy "$work/pubnoflag"
+replace_first "$work/pubnoflag/SKILL.md" '`--comment needs the pr scope; pass pr <number|url>`' '`--comment is ignored`'
+expect_fail "accepting --comment without the pr scope fails" "$work/pubnoflag" "Step 0 — Scope Selection is missing: \`--comment needs the pr scope; pass pr <number|url>\`"
+
+make_copy "$work/pubalways"
+replace_first "$work/pubalways/SKILL.md" 'Without `--comment`, never read `./references/publishing.md` and never publish' 'Always publish'
+expect_fail "publishing without --comment fails" "$work/pubalways" "Pull Request Scope is missing: Without \`--comment\`, never read \`./references/publishing.md\` and never publish"
+
+make_copy "$work/pubsecret"
+drop_lines "$work/pubsecret/references/publishing.md" '[REDACTED]'
+expect_fail "publishing rules without secret masking fail" "$work/pubsecret" "Publishing is missing: \`[REDACTED]\`"
+
+make_copy "$work/pubrepeat"
+replace_first "$work/pubrepeat/references/publishing.md" 'never post a second one' 'post a new one'
+expect_fail "posting a second summary comment fails" "$work/pubrepeat" "Publishing is missing: never post a second one"
+
+make_copy "$work/readmenodryrun"
+drop_lines "$work/readmenodryrun/README.md" '/code-review pr 123 --comment --dry-run'
+expect_fail "a README without the dry-run example fails" "$work/readmenodryrun" "README is missing: /code-review pr 123 --comment --dry-run"
+
+make_copy "$work/readmeneverwrites"
+replace_first "$work/readmeneverwrites/README.md" 'and never writes to the pull request unless you pass `--comment`;' 'and never comments on, approves or changes the pull request;'
+expect_fail "a README that still denies publishing fails" "$work/readmeneverwrites" "README still says the skill never comments on the pull request"
+
+make_copy "$work/exampleleak"
+replace_first "$work/exampleleak/example-output.md" 'falls back to `[REDACTED]`' "falls back to \`'dev-secret'\`"
+expect_fail "an example dry run that publishes the secret fails" "$work/exampleleak" "the example dry run publishes the secret 'dev-secret'"
+
+make_copy "$work/examplenomarker"
+replace_first "$work/examplenomarker/example-output.md" '"body": "<!-- code-review-skill:summary -->\n' '"body": "'
+expect_fail "an example summary payload without the marker fails" "$work/examplenomarker" "example dry run has no summary payload that starts with the summary marker"
+
+make_copy "$work/exampleapprove"
+replace_first "$work/exampleapprove/example-output.md" '"event": "COMMENT"' '"event": "APPROVE"'
+expect_fail "an example review payload that approves fails" "$work/exampleapprove" "example dry run has no review payload with event COMMENT"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}

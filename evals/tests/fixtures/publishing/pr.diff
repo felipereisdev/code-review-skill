@@ -1,0 +1,43 @@
+diff --git a/src/auth.js b/src/auth.js
+index 3eac82b..57ad331 100644
+--- a/src/auth.js
++++ b/src/auth.js
+@@ -1,6 +1,5 @@
+ function requireAdmin(req, res, next) {
+   if (!req.user) return res.status(401).end();
+-  if (req.user.role !== "admin") return res.status(403).end();
+   next();
+ }
+ 
+diff --git a/src/config.js b/src/config.js
+new file mode 100644
+index 0000000..9821848
+--- /dev/null
++++ b/src/config.js
+@@ -0,0 +1,4 @@
++module.exports = {
++  port: Number(process.env.PORT || 3000),
++  paymentsApiKey: "cr-skill-fake-secret-7f3a9c",
++};
+diff --git a/src/invoices.js b/src/invoices.js
+index 8708086..4305775 100644
+--- a/src/invoices.js
++++ b/src/invoices.js
+@@ -6,10 +6,14 @@ async function listInvoices(customerId) {
+ 
+ async function invoiceTotal(invoice) {
+   let total = 0;
+-  for (const line of invoice.lines) {
+-    total += line.amount;
++  for (let i = 0; i <= invoice.lines.length; i++) {
++    total += invoice.lines[i].amount;
+   }
+   return total;
+ }
+ 
+-module.exports = { listInvoices, invoiceTotal };
++function applyDiscount(total, percent) {
++  return total - total * percent / 100;
++}
++
++module.exports = { listInvoices, invoiceTotal, applyDiscount };
