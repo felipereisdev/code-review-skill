@@ -695,10 +695,10 @@ if "The skill will ask you to choose the review scope" in readme:
     errors.append("README still says the skill always asks for the scope")
 text = open("example-output.md", encoding="utf-8").read()
 lines = text.splitlines()
-if "`/code-review branch main`" not in text:
-    errors.append("example-output.md must say the review was started with `/code-review branch main`")
-SCOPE = re.compile(r"^\*\*Scope:\*\* (uncommitted|staged|branch \S+|commit \S+|range \S+\.\.\S+)"
-                   r"(, auto-detected)? \(git [^()]+\)$")
+if "`/code-review pr 123`" not in text:
+    errors.append("example-output.md must say the review was started with `/code-review pr 123`")
+SCOPE = re.compile(r"^\*\*Scope:\*\* (?:(?:uncommitted|staged|branch \S+|commit \S+|range \S+\.\.\S+)"
+                   r"(?:, auto-detected)? \(git [^()]+\)|pr \S+ \((?:gh pr|glab mr) diff \S+\))$")
 scopes = [i for i, line in enumerate(lines) if line.startswith("**Scope:**")]
 if len(scopes) != 2:
     errors.append("example-output.md must have 2 **Scope:** lines (full report and compact mode), "
@@ -706,7 +706,7 @@ if len(scopes) != 2:
 else:
     for i in scopes:
         if not SCOPE.match(lines[i]):
-            errors.append(f"example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)': {lines[i][:60]}")
+            errors.append(f"example-output.md **Scope:** line is not '**Scope:** <scope> (<command>)': {lines[i][:60]}")
     if lines[scopes[0]] != lines[scopes[1]]:
         errors.append("the full-report and compact-mode **Scope:** lines must match")
     done_well = next((i for i, line in enumerate(lines) if line == "### What Was Done Well"), None)
@@ -725,6 +725,63 @@ PY
     pass "README and example-output.md show scope arguments and the Scope line"
   else
     fail "README and example-output.md scope usage (see messages above)"
+  fi
+}
+
+check_docs_pr_scope() {
+  if python3 - <<'PY'
+import re, sys
+sys.path.insert(0, "evals")
+from score import parse_findings
+
+HEAD = "## Already raised in the PR (not repeated)"
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("/code-review pr 123", "`**Scope:** pr 123 (gh pr diff 123)`", "`" + HEAD + "`",
+          "6. **Pull request or merge request** (`pr <number|url>`)"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+text = open("example-output.md", encoding="utf-8").read()
+lines = text.splitlines()
+
+
+def at(heading):
+    return next((i for i, line in enumerate(lines) if line == heading), None)
+
+
+NOTE = re.compile(r"^- [^\s`]+:\d+(?:-\d+)? — \S.* \(https?://\S+\)$")
+starts = [i for i, line in enumerate(lines) if line == HEAD]
+if len(starts) != 2:
+    errors.append(f"example-output.md must have 2 '{HEAD}' sections (full report and compact mode), found {len(starts)}")
+pre, summary, compact = at("## Pre-existing issues (not counted)"), at("## Summary"), at("## Compact Mode")
+if starts and (pre is None or summary is None or not pre < starts[0] < summary):
+    errors.append(f"the first '{HEAD}' section must come after ## Pre-existing issues (not counted) and before ## Summary")
+if len(starts) == 2 and (compact is None or not compact < starts[1]):
+    errors.append(f"the second '{HEAD}' section must come after ## Compact Mode")
+for start in starts:
+    end = next((i for i in range(start + 1, len(lines))
+                if lines[i].startswith("#") or lines[i] == "---" or lines[i].startswith("**Verification:**")),
+               len(lines))
+    notes = [line for line in lines[start + 1:end] if line.strip()]
+    if not notes:
+        errors.append(f"the '{HEAD}' section at line {start + 1} has no notes")
+    for line in notes:
+        if not NOTE.match(line):
+            errors.append(f"already-raised note is not '- path:line — problem (<URL>)': {line[:60]}")
+        elif re.search(r"\b(?:Critical|Warning|Suggestion)\b", line):
+            errors.append(f"already-raised note carries a severity: {line[:60]}")
+if any(f["already_raised"] for f in parse_findings(text)):
+    errors.append(f"example-output.md has a finding with a severity under {HEAD}")
+if "and marked resolved, but" not in text:
+    errors.append("no example finding cites a resolved thread ('and marked resolved, but')")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show the pr scope, the already-raised section and a resolved-thread citation"
+  else
+    fail "README and example-output.md pr scope (see messages above)"
   fi
 }
 
@@ -1050,6 +1107,7 @@ check_readme_counts
 check_example_output
 check_example_findings
 check_docs_scope_usage
+check_docs_pr_scope
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

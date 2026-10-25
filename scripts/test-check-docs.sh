@@ -637,15 +637,15 @@ drop_lines "$work/noexamplescope/example-output.md" '**Scope:**'
 expect_fail "an example without the Scope line fails" "$work/noexamplescope" "example-output.md must have 2 **Scope:** lines (full report and compact mode), found 0"
 
 make_copy "$work/scopemismatch"
-replace_first "$work/scopemismatch/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch develop (git diff develop...HEAD)'
+replace_first "$work/scopemismatch/example-output.md" '**Scope:** pr 123 (gh pr diff 123)' '**Scope:** pr 124 (gh pr diff 124)'
 expect_fail "full and compact Scope lines that disagree fail" "$work/scopemismatch" "the full-report and compact-mode **Scope:** lines must match"
 
 make_copy "$work/scopenocommand"
-replace_first "$work/scopenocommand/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch main'
-expect_fail "a Scope line without its git command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)'"
+replace_first "$work/scopenocommand/example-output.md" '**Scope:** pr 123 (gh pr diff 123)' '**Scope:** pr 123'
+expect_fail "a Scope line without its command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<command>)'"
 
 make_copy "$work/latescope"
-replace_first "$work/latescope/example-output.md" $'**Scope:** branch main (git diff main...HEAD)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** branch main (git diff main...HEAD)\n'
+replace_first "$work/latescope/example-output.md" $'**Scope:** pr 123 (gh pr diff 123)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** pr 123 (gh pr diff 123)\n'
 expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
 
 make_copy "$work/shelltext"
@@ -771,6 +771,38 @@ expect_fail "counting already-raised lines fails" "$work/alreadycounted" "Output
 make_copy "$work/alreadycompact"
 drop_lines "$work/alreadycompact/SKILL.md" 'write already-raised lines under a'
 expect_fail "compact mode without the already-raised section fails" "$work/alreadycompact" "Output Format is missing: write already-raised lines under a \`## Already raised in the PR (not repeated)\` heading"
+
+make_copy "$work/readmenopr"
+drop_lines "$work/readmenopr/README.md" '/code-review pr 123'
+expect_fail "a README without the pr argument example fails" "$work/readmenopr" "README is missing: /code-review pr 123"
+
+make_copy "$work/readmenoalready"
+drop_lines "$work/readmenoalready/README.md" '## Already raised in the PR (not repeated)'
+expect_fail "a README without the already-raised section fails" "$work/readmenoalready" "README is missing: \`## Already raised in the PR (not repeated)\`"
+
+make_copy "$work/exampleprarg"
+replace_first "$work/exampleprarg/example-output.md" '`/code-review pr 123`' '`/code-review branch main`'
+expect_fail "an example not started with the pr argument fails" "$work/exampleprarg" "example-output.md must say the review was started with \`/code-review pr 123\`"
+
+make_copy "$work/noalready"
+drop_lines "$work/noalready/example-output.md" '## Already raised in the PR (not repeated)'
+expect_fail "an example without the already-raised sections fails" "$work/noalready" "example-output.md must have 2 '## Already raised in the PR (not repeated)' sections (full report and compact mode), found 0"
+
+make_copy "$work/alreadyseverity"
+replace_first "$work/alreadyseverity/example-output.md" '- src/routes/auth.routes.ts:8 — ' '- src/routes/auth.routes.ts:8 — Warning: '
+expect_fail "an already-raised note with a severity fails" "$work/alreadyseverity" "already-raised note carries a severity"
+
+make_copy "$work/alreadynourl"
+replace_first "$work/alreadynourl/example-output.md" ' (https://github.com/acme/shop-api/pull/123#discussion_r1201)' ''
+expect_fail "an already-raised note without the thread URL fails" "$work/alreadynourl" "already-raised note is not '- path:line — problem (<URL>)'"
+
+make_copy "$work/alreadyfinding"
+replace_first "$work/alreadyfinding/example-output.md" '- src/routes/auth.routes.ts:8 — ' '- src/routes/auth.routes.ts:8: Warning: '
+expect_fail "a scorable finding under the already-raised heading fails" "$work/alreadyfinding" "example-output.md has a finding with a severity under ## Already raised in the PR (not repeated)"
+
+make_copy "$work/noresolvedcite"
+replace_first "$work/noresolvedcite/example-output.md" 'and marked resolved, but' 'but'
+expect_fail "an example without a resolved-thread citation fails" "$work/noresolvedcite" "no example finding cites a resolved thread"
 
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
