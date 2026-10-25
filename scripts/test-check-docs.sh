@@ -860,6 +860,11 @@ make_copy "$work/noresolvedcite"
 replace_first "$work/noresolvedcite/example-output.md" 'and marked resolved, but' 'but'
 expect_fail "an example without a resolved-thread citation fails" "$work/noresolvedcite" "no example finding cites a resolved thread"
 
+make_copy "$work/pubcategory"
+printf '# Extra\n' > "$work/pubcategory/references/extra.md"
+printf -- '- `./references/extra.md`\n' >> "$work/pubcategory/SKILL.md"
+expect_fail "only publishing.md is exempt from the category index" "$work/pubcategory" "references/extra.md has no trigger in SKILL.md Conditional Categories"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}

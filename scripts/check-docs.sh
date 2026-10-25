@@ -87,7 +87,7 @@ check_readme_counts() {
   patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
   scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
   core=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
-  conditional=$(ls references/*.md 2>/dev/null | wc -l | tr -d ' ')
+  conditional=$(ls references/*.md 2>/dev/null | grep -vx 'references/publishing.md' | wc -l | tr -d ' ')
   categories=$((core + conditional))
   listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
   listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
@@ -530,6 +530,8 @@ import glob, os, re, sys
 
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Conditional Categories"
+# Files under references/ that are not review categories.
+NOT_CATEGORIES = {"references/publishing.md"}
 ITEM = re.compile(r"^- \*\*(?P<name>[^*]+)\*\* — `\./(?P<path>references/[a-z0-9-]+\.md)`: load when \S.*\.$")
 errors = []
 
@@ -577,6 +579,8 @@ for path, phrase in sorted(REQUIRED_TRIGGERS.items()):
     if phrase not in triggers.get(path, ""):
         errors.append(f"{path} trigger must cover: {phrase}")
 for path in sorted(glob.glob("references/*.md")):
+    if path in NOT_CATEGORIES:
+        continue
     if path not in listed:
         errors.append(f"{path} has no trigger in SKILL.md Conditional Categories")
 for path, name in sorted(listed.items()):
