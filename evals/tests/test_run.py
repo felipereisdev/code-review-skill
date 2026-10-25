@@ -118,7 +118,7 @@ class RunTest(unittest.TestCase):
         with open(os.path.join(self.out, "reports", "demo__bug.md"), encoding="utf-8") as f:
             report = f.read()
         self.assertIn("SKILL_DIR=" + os.path.dirname(EVALS), report)
-        self.assertIn('option 2, "Staged changes only"', report)
+        self.assertIn('the scope argument "staged" (git diff --cached). This run is headless', report)
         self.assertIn("./patterns/... and ./references/... are under " + os.path.dirname(EVALS), report)
 
     def test_failing_agent_is_an_error(self):

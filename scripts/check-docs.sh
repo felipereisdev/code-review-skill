@@ -601,6 +601,127 @@ PY
   fi
 }
 
+check_skill_scope_selection() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Step 0 — Scope Selection"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+def section(start):
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+start = first(heading)
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+text = section(start)
+for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<base>]`** — ",
+          "4. **`commit <sha>`** — ", "5. **`range <from>..<to>`** — ",
+          "`git status --porcelain --untracked-files=all`", "`git diff --cached`", "`git diff <base>...HEAD`",
+          "`git show <sha>`", "`git diff <from>..<to>`",
+          "The word `pr` is reserved for reviewing a pull request by number",
+          "The word `compact` turns on compact mode",
+          "`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`",
+          "`origin/main`, `origin/master`, `main` and `master`",
+          "`Cannot review: <reason>. Nothing was reviewed.`", "Never review a different scope instead",
+          "A value that starts with `-` is always rejected",
+          "Apply these rules in order and stop at the first one that matches",
+          "**Headless runs never ask.**", "In a headless run, never ask a question",
+          "ask only when detection is ambiguous", "A headless run uses `uncommitted`",
+          "`Nothing to review: <command> shows no changes.`",
+          "`Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.`",
+          "`no common ancestor between <base> and HEAD; fetch more history or use range <from>..<to>`",
+          "`**Scope:** <scope> (<command>)`", "add `, auto-detected` after it",
+          "never as text inside a shell command", "quote the whole value with POSIX single quotes",
+          "a symbolic ref whose target is missing, as after a branch was pruned, does not count",
+          "Never read an unexpected failure as an empty result",
+          "`Cannot review: git <command> failed; the history or diff could not be inspected. Nothing was reviewed.`",
+          "Those exits are results, not failures",
+          "Any other nonzero exit is an unexpected failure",
+          "Before the first commit, HEAD does not resolve",
+          "`uncommitted (git diff --cached + git diff + untracked files)`",
+          "An answer that names a base is validated like a `<base>` argument"):
+    if s not in text:
+        errors.append(f"Step 0 — Scope Selection is missing: {s}")
+for s in ("ask the user the following question and wait for their answer",
+          "Type the number of your choice"):
+    if s in text:
+        errors.append(f"Step 0 — Scope Selection still always asks: {s}")
+output_start = first("## 7. Output Format")
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+for s in ("Write the report in this order: the **Scope:** line (Step 0), What Was Done Well",
+          "- Start with the **Scope:** line."):
+    if s not in output:
+        errors.append(f"Output Format is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Step 0 takes the scope from arguments or detection, never asks in headless runs and reports the scope"
+  else
+    fail "SKILL.md scope selection (see messages above)"
+  fi
+}
+
+check_docs_scope_usage() {
+  if python3 - <<'PY'
+import re, sys
+
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("/code-review uncommitted", "/code-review staged", "/code-review branch main",
+          "/code-review commit abc123", "/code-review range ", "`Cannot review: ... Nothing was reviewed.`",
+          "`**Scope:** branch main (git diff main...HEAD)`"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+if "The skill will ask you to choose the review scope" in readme:
+    errors.append("README still says the skill always asks for the scope")
+text = open("example-output.md", encoding="utf-8").read()
+lines = text.splitlines()
+if "`/code-review branch main`" not in text:
+    errors.append("example-output.md must say the review was started with `/code-review branch main`")
+SCOPE = re.compile(r"^\*\*Scope:\*\* (uncommitted|staged|branch \S+|commit \S+|range \S+\.\.\S+)"
+                   r"(, auto-detected)? \(git [^()]+\)$")
+scopes = [i for i, line in enumerate(lines) if line.startswith("**Scope:**")]
+if len(scopes) != 2:
+    errors.append("example-output.md must have 2 **Scope:** lines (full report and compact mode), "
+                  f"found {len(scopes)}")
+else:
+    for i in scopes:
+        if not SCOPE.match(lines[i]):
+            errors.append(f"example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)': {lines[i][:60]}")
+    if lines[scopes[0]] != lines[scopes[1]]:
+        errors.append("the full-report and compact-mode **Scope:** lines must match")
+    done_well = next((i for i, line in enumerate(lines) if line == "### What Was Done Well"), None)
+    compact = next((i for i, line in enumerate(lines) if line == "## Compact Mode"), None)
+    first_line = next((i for i, line in enumerate(lines)
+                       if compact is not None and i > compact and re.match(r"^- \S+:\d+", line)), None)
+    if done_well is None or not scopes[0] < done_well:
+        errors.append("the full-report **Scope:** line must come before ### What Was Done Well")
+    if compact is None or first_line is None or not compact < scopes[1] < first_line:
+        errors.append("the compact-mode **Scope:** line must come after ## Compact Mode and before the first compact line")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show scope arguments and the Scope line"
+  else
+    fail "README and example-output.md scope usage (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -789,10 +910,12 @@ check_skill_repo_rules
 check_skill_untrusted_input
 check_skill_scope_and_noise
 check_skill_conditional_categories
+check_skill_scope_selection
 check_stack_precedents
 check_readme_counts
 check_example_output
 check_example_findings
+check_docs_scope_usage
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

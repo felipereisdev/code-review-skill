@@ -4,11 +4,13 @@ This is an example of the code review output format. The actual review will vary
 
 ## Scenario
 
-Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The branch also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch.
+Reviewing a feature branch that adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The branch also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch. The review was started with `/code-review branch main`.
 
 ---
 
 ## Code Review Report
+
+**Scope:** branch main (git diff main...HEAD)
 
 ### What Was Done Well
 
@@ -192,7 +194,9 @@ The Medium-confidence finding under Needs human verification is not counted in t
 
 ## Compact Mode
 
-The same review when the user asks for `/code-review compact`:
+The same review when the user asks for `/code-review branch main compact`:
+
+**Scope:** branch main (git diff main...HEAD)
 
 - src/services/auth.service.ts:45-46: Critical: the JWT secret falls back to 'dev-secret', so anyone can forge tokens → fail at startup when JWT_SECRET is unset
 - src/services/auth.service.ts:89-97: Critical: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction

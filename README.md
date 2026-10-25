@@ -23,7 +23,7 @@
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
 - **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
-- **5 Review Scopes** - Uncommitted changes, staged, branch comparison, specific commits
+- **5 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>` or `range <from>..<to>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and its git command
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
 
 ## 📦 Installation
@@ -115,15 +115,36 @@ Invoke the skill to review your code:
 /code-review
 ```
 
+### Scope arguments
+
+Pass the scope after the command, or leave it out and let the skill detect it:
+
+```
+/code-review uncommitted          # staged and unstaged changes, plus untracked files
+/code-review staged               # only the changes in the index
+/code-review branch main          # this branch since it left main (no base: the default branch)
+/code-review commit abc123        # one commit
+/code-review range v1.2.0..HEAD   # a range of commits
+/code-review staged compact       # any scope, in compact mode
+```
+
+In a run with no user to answer, such as CI or `claude -p`, pass the scope so the review starts at once:
+
+```bash
+claude -p "/code-review branch origin/main"
+```
+
 ## 📋 Review Process
 
-The skill will ask you to choose the review scope:
+The skill takes the scope from the argument, and detects it when there is none:
 
-1. **Uncommitted changes** - files modified but not staged (`git diff HEAD`)
-2. **Staged changes only** - files added to index (`git diff --cached`)
-3. **Current branch vs base** - all commits compared to merge base
-4. **Specific commit** - changes in a single commit
-5. **Commit range** - changes across a range
+1. **Uncommitted changes** (`uncommitted`) - staged and unstaged changes plus untracked files (`git diff HEAD`)
+2. **Staged changes only** (`staged`) - files added to the index (`git diff --cached`)
+3. **Current branch vs base** (`branch [<base>]`) - all commits since the branch left the base (`git diff <base>...HEAD`)
+4. **Specific commit** (`commit <sha>`) - changes in a single commit (`git show <sha>`)
+5. **Commit range** (`range <from>..<to>`) - changes across a range (`git diff <from>..<to>`)
+
+Without an argument, the skill reviews the uncommitted changes if there are any; otherwise, a branch with commits ahead of the default branch (from `origin/HEAD`, falling back to `main` or `master`) is reviewed against it; otherwise it says there is nothing to review. It asks only in an interactive run whose detection is ambiguous, and never in a headless run. An invalid argument, such as an unknown commit or base, stops with `Cannot review: ... Nothing was reviewed.` instead of reviewing another scope. The report starts with the scope and its git command, for example `**Scope:** branch main (git diff main...HEAD)`.
 
 ## 🛡️ Review Categories
 
