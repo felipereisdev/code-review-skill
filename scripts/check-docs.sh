@@ -1510,6 +1510,47 @@ check_triage_references() {
   fi
 }
 
+check_docs_triage() {
+  if python3 - <<'PY'
+import sys
+
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("**Triage, Verdict and Audit**", "`**Ready to merge:** Yes / No / With fixes`", "- **Triage and verdict**:",
+          "- **Audit**: the report ends with `## Audit`", "never approves or blocks a pull request",
+          "an open thread does not prove the problem",
+          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+for s in ("are not counted in the Summary table and do not change the verdict", "which the skill never runs"):
+    if s in readme:
+        errors.append(f"README still says: {s}")
+text = open("example-output.md", encoding="utf-8").read()
+for s in ("## Coverage Limits", "**Audit:** 6 of 6 changed files reviewed;", "The report ends with the Audit above."):
+    if s not in text:
+        errors.append(f"example-output.md is missing: {s}")
+verdict = "**Ready to merge:** No — 2 Critical findings must be fixed before merging."
+if "## Code Review Report" in text and "The report ends with the Audit above." in text:
+    full = text[text.index("## Code Review Report"):text.index("The report ends with the Audit above.")]
+    if verdict not in full:
+        errors.append(f"example-output.md full report is missing: {verdict}")
+if all(h in text for h in ("## Compact Mode", "## Coverage Limits", "## Repository Configuration")) and not (
+        text.index("## Compact Mode") < text.index("## Coverage Limits") < text.index("## Repository Configuration")):
+    errors.append("example-output.md must put ## Coverage Limits between ## Compact Mode and ## Repository Configuration")
+if all(h in text for h in ("## Audit", "The report ends with the Audit above.", "## Action Items")) and not (
+        text.index("## Audit") < text.index("The report ends with the Audit above.") < text.index("## Action Items")):
+    errors.append("example-output.md must end the report with ## Audit before ## Action Items")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show the triage lines, the verdict, the audit and the coverage limits"
+  else
+    fail "README and example-output.md triage (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -1537,6 +1578,7 @@ check_docs_scope_usage
 check_docs_pr_scope
 check_docs_publishing
 check_docs_configuration
+check_docs_triage
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

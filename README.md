@@ -18,6 +18,7 @@
 - **Multi-Stack Support** - 20 technology stacks covered
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
+- **Triage, Verdict and Audit** - Every report rates the review effort from 1 to 5, says which tests cover the change and what it ran without claiming a result it did not see, names up to 3 files to look at first, and gives a `**Ready to merge:** Yes / No / With fixes` verdict from a fixed table over the verified findings, before any configuration filter; a closing `## Audit` lists every file reviewed and read for context, the categories checked with no findings, and each limit with its reason, marked material or not
 - **Changed Lines Only** - Findings cover only the lines the change adds or modifies; a relevant older problem can go, one line each, to a short "Pre-existing issues (not counted)" section outside the Summary table; the same problem at several places is one finding with an **Also at:** list; length limits apply only to code the change adds, always as Suggestions
 - **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
@@ -151,6 +152,7 @@ With `--comment`, the skill first writes the whole report in the chat, then post
 - Each finding under `## Findings` whose location is on a line of the diff becomes an inline comment. On GitHub they go out in one review submitted only as a comment (`"event": "COMMENT"`); the skill never approves a pull request or requests changes. A `suggestion` block is added only when the fix replaces exactly the commented lines.
 - One summary comment, which starts with `<!-- code-review-skill:summary -->`, lists every finding. Later runs edit that comment instead of adding another, and never repeat a finding the skill already commented on at the same place.
 - Findings under Needs human verification appear only in the summary comment; pre-existing and already-raised lines are never posted. Secrets are replaced with `[REDACTED]`. If a command fails, the skill says so, and the report in the chat is still complete.
+- The summary comment also carries the triage lines, the `**Ready to merge:**` verdict and the one-line audit; inline comments never do, and the verdict never approves or blocks the pull request.
 
 `--comment` works only with the `pr` scope: with another scope, or `--dry-run` without `--comment`, the skill stops with `Cannot review: ... Nothing was reviewed.`. The rules live in `references/publishing.md`, which the skill reads only when `--comment` is given. `--dry-run` prints each command and its JSON payload under `## Dry run — nothing was published`, for example this review payload, shortened to one inline comment (see [example-output.md](example-output.md) for the full printout):
 
@@ -284,7 +286,9 @@ Each finding carries a severity, a location inside the diff, a concrete trigger 
 - **Repository rules**: a finding that breaks a rule from `CLAUDE.md`, `AGENTS.md` or another rules file adds a **Rule:** line that cites the rules file and its lines, for example `src/services/AGENTS.md:L4-L5`; in compact mode the line ends with `(Rule: src/services/AGENTS.md:L4-L5)`. Without a citation that can be checked, it is not a rule finding.
 - **Repository configuration**: with `.code-review/`, the report adds a `**Configuration:**` line and, when files were ignored, an `**Excluded by configuration:**` line after the Scope line, and an `**Omitted by configuration:**` line after the verification line.
 - **Changed lines, pre-existing issues and repeats**: findings cite only lines the change adds or modifies. An older problem the change does not touch is never a finding; it can go, one line each (`path:line — problem`), under `## Pre-existing issues (not counted)`, which the Summary table does not count. The same problem at several places is one finding whose **Also at:** line lists the other places; in compact mode the line ends with `(also at path:line)` before any rule citation.
-- **Already raised in the PR**: in a `pr` review, the lines under `## Already raised in the PR (not repeated)` have no severity, are not counted in the Summary table and do not change the verdict.
+- **Already raised in the PR**: in a `pr` review, the lines under `## Already raised in the PR (not repeated)` have no severity and are not counted in the Summary table; a Warning candidate already raised in an open thread makes the verdict `With fixes` as pending verification, because an open thread does not prove the problem, and the verdict never calls it confirmed or fixed.
+- **Triage and verdict**: after the verification line come `**Review effort:** <n>/5`, `**Relevant tests:**` (with `Execution:` saying what ran, or `not run`), `**Look first:**` and `**Ready to merge:**`. A Critical finding, or a material limit such as changed lines the review could not read, gives `No`; a Warning finding, a finding under Needs human verification or a Warning candidate already raised in an open thread gives `With fixes`; otherwise `Yes`. Files excluded by configuration are named in the verdict, never called clean, and the verdict never approves or blocks a pull request.
+- **Audit**: the report ends with `## Audit` (one `**Audit:**` line in compact mode): every file reviewed and read for context, the categories checked with no findings, the already-raised Warning candidates in a `pr` review, and each limit with its reason, such as `not read`, `API not validated` or `tests not verified`, marked `material` when it leaves changed behavior unjudged.
 - **Compact mode**: ask for `/code-review compact` to get one line per finding (`path:line: Severity: problem → fix`).
 
 Plus a summary table that counts the High-confidence findings:
@@ -336,7 +340,7 @@ code-review-skill/
 │   ├── baseline.json    # Baseline metrics of the skill before review-behavior changes
 │   ├── baseline/        # Baseline summary.md and raw reports
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
-│   └── tests/           # Offline tests for the runner, the scorer and the --comment dry-run payloads
+│   └── tests/           # Offline tests for the runner, the scorer, the --comment dry-run payloads and the triage verdict
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md

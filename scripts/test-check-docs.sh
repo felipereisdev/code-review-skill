@@ -1129,6 +1129,30 @@ make_copy "$work/cfgexcludedlimit"
 replace_first "$work/cfgexcludedlimit/references/configuration.md" 'an exclusion is not a limit of the review' 'an exclusion is a material limit'
 expect_fail "an exclusion treated as a material limit fails" "$work/cfgexcludedlimit" "references/configuration.md is missing: an exclusion is not a limit of the review"
 
+make_copy "$work/readmenotriage"
+drop_lines "$work/readmenotriage/README.md" '**Triage, Verdict and Audit**'
+expect_fail "a README without the triage feature fails" "$work/readmenotriage" "README is missing: **Triage, Verdict and Audit**"
+
+make_copy "$work/readmeraised"
+replace_first "$work/readmeraised/README.md" 'have no severity and are not counted in the Summary table;' 'have no severity, are not counted in the Summary table and do not change the verdict;'
+expect_fail "a README that keeps open Warnings out of the verdict fails" "$work/readmeraised" "README still says: are not counted in the Summary table and do not change the verdict"
+
+make_copy "$work/readmeneverruns"
+printf -- '\nTests are listed as `not run`, which the skill never runs.\n' >> "$work/readmeneverruns/README.md"
+expect_fail "a README that says the skill never runs tests fails" "$work/readmeneverruns" "README still says: which the skill never runs"
+
+make_copy "$work/exampleverdict"
+replace_first "$work/exampleverdict/example-output.md" '**Ready to merge:** No — 2 Critical findings must be fixed before merging.' '**Ready to merge:** Yes — no Critical or Warning findings.'
+expect_fail "an example that approves a Critical report fails" "$work/exampleverdict" "example-output.md full report is missing: **Ready to merge:** No — 2 Critical findings must be fixed before merging."
+
+make_copy "$work/examplenocoverage"
+replace_first "$work/examplenocoverage/example-output.md" '## Coverage Limits' '## Limits'
+expect_fail "an example without the coverage limits fails" "$work/examplenocoverage" "example-output.md is missing: ## Coverage Limits"
+
+make_copy "$work/exampleboundary"
+replace_first "$work/exampleboundary/example-output.md" 'The report ends with the Audit above.' 'The action items are part of the report.'
+expect_fail "an example without the report boundary fails" "$work/exampleboundary" "example-output.md is missing: The report ends with the Audit above."
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}
