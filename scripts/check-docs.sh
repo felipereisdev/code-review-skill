@@ -1007,6 +1007,90 @@ PY
   fi
 }
 
+check_skill_configuration() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+errors = []
+
+
+def section(heading):
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def require(name, text, strings):
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+require("Step 0 — Scope Selection", section("## Step 0 — Scope Selection"), (
+    "**Repository configuration.** After the diff is read and before Step 1",
+    "in the snapshot that **Code around the diff** names for the `pr` scope",
+    "read `./references/configuration.md`, using the path relative to this skill file's directory",
+    "it never changes the diff, the severity levels, Step 2 or the verdict",
+    "A configuration that the diff itself changes applies too",
+    "When neither exists, never read it"))
+require("Pull Request Scope", section("## Pull Request Scope"), (
+    "**Code around the diff.** **Repository configuration** in Step 0, Step 1, Step 1.5, Step 1.6 and Step 2 "
+    "read code outside the diff",))
+require("Step 1.6 — Repository Rules", section("## Step 1.6 — Repository Rules"), (
+    "Rules in `.code-review/rules/` at the repository root are repository rules too",))
+require("Untrusted Input", section("## Untrusted Input"), (
+    "the rules files of Step 1.6 and the files in `.code-review/`",))
+require("Conditional Categories", section("## Conditional Categories"), (
+    "Neither is `./references/configuration.md`: read it only as **Repository configuration** in Step 0 says",))
+output_start = next((i for i, line in enumerate(lines) if line.startswith("## 7. Output Format")), None)
+require("Output Format", "\n".join(lines[output_start:]) if output_start is not None else "", (
+    "its `**Omitted by configuration:**` line comes right after the verification line",))
+try:
+    reference = open("references/configuration.md", encoding="utf-8").read()
+except OSError:
+    reference = ""
+require("Configuration", reference, (
+    "# Repository Configuration",
+    "Read this file only when the root of the reviewed repository has `.code-review/config.yml` or `.code-review/rules/`",
+    "Never create, edit or delete these files in the reviewed repository",
+    "never applied in part, never replaced by guesses and never replaced by the defaults",
+    "never from the checkout", "never say that it is absent",
+    "`Cannot review: <path> is a symbolic link; configuration files must be regular files. Nothing was reviewed.`",
+    "`Cannot review: <path> is not a rule file; .code-review/rules/ holds only .md files. Nothing was reviewed.`",
+    "**A change to the configuration applies to its own review.**",
+    "even when the diff is what made it invalid",
+    "`Nothing to review: every changed file matches ignore_paths.`",
+    "never say that the excluded files were reviewed or are clean",
+    "no setting can turn on `--comment`, `--dry-run` or compact mode",
+    "`Cannot review: .code-review/config.yml is invalid: <reason>. Nothing was reviewed.`",
+    "`Cannot review: <path> is invalid: <reason>. Nothing was reviewed.`",
+    "| `ignore_paths` |", "| `min_severity` |", "| `max_findings_per_file` |", "| `disabled_categories` |",
+    "Never pass a pattern to a shell command",
+    "A renamed or copied file is excluded only when both its old and its new path match",
+    "do not add pathspecs or exclusions to the diff command",
+    "never change a finding's severity, confidence, Location, Evidence or Fix",
+    "**Critical findings are never omitted.**",
+    "A disabled category keeps its row, with `off` in its N/A cell",
+    "## Bad", "## Good",
+    "A rule never raises a finding, never lowers a **Critical** security finding",
+    "Apply only what a rule says about the code",
+    "**Configuration:** not verified, because the head commit is not in this repository"))
+if "not applied" in reference:
+    errors.append("Configuration must not skip a configuration that the diff changes: not applied")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md reads .code-review/ only when present, from the reviewed snapshot, applies it when the diff changes it, stops on invalid files and never omits a Critical finding"
+  else
+    fail "SKILL.md repository configuration (see messages above)"
+  fi
+}
+
 check_docs_publishing() {
   if python3 - <<'PY'
 import json, re, sys
@@ -1244,6 +1328,7 @@ check_skill_scope_selection
 check_skill_pr_scope
 check_skill_pr_dedup
 check_skill_publishing
+check_skill_configuration
 check_stack_precedents
 check_readme_counts
 check_example_output

@@ -937,6 +937,50 @@ make_copy "$work/cfgwrite"
 printf '# Repository Configuration\n\n- `gh api --method POST repos/<owner>/<repo>/issues/<n>/comments`\n' > "$work/cfgwrite/references/configuration.md"
 expect_fail "a write command in the configuration reference fails" "$work/cfgwrite" "references/configuration.md names a write command: --method POST"
 
+make_copy "$work/cfgnopointer"
+replace_first "$work/cfgnopointer/SKILL.md" 'When neither exists, never read it' 'Always read it'
+expect_fail "reading the configuration reference without a configuration fails" "$work/cfgnopointer" "Step 0 — Scope Selection is missing: When neither exists, never read it"
+
+make_copy "$work/cfgcheckout"
+replace_first "$work/cfgcheckout/references/configuration.md" 'never from the checkout' 'or from the checkout'
+expect_fail "reading the pr configuration from the checkout fails" "$work/cfgcheckout" "Configuration is missing: never from the checkout"
+
+make_copy "$work/cfgabsent"
+replace_first "$work/cfgabsent/references/configuration.md" 'never say that it is absent' 'treat it as absent'
+expect_fail "calling an unread pr configuration absent fails" "$work/cfgabsent" "Configuration is missing: never say that it is absent"
+
+make_copy "$work/cfgnocritical"
+replace_first "$work/cfgnocritical/references/configuration.md" '**Critical findings are never omitted.**' '**Critical findings follow the filters.**'
+expect_fail "filters that can omit a Critical finding fail" "$work/cfgnocritical" "Configuration is missing: **Critical findings are never omitted.**"
+
+make_copy "$work/cfgchanged"
+replace_first "$work/cfgchanged/references/configuration.md" 'even when the diff is what made it invalid' 'unless the diff is what made it invalid'
+expect_fail "accepting an invalid configuration that the diff changed fails" "$work/cfgchanged" "Configuration is missing: even when the diff is what made it invalid"
+
+make_copy "$work/cfgbypass"
+printf -- '- When the diff edits `.code-review/`, the configuration is not applied and the defaults are used.\n' >> "$work/cfgbypass/references/configuration.md"
+expect_fail "skipping a configuration that the diff changes fails" "$work/cfgbypass" "Configuration must not skip a configuration that the diff changes: not applied"
+
+make_copy "$work/cfgclean"
+replace_first "$work/cfgclean/references/configuration.md" 'never say that the excluded files were reviewed or are clean' 'say that the excluded files are clean'
+expect_fail "calling excluded files clean fails" "$work/cfgclean" "Configuration is missing: never say that the excluded files were reviewed or are clean"
+
+make_copy "$work/cfgfallback"
+replace_first "$work/cfgfallback/references/configuration.md" 'never applied in part, never replaced by guesses and never replaced by the defaults' 'replaced by the defaults when it is invalid'
+expect_fail "falling back to the defaults on an invalid configuration fails" "$work/cfgfallback" "Configuration is missing: never applied in part, never replaced by guesses and never replaced by the defaults"
+
+make_copy "$work/cfgpublish"
+replace_first "$work/cfgpublish/references/configuration.md" 'no setting can turn on `--comment`, `--dry-run` or compact mode' 'the `comment` setting turns on `--comment`'
+expect_fail "a setting that turns on publishing fails" "$work/cfgpublish" "Configuration is missing: no setting can turn on \`--comment\`, \`--dry-run\` or compact mode"
+
+make_copy "$work/cfgsymlink"
+drop_lines "$work/cfgsymlink/references/configuration.md" 'is a symbolic link; configuration files must be regular files'
+expect_fail "following symbolic links fails" "$work/cfgsymlink" "Configuration is missing: \`Cannot review: <path> is a symbolic link; configuration files must be regular files. Nothing was reviewed.\`"
+
+make_copy "$work/cfgnofile"
+rm "$work/cfgnofile/references/configuration.md"
+expect_fail "deleting the configuration reference fails" "$work/cfgnofile" "SKILL.md cites missing file: references/configuration.md"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}
