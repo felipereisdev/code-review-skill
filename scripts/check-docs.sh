@@ -791,7 +791,7 @@ PY
 
 check_skill_pr_scope() {
   if python3 - <<'PY'
-import re, sys
+import glob, re, sys
 
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Pull Request Scope"
@@ -846,8 +846,12 @@ else:
             errors.append(f"Pull Request Scope is missing: {s}")
 WRITES = ("gh pr comment", "gh pr review", "gh pr edit", "gh pr merge", "gh pr close", "gh pr checkout",
           "glab mr note", "glab mr approve", "glab mr merge", "glab mr close", "glab mr checkout",
-          "-X POST", "-X PATCH", "--method POST", "--method PATCH")
-for path in ("SKILL.md", "README.md"):
+          "-X POST", "-X PATCH", "-X PUT", "--method POST", "--method PATCH", "--method PUT")
+# Write commands are allowed only in references/publishing.md.
+scanned = ["SKILL.md", "README.md"] + sorted(
+    p for p in glob.glob("references/*.md") + glob.glob("stacks/*.md") + glob.glob("patterns/*.md")
+    if p != "references/publishing.md")
+for path in scanned:
     content = open(path, encoding="utf-8").read()
     for s in WRITES:
         if s in content:
@@ -920,6 +924,86 @@ PY
     pass "SKILL.md does not repeat what the pull request already raises, never reopens resolved threads and keeps Critical findings counted"
   else
     fail "SKILL.md pull request deduplication (see messages above)"
+  fi
+}
+
+check_skill_publishing() {
+  if python3 - <<'PY'
+import re, subprocess, sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+errors = []
+
+
+def section(heading):
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def require(name, text, strings):
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+require("Step 0 — Scope Selection", section("## Step 0 — Scope Selection"), (
+    "The flags `--comment` and `--dry-run` are not part of the scope either",
+    "`--comment needs the pr scope; pass pr <number|url>`",
+    "`--dry-run needs --comment`"))
+require("Pull Request Scope", section("## Pull Request Scope"), (
+    "except as **Publishing** below allows with `--comment`",
+    "The one exception is **Publishing** below, and only with `--comment`",
+    "**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, "
+    "read `./references/publishing.md`",
+    "Without `--comment`, never read `./references/publishing.md` and never publish",
+    "When publishing fails, the report in the chat still stands"))
+require("Conditional Categories", section("## Conditional Categories"), (
+    "`./references/publishing.md`, is not a review category",))
+try:
+    publishing = open("references/publishing.md", encoding="utf-8").read()
+except OSError:
+    publishing = ""
+require("Publishing", publishing, (
+    "# Publishing",
+    "Read this file only when the arguments include `--comment` and the scope is `pr`",
+    '`"event": "COMMENT"`', '"event": "COMMENT",',
+    "Never approve the pull request or request changes",
+    "Only findings under `## Findings` can become inline comments",
+    "A fix is complete when", "```` ```suggestion ````", "```` ```suggestion:-<k>+0 ````",
+    "`viewerDidAuthor`", "resolved or not", "within 3 lines",
+    "<!-- code-review-skill:summary -->", "<!-- code-review-skill:finding -->",
+    "never post a second one", "`[REDACTED]`", "never start a line with `/`",
+    "--method POST repos/<owner>/<repo>/pulls/<n>/reviews",
+    "--method PATCH repos/<owner>/<repo>/issues/comments/<comment_id>",
+    "--method POST projects/<project_id>/merge_requests/<iid>/discussions",
+    "--method PUT projects/<project_id>/merge_requests/<iid>/notes/<note_id>",
+    '"base_sha"', '"start_sha"', '"head_sha"', '"new_line"', "`old_line`",
+    "## Dry run — nothing was published",
+    "`Publishing failed: <command> exited <status>; <what was published>. The report above is complete.`"))
+for s in ("gh pr review", "gh pr merge", "gh pr close", "gh pr edit", "gh pr comment",
+          "glab mr approve", "glab mr merge", "glab mr close", "glab mr note"):
+    if s in publishing:
+        errors.append(f"references/publishing.md names a forbidden command: {s}")
+if re.search(r"\bmutation\s*[({]", publishing):
+    errors.append("references/publishing.md names a GraphQL mutation")
+listed = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.md", "*.json"],
+                        stdout=subprocess.PIPE, universal_newlines=True, check=True).stdout.splitlines()
+for path in listed:
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    for word in sorted(set(re.findall(r"(?<![A-Z_])(?:APPROVE|REQUEST_CHANGES)(?![A-Z_])", text))):
+        errors.append(f"{path} names a forbidden review event: {word}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md points to references/publishing.md only for --comment, which posts comments only, edits one summary and never approves"
+  else
+    fail "SKILL.md publishing (see messages above)"
   fi
 }
 
@@ -1114,6 +1198,7 @@ check_skill_conditional_categories
 check_skill_scope_selection
 check_skill_pr_scope
 check_skill_pr_dedup
+check_skill_publishing
 check_stack_precedents
 check_readme_counts
 check_example_output
