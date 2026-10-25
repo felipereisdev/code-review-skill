@@ -637,8 +637,12 @@ replace_first "$work/danglingdefault/SKILL.md" 'a symbolic ref whose target is m
 expect_fail "accepting a dangling default branch fails" "$work/danglingdefault" "Step 0 — Scope Selection is missing: a symbolic ref whose target is missing"
 
 make_copy "$work/failedgit"
-replace_first "$work/failedgit/SKILL.md" 'Never read a failed command as an empty result' 'Read the output'
-expect_fail "treating a failed git command as an empty result fails" "$work/failedgit" "Step 0 — Scope Selection is missing: Never read a failed command as an empty result"
+replace_first "$work/failedgit/SKILL.md" 'Never read an unexpected failure as an empty result' 'Read the output'
+expect_fail "treating a failed git command as an empty result fails" "$work/failedgit" "Step 0 — Scope Selection is missing: Never read an unexpected failure as an empty result"
+
+make_copy "$work/probefatal"
+replace_first "$work/probefatal/SKILL.md" 'Those exits are results, not failures: they select the next rule' 'Those exits stop the run: they select the next rule'
+expect_fail "stopping on an absent origin/HEAD probe exit fails" "$work/probefatal" "Step 0 — Scope Selection is missing: Those exits are results, not failures"
 
 make_copy "$work/unbornhead"
 replace_first "$work/unbornhead/SKILL.md" 'Before the first commit, HEAD does not resolve' 'On a fresh repository'
@@ -682,6 +686,46 @@ if [ "$dangling" = "origin/old-default" ] && ! git -C "$probe" rev-parse --verif
   printf 'PASS a dangling origin/HEAD target is rejected by the commit check\n'
 else
   printf 'FAIL a dangling origin/HEAD target was not rejected (symbolic-ref: %s)\n' "$dangling"
+  failures=$((failures + 1))
+fi
+
+# resolve_default_branch <repo>: the Default branch rule of SKILL.md Step 0, run with real git. Prints the default branch.
+resolve_default_branch() {
+  local ref cand
+  ref=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+  if [ -n "$ref" ] && git -C "$1" rev-parse --verify --quiet "$ref^{commit}" > /dev/null; then
+    printf '%s\n' "$ref"
+    return 0
+  fi
+  for cand in origin/main origin/master main master; do
+    if git -C "$1" rev-parse --verify --quiet "$cand^{commit}" > /dev/null; then
+      printf '%s\n' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Real git: with no origin/HEAD, the probes that exit 1 must fall through to local main, and the branch must count as ahead.
+fallback="$work/fallbackprobe"
+git init -q "$fallback"
+git -C "$fallback" -c user.name=check -c user.email=check@example.com -c commit.gpgsign=false commit -q --allow-empty -m base
+git -C "$fallback" branch -q -M main
+git -C "$fallback" switch -q -c feature
+git -C "$fallback" -c user.name=check -c user.email=check@example.com -c commit.gpgsign=false commit -q --allow-empty -m change
+if [ "$(resolve_default_branch "$fallback")" = "main" ] && [ "$(git -C "$fallback" rev-list --count main..HEAD)" = "1" ]; then
+  printf 'PASS with no origin/HEAD the default branch falls back to main and HEAD is one commit ahead\n'
+else
+  printf 'FAIL with no origin/HEAD the default branch did not fall back to main\n'
+  failures=$((failures + 1))
+fi
+
+# Real git: a dangling origin/HEAD target is skipped, and the fallback still reaches main.
+git -C "$fallback" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/old-default
+if [ "$(resolve_default_branch "$fallback")" = "main" ]; then
+  printf 'PASS a dangling origin/HEAD falls back to main\n'
+else
+  printf 'FAIL a dangling origin/HEAD did not fall back to main\n'
   failures=$((failures + 1))
 fi
 

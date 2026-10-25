@@ -644,8 +644,10 @@ for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<b
           "`**Scope:** <scope> (<command>)`", "add `, auto-detected` after it",
           "never as text inside a shell command", "quote the whole value with POSIX single quotes",
           "a symbolic ref whose target is missing, as after a branch was pruned, does not count",
-          "Never read a failed command as an empty result",
+          "Never read an unexpected failure as an empty result",
           "`Cannot review: git <command> failed; the history or diff could not be inspected. Nothing was reviewed.`",
+          "Those exits are results, not failures",
+          "Any other nonzero exit is an unexpected failure",
           "Before the first commit, HEAD does not resolve",
           "`uncommitted (git diff --cached + git diff + untracked files)`",
           "An answer that names a base is validated like a `<base>` argument"):
