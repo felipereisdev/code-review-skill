@@ -53,7 +53,7 @@ if not isinstance(desc, str) or not desc.strip():
 else:
     if len(desc) > 1024:
         errors.append(f"description is {len(desc)} chars (max 1024)")
-    for trigger in ("review PR", "review my changes", "revisar minhas mudanças", "code review"):
+    for trigger in ("review PR", "review my changes", "revisar minhas mudanças", "code review", "merge request"):
         if trigger not in desc:
             errors.append(f"description missing trigger: {trigger}")
 meta = fm.get("metadata")
@@ -629,7 +629,11 @@ for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<b
           "4. **`commit <sha>`** — ", "5. **`range <from>..<to>`** — ",
           "`git status --porcelain --untracked-files=all`", "`git diff --cached`", "`git diff <base>...HEAD`",
           "`git show <sha>`", "`git diff <from>..<to>`",
-          "The word `pr` is reserved for reviewing a pull request by number",
+          "6. **`pr <number|url>`** — ",
+          "for `branch`, `commit`, `range` and `pr`, the word after it is its value",
+          "or pr <number|url>`", "`pr needs a pull request number or URL`",
+          "is not a pull request number or URL`",
+          "`**Scope:** pr 123 (gh pr diff 123)`", "`**Scope:** pr 123 (glab mr diff 123)`",
           "The word `compact` turns on compact mode",
           "`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`",
           "`origin/main`, `origin/master`, `main` and `master`",
@@ -657,6 +661,8 @@ for s in ("ask the user the following question and wait for their answer",
           "Type the number of your choice"):
     if s in text:
         errors.append(f"Step 0 — Scope Selection still always asks: {s}")
+if "not supported yet" in "\n".join(lines):
+    errors.append("SKILL.md still says the pr scope is not supported yet")
 output_start = first("## 7. Output Format")
 output = "\n".join(lines[output_start:]) if output_start is not None else ""
 for s in ("Write the report in this order: the **Scope:** line (Step 0), What Was Done Well",

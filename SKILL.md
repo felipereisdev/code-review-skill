@@ -2,8 +2,9 @@
 name: code-review
 description: >-
   Performs a structured, comprehensive code review of git changes
-  (uncommitted, staged, current branch vs base, a single commit, or a
-  commit range). Detects the stack and architecture automatically, applies
+  (uncommitted, staged, current branch vs base, a single commit, a commit
+  range, or a GitHub pull request or GitLab merge request by number or
+  URL). Detects the stack and architecture automatically, applies
   stack- and pattern-specific rules, and reports findings by severity.
   Use when the user runs /code-review or /review-pr, or asks to
   "review my changes", "review PR", "review this branch", "do a code review",
@@ -28,18 +29,17 @@ Choose the scope before anything else. Take it from the arguments when there are
 3. **`branch [<base>]`** — every commit on the current branch since it left `<base>`. Run `git diff <base>...HEAD`. Without `<base>`, use the default branch.
 4. **`commit <sha>`** — the changes of one commit. Run `git show <sha>`.
 5. **`range <from>..<to>`** — the changes between two commits. Run `git diff <from>..<to>`.
+6. **`pr <number|url>`** — a GitHub pull request or GitLab merge request, by number or URL. Read it with `gh` or `glab` as **Pull Request Scope** describes, never with git alone; its diff is what `gh pr diff` or `glab mr diff` prints.
 
-The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.
-
-**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and for `branch`, `commit` and `range`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass each value to git as its own argument, never as text inside a shell command. When a shell command must contain a value, quote the whole value with POSIX single quotes: wrap it in `'`, and replace every `'` inside the value with `'\''`, so the apostrophe in `o'brien` becomes `'o'\''brien'`. Put any suffix, such as `^{commit}`, inside the same quotes.
+**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and for `branch`, `commit`, `range` and `pr`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass each value to git, `gh` or `glab` as its own argument, never as text inside a shell command. When a shell command must contain a value, quote the whole value with POSIX single quotes: wrap it in `'`, and replace every `'` inside the value with `'\''`, so the apostrophe in `o'brien` becomes `'o'\''brien'`. Put any suffix, such as `^{commit}`, inside the same quotes.
 
 **Default branch.** Run `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`. Its output, for example `origin/main`, is the default branch only when `git rev-parse --verify --quiet '<ref>^{commit}'` also accepts it: a symbolic ref whose target is missing, as after a branch was pruned, does not count. If the command prints nothing or the target is not accepted, the default branch is the first of `origin/main`, `origin/master`, `main` and `master` that `git rev-parse --verify --quiet '<ref>^{commit}'` accepts. If none is accepted, the default branch is unknown.
 
 **Invalid arguments.** Check the arguments before you run the diff. When one is invalid, reply with one line, `Cannot review: <reason>. Nothing was reviewed.`, and stop. Never review a different scope instead. The reasons:
 
-- An unknown first word: `unknown scope "<word>"; use uncommitted, staged, branch [<base>], commit <sha> or range <from>..<to>`.
-- The word `pr`: `the pr scope is not supported yet`.
+- An unknown first word: `unknown scope "<word>"; use uncommitted, staged, branch [<base>], commit <sha>, range <from>..<to> or pr <number|url>`.
 - `commit` without a value: `commit needs a commit hash`. `range` without a value: `range needs <from>..<to>`.
+- `pr` without a value: `pr needs a pull request number or URL`. A `pr` value that is neither a positive number, such as `123`, nor a pull request or merge request URL of a shape listed in **Pull Request Scope**: `"<value>" is not a pull request number or URL`.
 - `branch` without a value when the default branch is unknown: `the default branch could not be detected; pass a base with branch <base>`.
 - A word left over after the scope and its value: `unexpected argument "<word>"`.
 - A `range` value without `..` between two refs: `"<value>" is not a range of the form <from>..<to>`.
@@ -64,7 +64,7 @@ The word `pr` is reserved for reviewing a pull request by number. It is not supp
 
 **Empty diff.** If the scope's command shows no changes, and for `uncommitted` there are no untracked files either, reply `Nothing to review: <command> shows no changes.` and stop.
 
-**Scope line.** The report starts with one line that names the scope and the git command that produced the diff: `**Scope:** <scope> (<command>)`. When the scope came from detection, add `, auto-detected` after it. Examples: `**Scope:** branch origin/main, auto-detected (git diff origin/main...HEAD)`, `**Scope:** staged (git diff --cached)`, `**Scope:** uncommitted (git diff HEAD + untracked files)`. Before the first commit, the command part names the commands that were run instead, as in `uncommitted (git diff --cached + git diff + untracked files)`.
+**Scope line.** The report starts with one line that names the scope and the git command that produced the diff: `**Scope:** <scope> (<command>)`. When the scope came from detection, add `, auto-detected` after it. Examples: `**Scope:** branch origin/main, auto-detected (git diff origin/main...HEAD)`, `**Scope:** staged (git diff --cached)`, `**Scope:** uncommitted (git diff HEAD + untracked files)`. Before the first commit, the command part names the commands that were run instead, as in `uncommitted (git diff --cached + git diff + untracked files)`. For `pr`, the command part is the `gh` or `glab` command that printed the diff, without format flags such as `--raw`: `**Scope:** pr 123 (gh pr diff 123)` or `**Scope:** pr 123 (glab mr diff 123)`.
 
 ---
 

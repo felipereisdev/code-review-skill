@@ -573,8 +573,32 @@ replace_first "$work/fallbackscope/SKILL.md" ' Never review a different scope in
 expect_fail "falling back to another scope on a bad argument fails" "$work/fallbackscope" "Step 0 — Scope Selection is missing: Never review a different scope instead"
 
 make_copy "$work/nopr"
-replace_first "$work/nopr/SKILL.md" 'The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.' ''
-expect_fail "dropping the reserved pr word fails" "$work/nopr" "Step 0 — Scope Selection is missing: The word \`pr\` is reserved for reviewing a pull request by number"
+replace_first "$work/nopr/SKILL.md" '6. **`pr <number|url>`** — ' '6. **`pull <number>`** — '
+expect_fail "a pr scope without its argument word fails" "$work/nopr" "Step 0 — Scope Selection is missing: 6. **\`pr <number|url>\`** — "
+
+make_copy "$work/prunsupported"
+printf '\nThe word `pr` is reserved for reviewing a pull request by number. It is not supported yet.\n' >> "$work/prunsupported/SKILL.md"
+expect_fail "keeping the pr not-supported message fails" "$work/prunsupported" "SKILL.md still says the pr scope is not supported yet"
+
+make_copy "$work/prnovalue"
+replace_first "$work/prnovalue/SKILL.md" '`pr needs a pull request number or URL`' '`pr needs a value`'
+expect_fail "a pr scope without its missing-value message fails" "$work/prnovalue" "Step 0 — Scope Selection is missing: \`pr needs a pull request number or URL\`"
+
+make_copy "$work/prbadvalue"
+replace_first "$work/prbadvalue/SKILL.md" 'is not a pull request number or URL`' 'is not valid`'
+expect_fail "a pr scope that accepts any value fails" "$work/prbadvalue" "Step 0 — Scope Selection is missing: is not a pull request number or URL\`"
+
+make_copy "$work/prscopeline"
+replace_first "$work/prscopeline/SKILL.md" '`**Scope:** pr 123 (gh pr diff 123)`' '`**Scope:** pr 123`'
+expect_fail "a pr Scope line without its gh command fails" "$work/prscopeline" "Step 0 — Scope Selection is missing: \`**Scope:** pr 123 (gh pr diff 123)\`"
+
+make_copy "$work/prcount"
+replace_first "$work/prcount/README.md" '**6 Review Scopes**' '**5 Review Scopes**'
+expect_fail "a README that still counts 5 scopes fails" "$work/prcount" "README must say '**6 Review Scopes**'"
+
+make_copy "$work/prtrigger"
+replace_first "$work/prtrigger/SKILL.md" 'GitLab merge request by number' 'GitLab MR by number'
+expect_fail "a description without the merge request trigger fails" "$work/prtrigger" "description missing trigger: merge request"
 
 make_copy "$work/noscopeline"
 replace_first "$work/noscopeline/SKILL.md" 'Write the report in this order: the **Scope:** line (Step 0), What Was Done Well' 'Write the report in this order: What Was Done Well'
