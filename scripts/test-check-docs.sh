@@ -552,6 +552,54 @@ make_copy "$work/apiclientshttp"
 replace_first "$work/apiclientshttp/SKILL.md" 'or API client code, including SDK wrappers and non-HTTP transports such as WebSocket or gRPC clients.' 'or code that calls an HTTP API.'
 expect_fail "an API Design trigger narrowed to HTTP calls fails" "$work/apiclientshttp" "references/api-design.md trigger must cover: API client code, including SDK wrappers and non-HTTP transports"
 
+make_copy "$work/alwaysask"
+replace_first "$work/alwaysask/SKILL.md" 'Choose the scope before anything else.' 'Before anything else, ask the user the following question and wait for their answer.'
+expect_fail "asking for the scope on every run fails" "$work/alwaysask" "Step 0 — Scope Selection still always asks: ask the user the following question and wait for their answer"
+
+make_copy "$work/noheadless"
+replace_first "$work/noheadless/SKILL.md" 'In a headless run, never ask a question: take' 'Take'
+expect_fail "dropping the headless never-ask rule fails" "$work/noheadless" "Step 0 — Scope Selection is missing: In a headless run, never ask a question"
+
+make_copy "$work/noscopeword"
+replace_first "$work/noscopeword/SKILL.md" '2. **`staged`** — ' '2. **Staged changes only** — '
+expect_fail "a scope without its argument word fails" "$work/noscopeword" "Step 0 — Scope Selection is missing: 2. **\`staged\`** — "
+
+make_copy "$work/nodefaultbranch"
+replace_first "$work/nodefaultbranch/SKILL.md" '`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`' '`git remote show origin`'
+expect_fail "detecting the default branch another way fails" "$work/nodefaultbranch" "Step 0 — Scope Selection is missing: \`git symbolic-ref --quiet --short refs/remotes/origin/HEAD\`"
+
+make_copy "$work/fallbackscope"
+replace_first "$work/fallbackscope/SKILL.md" ' Never review a different scope instead.' ''
+expect_fail "falling back to another scope on a bad argument fails" "$work/fallbackscope" "Step 0 — Scope Selection is missing: Never review a different scope instead"
+
+make_copy "$work/nopr"
+replace_first "$work/nopr/SKILL.md" 'The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.' ''
+expect_fail "dropping the reserved pr word fails" "$work/nopr" "Step 0 — Scope Selection is missing: The word \`pr\` is reserved for reviewing a pull request by number"
+
+make_copy "$work/noscopeline"
+replace_first "$work/noscopeline/SKILL.md" 'Write the report in this order: the **Scope:** line (Step 0), What Was Done Well' 'Write the report in this order: What Was Done Well'
+expect_fail "a report order without the Scope line fails" "$work/noscopeline" "Output Format is missing: Write the report in this order: the **Scope:** line (Step 0), What Was Done Well"
+
+make_copy "$work/nocompactscope"
+replace_first "$work/nocompactscope/SKILL.md" '- Start with the **Scope:** line. Skip' '- Skip'
+expect_fail "compact mode without the Scope line fails" "$work/nocompactscope" "Output Format is missing: - Start with the **Scope:** line."
+
+make_copy "$work/dashvalue"
+replace_first "$work/dashvalue/SKILL.md" ' A value that starts with `-` is always rejected.' ''
+expect_fail "accepting a value that starts with a dash fails" "$work/dashvalue" "Step 0 — Scope Selection is missing: A value that starts with \`-\` is always rejected"
+
+make_copy "$work/compactword"
+replace_first "$work/compactword/SKILL.md" 'The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. ' ''
+expect_fail "reading compact as a scope word fails" "$work/compactword" "Step 0 — Scope Selection is missing: The word \`compact\` turns on compact mode"
+
+make_copy "$work/nodefaultmsg"
+replace_first "$work/nodefaultmsg/SKILL.md" 'a headless run replies `Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.` and stops, and an interactive' 'an interactive'
+expect_fail "a headless run without a default branch message fails" "$work/nodefaultmsg" "Step 0 — Scope Selection is missing: \`Cannot review: the default branch could not be detected"
+
+make_copy "$work/nomergebase"
+drop_lines "$work/nomergebase/SKILL.md" 'no common ancestor between'
+expect_fail "dropping the shallow-clone merge-base error fails" "$work/nomergebase" "Step 0 — Scope Selection is missing: \`no common ancestor between <base> and HEAD"
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

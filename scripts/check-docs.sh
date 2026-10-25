@@ -601,6 +601,70 @@ PY
   fi
 }
 
+check_skill_scope_selection() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+heading = "## Step 0 — Scope Selection"
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+def section(start):
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+start = first(heading)
+if start is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+text = section(start)
+for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<base>]`** — ",
+          "4. **`commit <sha>`** — ", "5. **`range <from>..<to>`** — ",
+          "`git status --porcelain --untracked-files=all`", "`git diff --cached`", "`git diff <base>...HEAD`",
+          "`git show <sha>`", "`git diff <from>..<to>`",
+          "The word `pr` is reserved for reviewing a pull request by number",
+          "The word `compact` turns on compact mode",
+          "`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`",
+          "`origin/main`, `origin/master`, `main` and `master`",
+          "`Cannot review: <reason>. Nothing was reviewed.`", "Never review a different scope instead",
+          "A value that starts with `-` is always rejected",
+          "Apply these rules in order and stop at the first one that matches",
+          "**Headless runs never ask.**", "In a headless run, never ask a question",
+          "ask only when detection is ambiguous", "A headless run uses `uncommitted`",
+          "`Nothing to review: <command> shows no changes.`",
+          "`Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.`",
+          "`no common ancestor between <base> and HEAD; fetch more history or use range <from>..<to>`",
+          "`**Scope:** <scope> (<command>)`", "add `, auto-detected` after it"):
+    if s not in text:
+        errors.append(f"Step 0 — Scope Selection is missing: {s}")
+for s in ("ask the user the following question and wait for their answer",
+          "Type the number of your choice"):
+    if s in text:
+        errors.append(f"Step 0 — Scope Selection still always asks: {s}")
+output_start = first("## 7. Output Format")
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+for s in ("Write the report in this order: the **Scope:** line (Step 0), What Was Done Well",
+          "- Start with the **Scope:** line."):
+    if s not in output:
+        errors.append(f"Output Format is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Step 0 takes the scope from arguments or detection, never asks in headless runs and reports the scope"
+  else
+    fail "SKILL.md scope selection (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -789,6 +853,7 @@ check_skill_repo_rules
 check_skill_untrusted_input
 check_skill_scope_and_noise
 check_skill_conditional_categories
+check_skill_scope_selection
 check_stack_precedents
 check_readme_counts
 check_example_output
