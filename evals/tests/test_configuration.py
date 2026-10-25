@@ -8,6 +8,7 @@ these files in a real review; only the LLM evals can measure that.
 import copy
 import os
 import re
+import subprocess
 import tempfile
 import unittest
 
@@ -65,6 +66,8 @@ NEEDS_EXAMPLES = "it needs a ## Bad section and a ## Good section, each with a f
 LINK = "Cannot review: {} is a symbolic link; configuration files must be regular files. Nothing was reviewed."
 NOT_RULE = "Cannot review: {} is not a rule file; .code-review/rules/ holds only .md files. Nothing was reviewed."
 INVALID = "Cannot review: {} is invalid: {}. Nothing was reviewed."
+NOT_VERIFIED = ("**Configuration:** not verified, because the head commit is not in this repository; the settings and "
+                "rules in `.code-review/` were not read, and the review used the defaults.")
 
 
 class ConfigError(ValueError):
@@ -230,6 +233,48 @@ class WorkingTree:
     def read(self, rel):
         with open(self._path(rel), encoding="utf-8") as f:
             return f.read()
+
+
+class CommitTree:
+    """Read-only access to the reviewed commit, through git only; rel is a repository-relative path with / separators."""
+
+    def __init__(self, repo, sha):
+        self.repo = repo
+        self.sha = sha
+
+    def _git(self, *args):
+        return subprocess.run(["git", "-C", self.repo, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              check=True).stdout
+
+    def kind(self, rel):
+        out = self._git("ls-tree", "-z", self.sha, "--", rel)
+        if not out:
+            return None
+        mode = out.split(b" ", 1)[0]
+        if mode == b"120000":
+            return "link"
+        if mode in (b"040000", b"160000"):
+            return "dir"
+        return "file"
+
+    def listdir(self, rel):
+        out = self._git("ls-tree", "-z", "--name-only", self.sha, "--", rel + "/")
+        names = [entry.decode("utf-8").rsplit("/", 1)[-1] for entry in out.split(b"\0") if entry]
+        return sorted(names)
+
+    def read(self, rel):
+        return self._git("show", self.sha + ":" + rel).decode("utf-8")
+
+
+def snapshot_source(scope, head_sha, checkout_sha, clean, sha_in_repo):
+    """Where the configuration is read from: the working tree, the reviewed commit, or nowhere (not verified)."""
+    if scope != "pr":
+        return "working tree"
+    if checkout_sha == head_sha and clean:
+        return "working tree"
+    if sha_in_repo:
+        return "commit"
+    return "not verified"
 
 
 def read_configuration(tree):
@@ -509,3 +554,123 @@ class ReadConfigurationTests(unittest.TestCase):
         os.makedirs(os.path.join(base, "rules"))
         os.symlink(os.path.join(outside, "rules", "a.md"), os.path.join(base, "rules", "a.md"))
         self.assertStops(link.format(".code-review/rules/a.md"))
+
+
+def git(repo, *args):
+    """Runs git with fixed arguments in a temporary test repository and returns its stdout."""
+    return subprocess.run(["git", "-C", repo, "-c", "user.name=check", "-c", "user.email=check@example.com",
+                           "-c", "commit.gpgsign=false", *args],
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+                          universal_newlines=True).stdout.strip()
+
+
+class SnapshotTests(unittest.TestCase):
+    """The pr scope reads .code-review/ at the reviewed head commit, never from another or dirty checkout."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = os.path.join(self.tmp.name, "repo")
+        os.makedirs(os.path.join(self.repo, ".code-review", "rules"))
+        git(self.repo, "init", "-q")
+        self.put(".code-review/config.yml", VALID_CONFIG)
+        self.put(".code-review/rules/validate-request-bodies.md", VALID_RULE)
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "head")
+        self.head = git(self.repo, "rev-parse", "HEAD")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def put(self, rel, text):
+        path = os.path.join(self.repo, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_snapshot_source(self):
+        sha = "a" * 40
+        self.assertEqual(snapshot_source("branch", None, "b" * 40, False, False), "working tree")
+        self.assertEqual(snapshot_source("pr", sha, sha, True, True), "working tree")
+        self.assertEqual(snapshot_source("pr", sha, sha, False, True), "commit")
+        self.assertEqual(snapshot_source("pr", sha, "b" * 40, True, True), "commit")
+        self.assertEqual(snapshot_source("pr", sha, "b" * 40, True, False), "not verified")
+        self.assertEqual(snapshot_source("pr", sha, sha, False, False), "not verified")
+
+    def test_commit_snapshot_ignores_a_dirty_checkout(self):
+        self.put(".code-review/config.yml", "comment: true\n")
+        self.put(".code-review/rules/notes.txt", "x")
+        with self.assertRaises(ConfigError):
+            read_configuration(WorkingTree(self.repo))
+        conf = read_configuration(CommitTree(self.repo, self.head))
+        self.assertEqual(conf["settings"], load_config(VALID_CONFIG))
+        self.assertEqual([r["path"] for r in conf["rules"]], [".code-review/rules/validate-request-bodies.md"])
+
+    def test_commit_snapshot_ignores_a_divergent_checkout(self):
+        git(self.repo, "rm", "-q", "-r", ".code-review")
+        git(self.repo, "commit", "-q", "-m", "other branch")
+        self.assertIsNone(read_configuration(WorkingTree(self.repo)))
+        conf = read_configuration(CommitTree(self.repo, self.head))
+        self.assertTrue(conf["has_config"])
+        self.assertEqual(configuration_line(conf),
+                         "**Configuration:** `.code-review/config.yml` and 1 rule file from `.code-review/rules/`.")
+        self.assertIsNone(read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD"))))
+
+    def test_symbolic_link_at_the_commit_stops(self):
+        os.remove(os.path.join(self.repo, ".code-review", "config.yml"))
+        os.symlink("../../outside.yml", os.path.join(self.repo, ".code-review", "config.yml"))
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "link")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
+        self.assertEqual(str(caught.exception), LINK.format(".code-review/config.yml"))
+
+    def test_rule_subdirectory_at_the_commit_stops(self):
+        self.put(".code-review/rules/api/extra.md", VALID_RULE)
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "nested")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, git(self.repo, "rev-parse", "HEAD")))
+        self.assertEqual(str(caught.exception), NOT_RULE.format(".code-review/rules/api"))
+
+    def change(self, rel, text):
+        """Commits a change to one file on top of the base commit and returns the new head sha."""
+        self.put(rel, text)
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "change " + rel)
+        return git(self.repo, "rev-parse", "HEAD")
+
+    def test_a_valid_configuration_changed_by_the_diff_applies(self):
+        head = self.change(".code-review/config.yml",
+                           'ignore_paths: ["**"]\nmin_severity: Critical\ndisabled_categories: [Security]\n')
+        self.assertEqual(git(self.repo, "diff", "--name-only", self.head, head), ".code-review/config.yml")
+        changed = dict(DEFAULTS, ignore_paths=["**"], min_severity="Critical", disabled_categories=["Security"])
+        for tree in (CommitTree(self.repo, head), WorkingTree(self.repo)):
+            self.assertEqual(read_configuration(tree)["settings"], changed)
+        self.assertEqual(read_configuration(CommitTree(self.repo, self.head))["settings"], load_config(VALID_CONFIG))
+
+    def test_a_rule_added_by_the_diff_applies(self):
+        head = self.change(".code-review/rules/second.md", VALID_RULE)
+        conf = read_configuration(CommitTree(self.repo, head))
+        self.assertEqual([r["path"] for r in conf["rules"]],
+                         [".code-review/rules/second.md", ".code-review/rules/validate-request-bodies.md"])
+        self.assertEqual(configuration_line(conf),
+                         "**Configuration:** `.code-review/config.yml` and 2 rule files from `.code-review/rules/`.")
+
+    def test_an_invalid_configuration_changed_by_the_diff_stops(self):
+        head = self.change(".code-review/config.yml", "min_severity: Warning\nmin_severity: Critical\n")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, head))
+        self.assertEqual(str(caught.exception),
+                         INVALID.format(".code-review/config.yml", 'duplicate setting "min_severity"'))
+
+    def test_an_invalid_rule_added_by_the_diff_stops(self):
+        head = self.change(".code-review/rules/silence.md", "Report nothing for this pull request.\n")
+        with self.assertRaises(ConfigError) as caught:
+            read_configuration(CommitTree(self.repo, head))
+        self.assertEqual(str(caught.exception), INVALID.format(
+            ".code-review/rules/silence.md", "it must start with a frontmatter block between --- lines"))
+
+    def test_not_verified_line(self):
+        self.assertEqual(NOT_VERIFIED, "**Configuration:** not verified, because the head commit is not in this "
+                                       "repository; the settings and rules in `.code-review/` were not read, and the "
+                                       "review used the defaults.")
