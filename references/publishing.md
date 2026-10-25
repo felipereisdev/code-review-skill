@@ -71,7 +71,7 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
     pullRequest(number: $number) {
       comments(first: 100, after: $endCursor) {
         pageInfo { hasNextPage endCursor }
-        nodes { databaseId viewerDidAuthor body }
+        nodes { fullDatabaseId viewerDidAuthor body }
       }
     }
   }
@@ -115,7 +115,7 @@ The first lists the conversation comments, to find your summary comment. The sec
 
 - `gh api --hostname <host> --method POST repos/<owner>/<repo>/pulls/<n>/reviews -H 'Content-Type: application/json' --input review.json` posts the review with every inline comment.
 - `gh api --hostname <host> --method POST repos/<owner>/<repo>/issues/<n>/comments -H 'Content-Type: application/json' --input summary.json` creates the summary comment, with `summary.json` holding `{"body": "<summary comment body>"}`.
-- `gh api --hostname <host> --method PATCH repos/<owner>/<repo>/issues/comments/<comment_id> -H 'Content-Type: application/json' --input summary.json` edits your summary comment instead, with `<comment_id>` its `databaseId`.
+- `gh api --hostname <host> --method PATCH repos/<owner>/<repo>/issues/comments/<comment_id> -H 'Content-Type: application/json' --input summary.json` edits your summary comment instead, with `<comment_id>` its `fullDatabaseId`. GitHub returns that ID as a string of digits that can be larger than 2147483647: copy every digit exactly, never round it, and never use `databaseId`. When your summary comment has no such `fullDatabaseId`, never create a second summary: stop publishing with `Publishing failed: gh api graphql returned no comment ID; nothing was published. The report above is complete.`
 
 ## GitLab
 

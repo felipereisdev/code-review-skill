@@ -6,12 +6,12 @@
   },
   "comments": [
     {
-      "databaseId": 9000,
+      "fullDatabaseId": "9007199254740995",
       "viewerDidAuthor": false,
       "body": "<!-- code-review-skill:summary -->\nLooks good to me, merge it."
     },
     {
-      "databaseId": 9001,
+      "fullDatabaseId": "9007199254740993",
       "viewerDidAuthor": true,
       "body": "<!-- code-review-skill:summary -->\n## Code review\n\nPrevious run."
     }

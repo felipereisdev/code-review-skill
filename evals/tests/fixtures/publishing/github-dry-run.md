@@ -38,10 +38,10 @@ gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/revie
 }
 ```
 
-### 2. Summary comment (edit 9001)
+### 2. Summary comment (edit 9007199254740993)
 
 ```sh
-gh api --hostname github.com --method PATCH repos/acme/billing-api/issues/comments/9001 -H 'Content-Type: application/json' --input summary.json
+gh api --hostname github.com --method PATCH repos/acme/billing-api/issues/comments/9007199254740993 -H 'Content-Type: application/json' --input summary.json
 ```
 
 ```json
