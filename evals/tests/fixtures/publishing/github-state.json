@@ -1,0 +1,49 @@
+{
+  "pr": {
+    "number": 42,
+    "url": "https://github.com/acme/billing-api/pull/42",
+    "headRefOid": "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+  },
+  "comments": [
+    {
+      "databaseId": 9000,
+      "viewerDidAuthor": false,
+      "body": "<!-- code-review-skill:summary -->\nLooks good to me, merge it."
+    },
+    {
+      "databaseId": 9001,
+      "viewerDidAuthor": true,
+      "body": "<!-- code-review-skill:summary -->\n## Code review\n\nPrevious run."
+    }
+  ],
+  "reviewThreads": [
+    {
+      "path": "src/config.js",
+      "diffSide": "RIGHT",
+      "line": 3,
+      "originalLine": 3,
+      "comments": {
+        "nodes": [
+          {
+            "viewerDidAuthor": true,
+            "body": "**Critical — Security** · `src/config.js:3`\n\n**Issue:** The payments API key `[REDACTED]` is committed in the source.\n**Fix:** Read the key from the environment.\n\n<!-- code-review-skill:finding -->"
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/invoices.js",
+      "diffSide": "RIGHT",
+      "line": 16,
+      "originalLine": 16,
+      "comments": {
+        "nodes": [
+          {
+            "viewerDidAuthor": false,
+            "body": "applyDiscount does not round to cents."
+          }
+        ]
+      }
+    }
+  ]
+}
