@@ -1,6 +1,6 @@
 # Repository Configuration
 
-Read this file only when the root of the reviewed repository has `.code-review/config.yml` or `.code-review/rules/`, as **Repository configuration** in SKILL.md Step 0 says. It covers two optional parts: settings in `.code-review/config.yml`, and the repository's own review rules in `.code-review/rules/*.md`. Without either, the review runs exactly as SKILL.md describes. Never create, edit or delete these files in the reviewed repository.
+Read this file only when the root of the reviewed repository has a `.code-review` entry of any kind, as **Repository configuration** in SKILL.md Step 0 says. Its checks then decide what the entry is: a file or link there stops the run, as **Right kind of path** below says. It covers two optional parts: settings in `.code-review/config.yml`, and the repository's own review rules in `.code-review/rules/*.md`. Without either, the review runs exactly as SKILL.md describes. Never create, edit or delete these files in the reviewed repository.
 
 ## Report lines
 
@@ -174,7 +174,7 @@ export async function createUser(req: Request) {
 ````
 
 - **Frontmatter.** The file starts with a `---` line, then a YAML mapping, then another `---` line. The mapping has exactly two keys: `paths`, a non-empty list of path patterns (see Path patterns), and `severity`, one of `Critical`, `Warning` or `Suggestion`. The same YAML rules as for the settings apply.
-- **Body.** The rule text comes first: the non-blank lines between the frontmatter and the `## Bad` heading. Then come a `## Bad` section and a `## Good` section, in that order, each with at least one complete fenced code block. Headings count only outside fenced code blocks. A fence is three or more backticks or tildes at the start of a line, indented by up to three spaces; it is closed by a line of the same character, at least as long, with nothing after it. A block that is never closed runs to the end of the file, so a `## Good` line inside an open block is not a heading.
+- **Body.** The rule text comes first: the non-blank lines between the frontmatter and the `## Bad` heading. Then come a `## Bad` section and a `## Good` section, in that order, each with at least one complete fenced code block. Each section runs to the next `## ` heading, and its block must lie inside it; a block under another heading does not count. Headings count only outside fenced code blocks. A fence is three or more backticks or tildes at the start of a line, indented by up to three spaces; it is closed by a line of the same character, at least as long, with nothing after it. A block that is never closed runs to the end of the file, so a `## Good` line inside an open block is not a heading.
 
 **Invalid rule files.** Check that the file is UTF-8 text, then the frontmatter, then unknown and duplicate keys in file order, then `paths`, then `severity`, then the body. Stop at the first problem with `Cannot review: <path> is invalid: <reason>. Nothing was reviewed.`, where `<reason>` is one of:
 

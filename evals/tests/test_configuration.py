@@ -274,8 +274,8 @@ def load_rule(text):
     g = next((i for i in headings if b is not None and i > b and lines[i].rstrip() == "## Good"), None)
     if b is None or g is None:
         raise ConfigError(NEEDS_EXAMPLES)
-    end = next((i for i in headings if i > g), len(lines))
-    for start, stop in ((b, g), (g, end)):
+    for start in (b, g):
+        stop = next((i for i in headings if i > start), len(lines))
         if "close" not in [kind for i, kind in kinds if start < i < stop]:
             raise ConfigError(NEEDS_EXAMPLES)
     rule_text = [i for i in range(j + 1, b) if lines[i].strip()]
@@ -628,6 +628,8 @@ class RuleTests(unittest.TestCase):
              "```ts\ngood()\n", NEEDS_EXAMPLES),
             (front + "\nRule text.\n\n## Bad\n\n```ts\nbad()\n```\n\n## Good\n\n~~~ts\ngood()\n", NEEDS_EXAMPLES),
             (front + "\nRule text.\n\n## Bad\n\n```md\n## Good\n```\n", NEEDS_EXAMPLES),
+            (front + "\nRule text.\n\n## Bad\nNo example here.\n## Other\n\n```ts\nbad()\n```\n\n## Good\n\n```ts\n"
+             "good()\n```\n", NEEDS_EXAMPLES),
         ]
         for text, reason in cases:
             with self.subTest(text=text):

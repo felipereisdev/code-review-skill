@@ -1031,11 +1031,14 @@ def require(name, text, strings):
 
 require("Step 0 — Scope Selection", section("## Step 0 — Scope Selection"), (
     "**Repository configuration.** After the diff is read and before Step 1",
+    "look for `.code-review` at the root of the reviewed repository",
     "in the snapshot that **Code around the diff** names for the `pr` scope",
+    "When it exists, in any form,",
+    "when `.code-review` has the wrong kind or a file there is invalid",
     "read `./references/configuration.md`, using the path relative to this skill file's directory",
     "it never changes the diff, the severity levels, Step 2 or the verdict",
     "A configuration that the diff itself changes applies too",
-    "When neither exists, never read it"))
+    "When `.code-review` does not exist, never read it"))
 require("Pull Request Scope", section("## Pull Request Scope"), (
     "**Code around the diff.** **Repository configuration** in Step 0, Step 1, Step 1.5, Step 1.6 and Step 2 "
     "read code outside the diff",))
@@ -1054,7 +1057,7 @@ except OSError:
     reference = ""
 require("Configuration", reference, (
     "# Repository Configuration",
-    "Read this file only when the root of the reviewed repository has `.code-review/config.yml` or `.code-review/rules/`",
+    "Read this file only when the root of the reviewed repository has a `.code-review` entry of any kind",
     "Never create, edit or delete these files in the reviewed repository",
     "never applied in part, never replaced by guesses and never replaced by the defaults",
     "never from the checkout", "never say that it is absent",
@@ -1063,6 +1066,7 @@ require("Configuration", reference, (
     "`Cannot review: <path> is not a directory. Nothing was reviewed.`",
     "`Cannot review: <path> is not a regular file; configuration files must be regular files. Nothing was reviewed.`",
     "Headings count only outside fenced code blocks",
+    "Each section runs to the next `## ` heading, and its block must lie inside it; a block under another heading does not count.",
     "**A change to the configuration applies to its own review.**",
     "even when the diff is what made it invalid",
     "`Nothing to review: every changed file matches ignore_paths.`",

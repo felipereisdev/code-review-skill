@@ -938,8 +938,20 @@ printf '# Repository Configuration\n\n- `gh api --method POST repos/<owner>/<rep
 expect_fail "a write command in the configuration reference fails" "$work/cfgwrite" "references/configuration.md names a write command: --method POST"
 
 make_copy "$work/cfgnopointer"
-replace_first "$work/cfgnopointer/SKILL.md" 'When neither exists, never read it' 'Always read it'
-expect_fail "reading the configuration reference without a configuration fails" "$work/cfgnopointer" "Step 0 — Scope Selection is missing: When neither exists, never read it"
+replace_first "$work/cfgnopointer/SKILL.md" 'When `.code-review` does not exist, never read it' 'Always read it'
+expect_fail "reading the configuration reference without a configuration fails" "$work/cfgnopointer" "Step 0 — Scope Selection is missing: When \`.code-review\` does not exist, never read it"
+
+make_copy "$work/cfgnoentry"
+replace_first "$work/cfgnoentry/SKILL.md" 'When it exists, in any form,' 'When config.yml or rules exists,'
+expect_fail "checking the configuration only through its children fails" "$work/cfgnoentry" "Step 0 — Scope Selection is missing: When it exists, in any form,"
+
+make_copy "$work/cfgwrongkind"
+replace_first "$work/cfgwrongkind/SKILL.md" 'when `.code-review` has the wrong kind or a file there is invalid' 'when a file there is invalid'
+expect_fail "not stopping on a wrong-kind .code-review entry fails" "$work/cfgwrongkind" "Step 0 — Scope Selection is missing: when \`.code-review\` has the wrong kind or a file there is invalid"
+
+make_copy "$work/cfgsection"
+replace_first "$work/cfgsection/references/configuration.md" 'Each section runs to the next `## ` heading, and its block must lie inside it; a block under another heading does not count.' 'Each section needs a block somewhere after its heading.'
+expect_fail "letting a block under another heading satisfy a section fails" "$work/cfgsection" "Configuration is missing: Each section runs to the next \`## \` heading"
 
 make_copy "$work/cfgcheckout"
 replace_first "$work/cfgcheckout/references/configuration.md" 'never from the checkout' 'or from the checkout'
