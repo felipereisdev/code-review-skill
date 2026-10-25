@@ -933,6 +933,10 @@ make_copy "$work/exampleapprove"
 replace_first "$work/exampleapprove/example-output.md" '"event": "COMMENT"' '"event": "APPROVE"'
 expect_fail "an example review payload that approves fails" "$work/exampleapprove" "example dry run has no review payload with event COMMENT"
 
+make_copy "$work/cfgwrite"
+printf '# Repository Configuration\n\n- `gh api --method POST repos/<owner>/<repo>/issues/<n>/comments`\n' > "$work/cfgwrite/references/configuration.md"
+expect_fail "a write command in the configuration reference fails" "$work/cfgwrite" "references/configuration.md names a write command: --method POST"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}
