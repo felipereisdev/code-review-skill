@@ -229,6 +229,68 @@ The same review when the user asks for `/code-review pr 123 compact`:
 
 ---
 
+## Repository Configuration
+
+The same kind of review in another repository, which has this `.code-review/config.yml`:
+
+```yaml
+ignore_paths:
+  - "src/generated/**"
+min_severity: Warning
+disabled_categories:
+  - Accessibility
+```
+
+and one rule, saved as `.code-review/rules/validate-request-bodies.md`:
+
+````markdown
+---
+paths:
+  - "src/api/**/*.ts"
+severity: Warning
+---
+
+Every API handler parses its request body with the zod schema of the route
+before it reads any field of `req.body`.
+
+## Bad
+
+```ts
+export async function createUser(req: Request) {
+  const email = req.body.email;
+}
+```
+
+## Good
+
+```ts
+export async function createUser(req: Request) {
+  const { email } = CreateUserBody.parse(req.body);
+}
+```
+````
+
+The pull request changes `src/api/users.ts`, `src/components/SignupForm.vue` and the generated `src/generated/api-client.ts`. Right after its Scope line, the report says what the configuration did:
+
+```markdown
+**Configuration:** `.code-review/config.yml` and 1 rule file from `.code-review/rules/`.
+**Excluded by configuration:** 1 changed file matches ignore_paths and was not reviewed: `src/generated/api-client.ts`.
+```
+
+A finding that breaks the rule cites it. In compact mode:
+
+```markdown
+- src/api/users.ts:12: Warning: the handler reads `req.body.email` before the body is parsed, so a request without an email stores a user whose email is `undefined` → parse the body with `CreateUserBody` first (Rule: .code-review/rules/validate-request-bodies.md:L7-L8)
+```
+
+Right after the verification line, the report counts what the filters left out: two Suggestions below `min_severity` and one Accessibility Warning on the signup form. A Critical finding would have been shown in any category.
+
+```markdown
+**Omitted by configuration:** min_severity Warning: 2 omitted; disabled categories Accessibility: 1 omitted.
+```
+
+---
+
 ## Publishing Dry Run
 
 The same review when the user asks for `/code-review pr 123 --comment --dry-run`: after the report, the skill prints what `--comment` would post and posts nothing. The pull request has no summary comment from an earlier run, so the summary comment would be created. The review payload below shows one of its 8 inline comments.

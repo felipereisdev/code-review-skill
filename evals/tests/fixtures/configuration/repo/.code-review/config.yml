@@ -1,0 +1,8 @@
+ignore_paths:
+  - "src/generated/**"
+  - "docs/"
+min_severity: Warning
+max_findings_per_file: 2
+disabled_categories:
+  - Security
+  - Architecture

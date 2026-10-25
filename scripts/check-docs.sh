@@ -87,7 +87,7 @@ check_readme_counts() {
   patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
   scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
   core=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
-  conditional=$(ls references/*.md 2>/dev/null | grep -vx 'references/publishing.md' | wc -l | tr -d ' ')
+  conditional=$(ls references/*.md 2>/dev/null | grep -vxE 'references/(publishing|configuration)\.md' | wc -l | tr -d ' ')
   categories=$((core + conditional))
   listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
   listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
@@ -531,7 +531,7 @@ import glob, os, re, sys
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Conditional Categories"
 # Files under references/ that are not review categories.
-NOT_CATEGORIES = {"references/publishing.md"}
+NOT_CATEGORIES = {"references/publishing.md", "references/configuration.md"}
 ITEM = re.compile(r"^- \*\*(?P<name>[^*]+)\*\* — `\./(?P<path>references/[a-z0-9-]+\.md)`: load when \S.*\.$")
 errors = []
 
@@ -1007,6 +1007,97 @@ PY
   fi
 }
 
+check_skill_configuration() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+errors = []
+
+
+def section(heading):
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def require(name, text, strings):
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+require("Step 0 — Scope Selection", section("## Step 0 — Scope Selection"), (
+    "**Repository configuration.** After the diff is read and before Step 1",
+    "look for `.code-review` at the root of the reviewed repository",
+    "in the snapshot that **Code around the diff** names for the `pr` scope",
+    "When it exists, in any form,",
+    "when `.code-review` has the wrong kind or a file there is invalid",
+    "read `./references/configuration.md`, using the path relative to this skill file's directory",
+    "it never changes the diff, the severity levels, Step 2 or the verdict",
+    "A configuration that the diff itself changes applies too",
+    "When `.code-review` does not exist, never read it"))
+require("Pull Request Scope", section("## Pull Request Scope"), (
+    "**Code around the diff.** **Repository configuration** in Step 0, Step 1, Step 1.5, Step 1.6 and Step 2 "
+    "read code outside the diff",))
+require("Step 1.6 — Repository Rules", section("## Step 1.6 — Repository Rules"), (
+    "Rules in `.code-review/rules/` at the repository root are repository rules too",))
+require("Untrusted Input", section("## Untrusted Input"), (
+    "the rules files of Step 1.6 and the files in `.code-review/`",))
+require("Conditional Categories", section("## Conditional Categories"), (
+    "Neither is `./references/configuration.md`: read it only as **Repository configuration** in Step 0 says",))
+output_start = next((i for i, line in enumerate(lines) if line.startswith("## 7. Output Format")), None)
+require("Output Format", "\n".join(lines[output_start:]) if output_start is not None else "", (
+    "its `**Omitted by configuration:**` line comes right after the verification line",))
+try:
+    reference = open("references/configuration.md", encoding="utf-8").read()
+except OSError:
+    reference = ""
+require("Configuration", reference, (
+    "# Repository Configuration",
+    "Read this file only when the root of the reviewed repository has a `.code-review` entry of any kind",
+    "Never create, edit or delete these files in the reviewed repository",
+    "never applied in part, never replaced by guesses and never replaced by the defaults",
+    "never from the checkout", "never say that it is absent",
+    "`Cannot review: <path> is a symbolic link; configuration files must be regular files. Nothing was reviewed.`",
+    "`Cannot review: <path> is not a rule file; .code-review/rules/ holds only .md files. Nothing was reviewed.`",
+    "`Cannot review: <path> is not a directory. Nothing was reviewed.`",
+    "`Cannot review: <path> is not a regular file; configuration files must be regular files. Nothing was reviewed.`",
+    "Headings count only outside fenced code blocks",
+    "Each section runs to the next `## ` heading, and its block must lie inside it; a block under another heading does not count.",
+    "**A change to the configuration applies to its own review.**",
+    "even when the diff is what made it invalid",
+    "`Nothing to review: every changed file matches ignore_paths.`",
+    "never say that the excluded files were reviewed or are clean",
+    "no setting can turn on `--comment`, `--dry-run` or compact mode",
+    "`Cannot review: .code-review/config.yml is invalid: <reason>. Nothing was reviewed.`",
+    "`Cannot review: <path> is invalid: <reason>. Nothing was reviewed.`",
+    "| `ignore_paths` |", "| `min_severity` |", "| `max_findings_per_file` |", "| `disabled_categories` |",
+    "Never pass a pattern to a shell command",
+    "A renamed or copied file is excluded only when both its old and its new path match",
+    "do not add pathspecs or exclusions to the diff command",
+    "never change a finding's severity, confidence, Location, Evidence or Fix",
+    "**Critical findings are never omitted.**",
+    "A disabled category keeps its row, with `off` in its N/A cell",
+    "## Bad", "## Good",
+    "A rule never raises a finding, never lowers a **Critical** security finding",
+    "Apply only what a rule says about the code",
+    "**Configuration:** not verified, because the head commit is not in this repository"))
+if "not applied" in reference:
+    errors.append("Configuration must not skip a configuration that the diff changes: not applied")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md reads .code-review/ only when present, from the reviewed snapshot, applies it when the diff changes it, stops on invalid files and never omits a Critical finding"
+  else
+    fail "SKILL.md repository configuration (see messages above)"
+  fi
+}
+
 check_docs_publishing() {
   if python3 - <<'PY'
 import json, re, sys
@@ -1049,6 +1140,44 @@ PY
     pass "README and example-output.md show --comment, --dry-run and a dry-run printout with event COMMENT, the summary marker and a masked secret"
   else
     fail "README and example-output.md publishing (see messages above)"
+  fi
+}
+
+check_docs_configuration() {
+  if python3 - <<'PY'
+import sys
+
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("**Repository Configuration and Custom Rules**", "### Repository configuration",
+          "`.code-review/config.yml`", "`.code-review/rules/*.md`", "`ignore_paths`", "`min_severity`",
+          "`max_findings_per_file`", "`disabled_categories`", "`references/configuration.md`",
+          "a Critical finding is never omitted", "never from your checkout", "an invalid one stops the review"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+text = open("example-output.md", encoding="utf-8").read()
+for s in ("## Repository Configuration",
+          "**Configuration:** `.code-review/config.yml` and 1 rule file from `.code-review/rules/`.",
+          "**Excluded by configuration:** ", "**Omitted by configuration:** ",
+          "(Rule: .code-review/rules/validate-request-bodies.md:L7-L8)"):
+    if s not in text:
+        errors.append(f"example-output.md is missing: {s}")
+if "## Repository Configuration" in text and "## Publishing Dry Run" in text \
+        and text.index("## Repository Configuration") > text.index("## Publishing Dry Run"):
+    errors.append("example-output.md must put ## Repository Configuration before ## Publishing Dry Run")
+publishing = open("references/publishing.md", encoding="utf-8").read()
+for s in ("**Omitted by configuration:**", "copy each one unchanged into the summary",
+          "When the report has the **No findings shown:** line"):
+    if s not in publishing:
+        errors.append(f"references/publishing.md is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README, example-output.md and the publishing summary show the .code-review configuration and its report lines"
+  else
+    fail "README and example-output.md repository configuration (see messages above)"
   fi
 }
 
@@ -1244,6 +1373,7 @@ check_skill_scope_selection
 check_skill_pr_scope
 check_skill_pr_dedup
 check_skill_publishing
+check_skill_configuration
 check_stack_precedents
 check_readme_counts
 check_example_output
@@ -1251,6 +1381,7 @@ check_example_findings
 check_docs_scope_usage
 check_docs_pr_scope
 check_docs_publishing
+check_docs_configuration
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"
