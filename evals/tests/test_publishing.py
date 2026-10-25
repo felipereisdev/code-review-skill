@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 import unittest
 
@@ -12,6 +13,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from score import parse_findings  # noqa: E402
 
 FIXTURES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "fixtures", "publishing")
+REFERENCE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+                         "references", "publishing.md")
+GITLAB_HEAD = "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
 SECRET = "cr-skill-fake-secret-7f3a9c"
 SUMMARY_MARKER = "<!-- code-review-skill:summary -->"
 FINDING_MARKER = "<!-- code-review-skill:finding -->"
@@ -33,6 +37,7 @@ LOCATION = re.compile(r"^\*\*Location:\*\* `([^`:]+):(\d+)(?:-(\d+))?`$", re.M)
 SUGGESTION = re.compile(r"```suggestion(?::-(\d+)\+(\d+))?\n(.*?)\n```", re.S)
 FENCES = ("```", "~~~")
 CLI = re.compile(r"(?<![\w-])(?:gh|glab)(?![\w./:-])")  # a gh/glab word, not a path such as src/gh/index.js
+HEADING = re.compile(r"^### \d+\. Discussion on \S+:\d+(?:-\d+)?$")  # a canonical heading; its path is data
 
 
 def read(name):
@@ -99,6 +104,19 @@ def anchor(finding, diff):
     return None
 
 
+def comment_span(finding, side, diff, platform):
+    """Return (start, end), the lines an inline comment for a finding on this side carries.
+
+    GitHub takes unchanged lines on RIGHT only, so a LEFT comment covers its last removed line alone; the
+    Location stays in the body. Elsewhere the comment covers the Location.
+    """
+    if platform == "github" and side == "LEFT":
+        last = max(n for h in diff.get(finding["path"], []) for n in range(finding["start"], finding["end"] + 1)
+                   if h["left"].get(n) == "del")
+        return last, last
+    return finding["start"], finding["end"]
+
+
 def complete(finding):
     code = finding["code"]
     return code is not None and "..." not in code and "…" not in code
@@ -130,12 +148,13 @@ def parse_pairs(text):
     payload, a payload without a command, a payload that is not a JSON object, or a line outside the fences
     that names gh or glab as a word, so no printed write can be skipped. A gh or glab followed by "/", "." or
     ":" is a path, as in the heading "### 1. Discussion on src/gh/index.js:9", and is ignored like any other
-    text outside the fences.
+    text outside the fences. A canonical discussion heading, "### N. Discussion on <path>:<lines>", is data too, so
+    its path may name gh or glab in any form, as in "app/(gh)/page.tsx:9"; any other heading or prose is checked.
     """
     lines, pairs, i = text.split("\n"), [], 0
     while i < len(lines):
         if not lines[i].lstrip().startswith(FENCES):
-            if CLI.search(lines[i]):
+            if CLI.search(lines[i]) and not HEADING.match(lines[i]):
                 raise ValueError(f"gh or glab command outside a sh fence: {lines[i].strip()}")
             i += 1
             continue
@@ -184,15 +203,15 @@ def check_inline(items, findings, diff, own, platform):
         if item.get("error"):
             errors.append(item["error"])
             continue
-        match = next((f for f in findings if f["path"] == item["path"] and f["end"] == item["end"]
-                      and anchor(f, diff) == item["side"]), None)
+        match = next((f for f in findings if f["path"] == item["path"] and anchor(f, diff) == item["side"]
+                      and comment_span(f, item["side"], diff, platform)[1] == item["end"]), None)
         where = f"{item['path']}:{item['end']} ({item['side']})"
         if match is None:
             errors.append(f"comment {where} matches no inline finding")
             continue
         loc = match["loc"]
         seen.add(loc)
-        if item["start"] != match["start"]:
+        if item["start"] != comment_span(match, item["side"], diff, platform)[0]:
             errors.append(f"comment range does not match {loc}")
         if own_commented(match, item["side"], own):
             errors.append(f"inline comment for {loc} repeats the skill's own comment")
@@ -249,6 +268,15 @@ def check_summary(body, report, findings, needs, diff, own, inline_count):
     return errors
 
 
+def github_span_on_side(hunks, side, start, end):
+    """Whether lines start..end sit in one hunk: RIGHT lines are added or unchanged; LEFT lines must all be removed."""
+    if start > end:
+        return False
+    if side == "RIGHT":
+        return any(start in h["right"] and end in h["right"] for h in hunks)
+    return any(all(h["left"].get(n) == "del" for n in range(start, end + 1)) for h in hunks)
+
+
 def check_github(pairs, report, diff_text, state):
     errors = check_common(pairs, (GITHUB_REVIEW, GITHUB_CREATE, GITHUB_EDIT))
     findings, needs = report_findings(report)
@@ -278,8 +306,7 @@ def check_github(pairs, report, diff_text, state):
         side, line, start = c.get("side"), c.get("line"), c.get("start_line", c.get("line"))
         item = {"path": c.get("path"), "side": side, "start": start, "end": line, "body": c.get("body", "")}
         hunks = parse_diff(diff_text).get(c.get("path"), [])
-        key = "right" if side == "RIGHT" else "left"
-        if side not in ("RIGHT", "LEFT") or not any(line in h[key] and start in h[key] for h in hunks):
+        if side not in ("RIGHT", "LEFT") or None in (start, line) or not github_span_on_side(hunks, side, start, line):
             item["error"] = f"comment {c.get('path')}:{line} ({side}) is not on a diff line"
         elif "start_line" in c and c.get("start_side") != side:
             item["error"] = f"comment {c.get('path')}:{line} has a start_side that differs from its side"
@@ -303,6 +330,20 @@ def check_github(pairs, report, diff_text, state):
     return errors
 
 
+def gitlab_side(position, findings, diff):
+    """Return (side, line) for a GitLab position with a finding's identity: the side on which a finding is anchored.
+
+    A context line gives both numbers, so the finding decides the side: an old-side (LEFT) Location keeps its old
+    number. Without a matching finding, the new number wins, as an added line has only that number.
+    """
+    path, new, old = position.get("new_path"), position.get("new_line"), position.get("old_line")
+    options = ([("RIGHT", new)] if new is not None else []) + ([("LEFT", old)] if old is not None else [])
+    for side, line in options:
+        if any(f["path"] == path and f["end"] == line and anchor(f, diff) == side for f in findings):
+            return side, line
+    return options[0] if options else ("LEFT", None)
+
+
 def check_gitlab(pairs, report, diff_text, state):
     errors = check_common(pairs, (GITLAB_DISCUSSION, GITLAB_CREATE, GITLAB_EDIT))
     findings, needs = report_findings(report)
@@ -313,16 +354,21 @@ def check_gitlab(pairs, report, diff_text, state):
         note = d["notes"][0]
         if note["author"]["username"] == state["username"] and FINDING_MARKER in note["body"]:
             pos = note["position"]
-            new = pos.get("new_line")
-            own.append((pos["new_path"], "RIGHT" if new is not None else "LEFT",
-                        new if new is not None else pos.get("old_line"), note["body"]))
+            # A discussion with both numbers is a context line: it counts on each side at its own number.
+            if pos.get("new_line") is not None:
+                own.append((pos["new_path"], "RIGHT", pos["new_line"], note["body"]))
+            if pos.get("old_line") is not None:
+                own.append((pos["new_path"], "LEFT", pos["old_line"], note["body"]))
+    if refs.get("head_sha") != state["mr"]["sha"]:
+        # The merge request head moved after the review was built, so the findings and the head disagree.
+        return errors + ["diff_refs head_sha differs from the reviewed sha: publishing must stop before any write"]
     items = []
     for cmd, payload in pairs:
         if not GITLAB_DISCUSSION.match(cmd):
             continue
         pos = payload.get("position", {})
         new, old = pos.get("new_line"), pos.get("old_line")
-        side, line = ("RIGHT", new) if new is not None else ("LEFT", old)
+        side, line = gitlab_side(pos, findings, diff)
         item = {"path": pos.get("new_path"), "side": side, "end": line, "body": payload.get("body", "")}
         match = next((f for f in findings if f["path"] == item["path"] and f["end"] == line
                       and anchor(f, diff) == side), None)
@@ -339,8 +385,15 @@ def check_gitlab(pairs, report, diff_text, state):
                 item["error"] = f"context line needs old_line and new_line: {where}"
             elif kinds[0][0] == "add" and old is not None:
                 item["error"] = f"added line takes new_line only: {where}"
-        elif not any(h["left"].get(old) == "del" for h in hunks):
-            item["error"] = f"comment {where} (LEFT) is not on a diff line"
+        else:
+            kinds = [h["left"][old] for h in hunks if old in h["left"]]
+            mapped = [n for h in hunks for n, kind in h["right"].items() if kind == ("ctx", old)]
+            if not kinds:
+                item["error"] = f"comment {where} (LEFT) is not on a diff line"
+            elif kinds[0] == "del" and new is not None:
+                item["error"] = f"removed line takes old_line only: {where}"
+            elif kinds[0] == "ctx" and new not in mapped:
+                item["error"] = f"context line needs old_line and new_line: {where}"
         items.append(item)
     errors += check_inline(items, findings, diff, own, "gitlab")
     own_ids = [n["id"] for n in state["notes"] if not n["system"]
@@ -673,6 +726,93 @@ class FixtureTest(unittest.TestCase):
                 pairs = parse_pairs(text.replace(heading, "### 1. Discussion on " + path))
                 self.assertEqual(pairs, parse_pairs(text))
                 self.assertEqual(check_gitlab(pairs, self.report, self.diff, self.gl_state), [])
+
+    def test_heading_paths_with_parentheses_or_at_sign_stay_valid(self):
+        text = read("gitlab-dry-run.md")
+        heading = "### 1. Discussion on src/invoices.js:9-10"
+        for path in ("app/(gh)/page.tsx:9", "src/gh@2/x.js:9", "app/(glab)/x.tsx:9-10"):
+            with self.subTest(path=path):
+                self.assertEqual(parse_pairs(text.replace(heading, "### 1. Discussion on " + path)), parse_pairs(text))
+
+    def test_command_hidden_in_a_heading_fails(self):
+        text = read("gitlab-dry-run.md").replace("### 1. Discussion on src/invoices.js:9-10",
+                                                  "### 1. Discussion on src/invoices.js:9 glab mr approve 42")
+        with self.assertRaises(ValueError) as caught:
+            parse_pairs(text)
+        self.assertEqual(str(caught.exception),
+                         "gh or glab command outside a sh fence: ### 1. Discussion on src/invoices.js:9 glab mr approve 42")
+
+    def test_real_write_commands_read_the_files_they_write(self):
+        with open(REFERENCE, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("made with `mktemp -d`", text)
+        commands = [c for c in re.findall(r"`((?:gh|glab) api [^`]*)`", text) if "--input" in c]
+        self.assertEqual(len(commands), 6)
+        for cmd in commands:
+            tokens = shlex.split(cmd)
+            value = tokens[tokens.index("--input") + 1]
+            with self.subTest(command=cmd):
+                self.assertTrue(value.startswith("<dir>/"), f"--input is not the payload directory's file: {value}")
+                name = value[len("<dir>/"):]
+                self.assertRegex(name, r"^(?:review\.json|summary\.json|discussion-<i>\.json)$")
+                self.assertIn(f"`<dir>/{name}`", text, "the payload file is never written to that path")
+
+    def test_gitlab_head_that_moved_after_the_review_fails(self):
+        state = copy.deepcopy(self.gl_state)
+        state["mr"]["diff_refs"]["head_sha"] = "b" * 40
+        for d in state["discussions"]:
+            d["notes"][0]["position"]["head_sha"] = "b" * 40
+        pairs = copy.deepcopy(self.gl)
+        for _, payload in pairs:
+            if "position" in payload:
+                payload["position"]["head_sha"] = "b" * 40
+        self.assertError(self.gl_errors(pairs, state), "diff_refs head_sha differs from the reviewed sha")
+
+    def old_side_context_auth(self):
+        """The auth finding as the old-side Location 3-4, whose context line 4 is anchored on old 4 and new 3."""
+        report = self.report.replace("`src/auth.js:3`", "`src/auth.js:3-4`")
+        pairs = parse_pairs(read("gitlab-dry-run.md").replace("src/auth.js:3", "src/auth.js:3-4"))
+        pairs[1][1]["position"].update(old_line=4, new_line=3)
+        return report, pairs
+
+    def test_gitlab_old_side_context_anchor_is_valid(self):
+        report, pairs = self.old_side_context_auth()
+        self.assertEqual(check_gitlab(pairs, report, self.diff, self.gl_state), [])
+
+    def test_gitlab_repeated_old_side_context_anchor_is_already_commented(self):
+        report, pairs = self.old_side_context_auth()
+        state = copy.deepcopy(self.gl_state)
+        state["discussions"].append({"notes": [{
+            "author": {"username": "review-bot"}, "resolved": False,
+            "body": "**Critical — Security** · `src/auth.js:3-4`\n\n" + FINDING_MARKER,
+            "position": {"new_path": "src/auth.js", "old_path": "src/auth.js", "old_line": 4, "new_line": 3,
+                         "head_sha": GITLAB_HEAD}}]})
+        pairs = [p for i, p in enumerate(pairs) if i != 1]
+        summary = pairs[-1][1]
+        summary["body"], tagged = re.subn(r"^(- src/auth\.js:3-4: .*) \(inline\)$", r"\1 (already commented)",
+                                          summary["body"], flags=re.M)
+        summary["body"], counted = re.subn(r"Inline comments: 3\.", "Inline comments: 2.", summary["body"])
+        self.assertEqual((tagged, counted), (1, 1))
+        self.assertEqual(check_gitlab(pairs, report, self.diff, state), [])
+
+    def test_gitlab_removed_line_with_a_new_line_fails(self):
+        pairs = copy.deepcopy(self.gl)
+        pairs[1][1]["position"]["new_line"] = 3
+        self.assertError(self.gl_errors(pairs), "removed line takes old_line only: src/auth.js:3")
+
+    def test_github_old_side_context_location_anchors_on_last_removed_line(self):
+        report = self.report.replace("`src/auth.js:3`", "`src/auth.js:3-4`")
+        pairs = parse_pairs(read("github-dry-run.md").replace("src/auth.js:3", "src/auth.js:3-4"))
+        self.assertEqual(check_github(pairs, report, self.diff, self.gh_state), [])
+
+    def test_github_left_range_ending_on_context_fails(self):
+        report = self.report.replace("`src/auth.js:3`", "`src/auth.js:3-4`")
+        pairs = parse_pairs(read("github-dry-run.md").replace("src/auth.js:3", "src/auth.js:3-4"))
+        auth = pairs[0][1]["comments"][1]
+        auth.pop("line")
+        auth.update(start_line=3, start_side="LEFT", line=4, side="LEFT")
+        self.assertError(check_github(pairs, report, self.diff, self.gh_state),
+                         "comment src/auth.js:4 (LEFT) is not on a diff line")
 
 
 if __name__ == "__main__":
