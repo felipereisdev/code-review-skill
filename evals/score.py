@@ -31,11 +31,12 @@ PASSED_LINE = re.compile(
 )
 # The headline of a report with no listed finding whose Ready to merge is not Yes (SKILL.md Step 3).
 INCOMPLETE_LINE = re.compile(
-    r"^[\s*_\"']*review incomplete or pending\s*[—–-]{1,2}\s*no confirmed findings in the code inspected\.?[\s*_\"']*$",
+    r"^[\s*_]*review incomplete or pending\s*[—–-]{1,2}\s*no confirmed findings in the code inspected\.?[\s*_]*$",
     re.I,
 )
-_READY_LINE_RE = re.compile(r"^[\s*_\"'>]*ready to merge:[\s*_\"']*(yes|no|with fixes)\b", re.I)
-_AUDIT_LINE_RE = re.compile(r"^(?:#{1,6}\s*audit\s*#*\s*$|[\s*_\"'>]*audit:)", re.I)
+# Discovery-only recognizers: a blockquote marker or literal quote makes the line template data, not metadata.
+_READY_LINE_RE = re.compile(r"^[\s*_]*ready to merge:[\s*_]*(yes|no|with fixes)\b", re.I)
+_AUDIT_LINE_RE = re.compile(r"^(?:#{1,6}\s*audit\s*#*\s*$|[\s*_]*audit:)", re.I)
 
 _NORMALIZED_SEVERITY = {
     "critical": "Critical",

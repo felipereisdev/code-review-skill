@@ -382,8 +382,24 @@ class IncompleteReportTest(unittest.TestCase):
         self.assertFalse(looks_like_report(template))
         self.assertFalse(looks_like_report(f"> {self.INCOMPLETE}\n\n{self.NOT_READY}\n\n## Audit\n"))
 
+    def test_blockquoted_readiness_or_audit_is_not_discovery_context(self):
+        quoted_ready = f"> {self.NOT_READY}"
+        quoted_audit = f"> {self.COMPACT_AUDIT}"
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{quoted_ready}\n\n## Audit\n"))
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{self.NOT_READY}\n\n{quoted_audit}\n"))
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{quoted_ready}\n{quoted_audit}\n"))
 
-PRE_EXISTING_REPORT = """\
+    def test_literal_quotes_are_not_discovery_context(self):
+        self.assertFalse(looks_like_report(f'"{self.INCOMPLETE}"\n\n{self.NOT_READY}\n\n## Audit\n'))
+        self.assertFalse(looks_like_report(f'{self.INCOMPLETE}\n\n"{self.NOT_READY}"\n\n## Audit\n'))
+        self.assertFalse(looks_like_report(f'{self.INCOMPLETE}\n\n{self.NOT_READY}\n\n"{self.COMPACT_AUDIT}"\n'))
+
+    def test_emphasis_and_indentation_still_discover(self):
+        report = f"**{self.INCOMPLETE}**\n\n  {self.NOT_READY}\n\n  {self.COMPACT_AUDIT}\n"
+        self.assertTrue(looks_like_report(report))
+
+
+PRE_EXISTING_REPORT ="""\
 ## Findings
 
 ### Potential Bugs — Warning
