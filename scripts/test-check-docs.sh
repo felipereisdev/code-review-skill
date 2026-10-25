@@ -624,6 +624,67 @@ make_copy "$work/latescope"
 replace_first "$work/latescope/example-output.md" $'**Scope:** branch main (git diff main...HEAD)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** branch main (git diff main...HEAD)\n'
 expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
 
+make_copy "$work/shelltext"
+replace_first "$work/shelltext/SKILL.md" 'never as text inside a shell command' 'as text in a shell command'
+expect_fail "passing a value to git as shell text fails" "$work/shelltext" "Step 0 — Scope Selection is missing: never as text inside a shell command"
+
+make_copy "$work/noquoterule"
+replace_first "$work/noquoterule/SKILL.md" 'quote the whole value with POSIX single quotes' 'quote the value'
+expect_fail "dropping the POSIX quoting rule fails" "$work/noquoterule" "Step 0 — Scope Selection is missing: quote the whole value with POSIX single quotes"
+
+make_copy "$work/danglingdefault"
+replace_first "$work/danglingdefault/SKILL.md" 'a symbolic ref whose target is missing, as after a branch was pruned, does not count' ''
+expect_fail "accepting a dangling default branch fails" "$work/danglingdefault" "Step 0 — Scope Selection is missing: a symbolic ref whose target is missing"
+
+make_copy "$work/failedgit"
+replace_first "$work/failedgit/SKILL.md" 'Never read a failed command as an empty result' 'Read the output'
+expect_fail "treating a failed git command as an empty result fails" "$work/failedgit" "Step 0 — Scope Selection is missing: Never read a failed command as an empty result"
+
+make_copy "$work/unbornhead"
+replace_first "$work/unbornhead/SKILL.md" 'Before the first commit, HEAD does not resolve' 'On a fresh repository'
+expect_fail "dropping the unborn HEAD rule fails" "$work/unbornhead" "Step 0 — Scope Selection is missing: Before the first commit, HEAD does not resolve"
+
+make_copy "$work/unbornscope"
+replace_first "$work/unbornscope/SKILL.md" '`uncommitted (git diff --cached + git diff + untracked files)`' '`uncommitted`'
+expect_fail "an unborn-HEAD Scope line without its commands fails" "$work/unbornscope" "Step 0 — Scope Selection is missing: \`uncommitted (git diff --cached + git diff + untracked files)\`"
+
+make_copy "$work/answerunvalidated"
+replace_first "$work/answerunvalidated/SKILL.md" 'An answer that names a base is validated like a `<base>` argument, as in **Invalid arguments**.' ''
+expect_fail "an interactive base answer that skips validation fails" "$work/answerunvalidated" "Step 0 — Scope Selection is missing: An answer that names a base is validated like a \`<base>\` argument"
+
+# quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
+quote_value() {
+  local s=${1//"'"/"'\''"}
+  printf "'%s'" "$s"
+}
+
+# Real git: the prescribed quoting keeps an apostrophe and a shell metacharacter in a ref name as one argument.
+probe="$work/gitprobe"
+git init -q "$probe"
+git -C "$probe" -c user.name=check -c user.email=check@example.com commit -q --allow-empty -m init
+probe_commit=$(git -C "$probe" rev-parse HEAD)
+for ref in "topic/o'brien" "topic/review';printf\${IFS}U09_QUOTE_PROBE;#"; do
+  git -C "$probe" branch -q "$ref" HEAD
+  out=$(cd "$probe" && sh -c "git rev-parse --verify --quiet $(quote_value "$ref^{commit}")" 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ "$out" = "$probe_commit" ]; then
+    printf 'PASS quoted ref %s resolves to the commit as one argument\n' "$ref"
+  else
+    printf 'FAIL quoted ref %s (exit %s; output: %s)\n' "$ref" "$rc" "$out"
+    failures=$((failures + 1))
+  fi
+done
+
+# Real git: a symbolic origin/HEAD whose target is missing must not pass the default-branch validation.
+git -C "$probe" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/old-default
+dangling=$(git -C "$probe" symbolic-ref --quiet --short refs/remotes/origin/HEAD)
+if [ "$dangling" = "origin/old-default" ] && ! git -C "$probe" rev-parse --verify --quiet 'origin/old-default^{commit}' > /dev/null; then
+  printf 'PASS a dangling origin/HEAD target is rejected by the commit check\n'
+else
+  printf 'FAIL a dangling origin/HEAD target was not rejected (symbolic-ref: %s)\n' "$dangling"
+  failures=$((failures + 1))
+fi
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

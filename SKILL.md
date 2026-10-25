@@ -23,7 +23,7 @@ Choose the scope before anything else. Take it from the arguments when there are
 
 **Scopes.** Each scope is one plain word, followed by a value where shown:
 
-1. **`uncommitted`** — staged and unstaged changes to tracked files, plus untracked files that are not ignored. Run `git diff HEAD`, then list the untracked files with `git status --porcelain --untracked-files=all` (the lines that start with `??`) and review each one as a new file. Skip binary files.
+1. **`uncommitted`** — staged and unstaged changes to tracked files, plus untracked files that are not ignored. Run `git diff HEAD`, then list the untracked files with `git status --porcelain --untracked-files=all` (the lines that start with `??`) and review each one as a new file. Skip binary files. Before the first commit, HEAD does not resolve: run `git diff --cached` and `git diff` instead of `git diff HEAD`, and review the untracked files the same way.
 2. **`staged`** — changes added to the index but not committed. Run `git diff --cached`.
 3. **`branch [<base>]`** — every commit on the current branch since it left `<base>`. Run `git diff <base>...HEAD`. Without `<base>`, use the default branch.
 4. **`commit <sha>`** — the changes of one commit. Run `git show <sha>`.
@@ -31,9 +31,9 @@ Choose the scope before anything else. Take it from the arguments when there are
 
 The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.
 
-**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and for `branch`, `commit` and `range`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass every value to git as one single-quoted argument.
+**Arguments.** Read the words passed after the command, for example `/code-review branch main` or `/code-review commit abc123`. The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. The first other word names the scope, and for `branch`, `commit` and `range`, the word after it is its value. A scope the user names in plain words, such as "review my staged changes", counts as that argument. Pass each value to git as its own argument, never as text inside a shell command. When a shell command must contain a value, quote the whole value with POSIX single quotes: wrap it in `'`, and replace every `'` inside the value with `'\''`, so the apostrophe in `o'brien` becomes `'o'\''brien'`. Put any suffix, such as `^{commit}`, inside the same quotes.
 
-**Default branch.** Run `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`. Its output, for example `origin/main`, is the default branch. If it prints nothing, the default branch is the first of `origin/main`, `origin/master`, `main` and `master` that `git rev-parse --verify --quiet '<ref>^{commit}'` accepts. If none is accepted, the default branch is unknown.
+**Default branch.** Run `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`. Its output, for example `origin/main`, is the default branch only when `git rev-parse --verify --quiet '<ref>^{commit}'` also accepts it: a symbolic ref whose target is missing, as after a branch was pruned, does not count. If the command prints nothing or the target is not accepted, the default branch is the first of `origin/main`, `origin/master`, `main` and `master` that `git rev-parse --verify --quiet '<ref>^{commit}'` accepts. If none is accepted, the default branch is unknown.
 
 **Invalid arguments.** Check the arguments before you run the diff. When one is invalid, reply with one line, `Cannot review: <reason>. Nothing was reviewed.`, and stop. Never review a different scope instead. The reasons:
 
@@ -45,6 +45,8 @@ The word `pr` is reserved for reviewing a pull request by number. It is not supp
 - A `range` value without `..` between two refs: `"<value>" is not a range of the form <from>..<to>`.
 - A `<sha>`, `<base>`, `<from>` or `<to>` that `git rev-parse --verify --quiet '<value>^{commit}'` rejects: `"<value>" is not a commit or branch in this repository`. A value that starts with `-` is always rejected.
 - For `branch`, a base that `git merge-base '<base>' HEAD` cannot join with `HEAD`, as in a shallow clone: `no common ancestor between <base> and HEAD; fetch more history or use range <from>..<to>`.
+
+**Git failures.** Check the exit status of every git command in this step and of the review's diff command. Never read a failed command as an empty result: when one exits nonzero, reply `Cannot review: git <command> failed; the history or diff could not be inspected. Nothing was reviewed.`, with `<command>` the git subcommand, such as `rev-list`, and stop.
 
 **Without a scope argument**, detect the scope. Apply these rules in order and stop at the first one that matches:
 
@@ -58,11 +60,11 @@ The word `pr` is reserved for reviewing a pull request by number. It is not supp
 **Interactive runs** ask only when detection is ambiguous, in these two cases, and wait for the answer:
 
 - Rule 1 matches and the current branch also has commits ahead of the default branch. Ask: *"There are uncommitted changes, and this branch has commits ahead of <default>. Review the uncommitted changes (uncommitted) or the whole branch (branch <default>)?"* A headless run uses `uncommitted`.
-- No rule finds a scope because the default branch is unknown. Ask: *"Which base branch should this branch be compared with?"* and use `branch <answer>`.
+- No rule finds a scope because the default branch is unknown. Ask: *"Which base branch should this branch be compared with?"* and use `branch <answer>`. An answer that names a base is validated like a `<base>` argument, as in **Invalid arguments**.
 
 **Empty diff.** If the scope's command shows no changes, and for `uncommitted` there are no untracked files either, reply `Nothing to review: <command> shows no changes.` and stop.
 
-**Scope line.** The report starts with one line that names the scope and the git command that produced the diff: `**Scope:** <scope> (<command>)`. When the scope came from detection, add `, auto-detected` after it. Examples: `**Scope:** branch origin/main, auto-detected (git diff origin/main...HEAD)`, `**Scope:** staged (git diff --cached)`, `**Scope:** uncommitted (git diff HEAD + untracked files)`.
+**Scope line.** The report starts with one line that names the scope and the git command that produced the diff: `**Scope:** <scope> (<command>)`. When the scope came from detection, add `, auto-detected` after it. Examples: `**Scope:** branch origin/main, auto-detected (git diff origin/main...HEAD)`, `**Scope:** staged (git diff --cached)`, `**Scope:** uncommitted (git diff HEAD + untracked files)`. Before the first commit, the command part names the commands that were run instead, as in `uncommitted (git diff --cached + git diff + untracked files)`.
 
 ---
 

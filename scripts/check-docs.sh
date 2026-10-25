@@ -641,7 +641,14 @@ for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<b
           "`Nothing to review: <command> shows no changes.`",
           "`Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.`",
           "`no common ancestor between <base> and HEAD; fetch more history or use range <from>..<to>`",
-          "`**Scope:** <scope> (<command>)`", "add `, auto-detected` after it"):
+          "`**Scope:** <scope> (<command>)`", "add `, auto-detected` after it",
+          "never as text inside a shell command", "quote the whole value with POSIX single quotes",
+          "a symbolic ref whose target is missing, as after a branch was pruned, does not count",
+          "Never read a failed command as an empty result",
+          "`Cannot review: git <command> failed; the history or diff could not be inspected. Nothing was reviewed.`",
+          "Before the first commit, HEAD does not resolve",
+          "`uncommitted (git diff --cached + git diff + untracked files)`",
+          "An answer that names a base is validated like a `<base>` argument"):
     if s not in text:
         errors.append(f"Step 0 — Scope Selection is missing: {s}")
 for s in ("ask the user the following question and wait for their answer",
