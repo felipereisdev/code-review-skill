@@ -21,6 +21,36 @@ CATEGORIES = ("Security", "Performance", "Tests/Coverage", "Architecture", "Code
 SETTINGS = ("ignore_paths", "min_severity", "max_findings_per_file", "disabled_categories")
 DEFAULTS = {"ignore_paths": [], "min_severity": "Suggestion", "max_findings_per_file": None, "disabled_categories": []}
 STRUCTURE = "anchors, aliases, tags and multiple documents are not allowed"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+REFERENCE = os.path.join(ROOT, "references", "configuration.md")
+
+
+def read_file(*parts):
+    with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
+        return f.read()
+
+
+def table(text, header):
+    """The rows under the Markdown table whose header line is `header`, as lists of stripped cell texts."""
+    lines = text.splitlines()
+    start = lines.index(header)
+    rows = []
+    for line in lines[start + 2:]:
+        if not line.startswith("| "):
+            break
+        rows.append([cell.strip() for cell in line.strip().strip("|").split("|")])
+    return rows
+
+
+def code(cell):
+    """The text of a cell written as one inline code span."""
+    assert cell.startswith("`") and cell.endswith("`"), cell
+    return cell[1:-1]
+
+
+def fenced(text, info):
+    """The bodies of the fenced blocks whose opening line is three or more backticks followed by `info`."""
+    return [m.group(2) + "\n" for m in re.finditer(r"^(`{3,})" + info + r"\n(.*?)\n\1$", text, re.M | re.S)]
 
 VALID_CONFIG = """\
 ignore_paths:
@@ -885,4 +915,92 @@ class FilterTests(unittest.TestCase):
         self.assertIsNone(omitted_line(self.settings(min_severity="Suggestion"), ZERO))
         self.assertEqual(NO_FINDINGS_SHOWN, "**No findings shown:** the configuration omitted every finding; see the "
                                             "Omitted by configuration line.")
+
+
+class ReferenceTests(unittest.TestCase):
+    """references/configuration.md must agree with the reference implementation above."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = read_file("references", "configuration.md")
+
+    def test_settings_table_names_every_setting_in_order(self):
+        rows = table(self.text, "| Setting | Type | Default | Effect |")
+        self.assertEqual([code(r[0]) for r in rows], list(SETTINGS))
+        self.assertEqual([r[2] for r in rows], ["`[]`", "`Suggestion`", "no limit", "`[]`"])
+
+    def test_example_config_is_valid(self):
+        blocks = fenced(self.text, "yaml")
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(load_config(blocks[0]), load_config(VALID_CONFIG))
+
+    def test_invalid_config_table(self):
+        rows = table(self.text, "| Input | `<reason>` |")
+        self.assertGreaterEqual(len(rows), 18)
+        for cells in rows:
+            with self.subTest(input=cells[0]):
+                with self.assertRaises(ConfigError) as caught:
+                    load_config(code(cells[0]) + "\n")
+                self.assertEqual(str(caught.exception), code(cells[1]))
+
+    def test_glob_table_matches_the_reference_matcher(self):
+        rows = table(self.text, "| Pattern | Path | Matches |")
+        self.assertGreaterEqual(len(rows), 15)
+        for cells in rows:
+            with self.subTest(pattern=cells[0], path=cells[1]):
+                check_pattern(code(cells[0]))
+                self.assertIs(match_path(code(cells[0]), code(cells[1])), cells[2] == "yes")
+
+    def test_example_rule_is_valid_and_its_citation_matches(self):
+        blocks = fenced(self.text, "markdown")
+        rules = [b for b in blocks if b.startswith("---\n")]
+        self.assertEqual(rules, [VALID_RULE])
+        self.assertEqual(load_rule(rules[0])["rule_lines"], (7, 8))
+        self.assertIn("`.code-review/rules/validate-request-bodies.md:L7-L8`", self.text)
+        self.assertIn("`(Rule: .code-review/rules/validate-request-bodies.md:L7-L8)`", self.text)
+
+    def test_category_names_match_the_skill_summary_table(self):
+        skill = read_file("SKILL.md").splitlines()
+        start = next(i for i, line in enumerate(skill) if line.startswith("| Category "))
+        names = []
+        for line in skill[start + 2:]:
+            if line.startswith("| **Total**"):
+                break
+            names.append(line.strip("|").split("|")[0].strip())
+        self.assertEqual(tuple(names), CATEGORIES)
+        self.assertIn(", ".join("`%s`" % n for n in CATEGORIES) + ".", self.text)
+
+    def test_report_lines_match_the_reference(self):
+        lines = fenced(self.text, "markdown")[0].splitlines()
+        conf = {"has_config": True, "has_rules_dir": False, "rules": []}
+        expected = [
+            configuration_line(conf),
+            configuration_line(dict(conf, has_config=False, has_rules_dir=True, rules=[{}])),
+            configuration_line(dict(conf, has_rules_dir=True, rules=[{}, {}])),
+            NOT_VERIFIED,
+            excluded_line(["docs/setup.md"]),
+            excluded_line(["src/generated/client.ts", "docs/setup.md"]),
+            omitted_line(load_config(VALID_CONFIG), {"min_severity": 2, "disabled_categories": 1,
+                                                     "max_findings_per_file": 0}),
+            NO_FINDINGS_SHOWN,
+        ]
+        self.assertEqual(lines, expected)
+
+    def test_a_changed_configuration_applies_to_its_own_review(self):
+        self.assertIn("**A change to the configuration applies to its own review.**", self.text)
+        self.assertIn("even when the diff is what made it invalid", self.text)
+        self.assertIn("`" + NOTHING_TO_REVIEW + "`", self.text)
+        self.assertIn("never say that the excluded files were reviewed or are clean", self.text)
+        self.assertNotIn("not applied", self.text)
+
+    def test_error_lines_match_the_reference(self):
+        for template in (LINK, NOT_RULE):
+            self.assertIn("`" + template.format("<path>") + "`", self.text)
+        self.assertIn("`" + INVALID.format(".code-review/config.yml", "<reason>") + "`", self.text)
+        self.assertIn("`" + INVALID.format("<path>", "<reason>") + "`", self.text)
+        for reason in ("it must start with a frontmatter block between --- lines", "its frontmatter is not valid YAML",
+                       "its frontmatter must be a mapping with paths and severity", "unknown frontmatter key",
+                       "duplicate frontmatter key", STRUCTURE, "paths must be a non-empty list of path patterns",
+                       SEVERITY_REASON, NEEDS_EXAMPLES, "it has no rule text before ## Bad"):
+            self.assertIn(reason, self.text)
 

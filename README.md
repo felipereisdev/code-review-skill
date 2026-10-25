@@ -322,6 +322,7 @@ code-review-skill/
 │   ├── accessibility.md
 │   ├── api-design.md
 │   ├── concurrency.md
+│   ├── configuration.md # Settings and custom rules from .code-review/ (not a review category)
 │   ├── database-migrations.md
 │   ├── i18n.md
 │   ├── observability.md
