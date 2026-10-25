@@ -552,6 +552,183 @@ make_copy "$work/apiclientshttp"
 replace_first "$work/apiclientshttp/SKILL.md" 'or API client code, including SDK wrappers and non-HTTP transports such as WebSocket or gRPC clients.' 'or code that calls an HTTP API.'
 expect_fail "an API Design trigger narrowed to HTTP calls fails" "$work/apiclientshttp" "references/api-design.md trigger must cover: API client code, including SDK wrappers and non-HTTP transports"
 
+make_copy "$work/alwaysask"
+replace_first "$work/alwaysask/SKILL.md" 'Choose the scope before anything else.' 'Before anything else, ask the user the following question and wait for their answer.'
+expect_fail "asking for the scope on every run fails" "$work/alwaysask" "Step 0 — Scope Selection still always asks: ask the user the following question and wait for their answer"
+
+make_copy "$work/noheadless"
+replace_first "$work/noheadless/SKILL.md" 'In a headless run, never ask a question: take' 'Take'
+expect_fail "dropping the headless never-ask rule fails" "$work/noheadless" "Step 0 — Scope Selection is missing: In a headless run, never ask a question"
+
+make_copy "$work/noscopeword"
+replace_first "$work/noscopeword/SKILL.md" '2. **`staged`** — ' '2. **Staged changes only** — '
+expect_fail "a scope without its argument word fails" "$work/noscopeword" "Step 0 — Scope Selection is missing: 2. **\`staged\`** — "
+
+make_copy "$work/nodefaultbranch"
+replace_first "$work/nodefaultbranch/SKILL.md" '`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`' '`git remote show origin`'
+expect_fail "detecting the default branch another way fails" "$work/nodefaultbranch" "Step 0 — Scope Selection is missing: \`git symbolic-ref --quiet --short refs/remotes/origin/HEAD\`"
+
+make_copy "$work/fallbackscope"
+replace_first "$work/fallbackscope/SKILL.md" ' Never review a different scope instead.' ''
+expect_fail "falling back to another scope on a bad argument fails" "$work/fallbackscope" "Step 0 — Scope Selection is missing: Never review a different scope instead"
+
+make_copy "$work/nopr"
+replace_first "$work/nopr/SKILL.md" 'The word `pr` is reserved for reviewing a pull request by number. It is not supported yet.' ''
+expect_fail "dropping the reserved pr word fails" "$work/nopr" "Step 0 — Scope Selection is missing: The word \`pr\` is reserved for reviewing a pull request by number"
+
+make_copy "$work/noscopeline"
+replace_first "$work/noscopeline/SKILL.md" 'Write the report in this order: the **Scope:** line (Step 0), What Was Done Well' 'Write the report in this order: What Was Done Well'
+expect_fail "a report order without the Scope line fails" "$work/noscopeline" "Output Format is missing: Write the report in this order: the **Scope:** line (Step 0), What Was Done Well"
+
+make_copy "$work/nocompactscope"
+replace_first "$work/nocompactscope/SKILL.md" '- Start with the **Scope:** line. Skip' '- Skip'
+expect_fail "compact mode without the Scope line fails" "$work/nocompactscope" "Output Format is missing: - Start with the **Scope:** line."
+
+make_copy "$work/dashvalue"
+replace_first "$work/dashvalue/SKILL.md" ' A value that starts with `-` is always rejected.' ''
+expect_fail "accepting a value that starts with a dash fails" "$work/dashvalue" "Step 0 — Scope Selection is missing: A value that starts with \`-\` is always rejected"
+
+make_copy "$work/compactword"
+replace_first "$work/compactword/SKILL.md" 'The word `compact` turns on compact mode (see Output Format) wherever it appears and is not part of the scope. ' ''
+expect_fail "reading compact as a scope word fails" "$work/compactword" "Step 0 — Scope Selection is missing: The word \`compact\` turns on compact mode"
+
+make_copy "$work/nodefaultmsg"
+replace_first "$work/nodefaultmsg/SKILL.md" 'a headless run replies `Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.` and stops, and an interactive' 'an interactive'
+expect_fail "a headless run without a default branch message fails" "$work/nodefaultmsg" "Step 0 — Scope Selection is missing: \`Cannot review: the default branch could not be detected"
+
+make_copy "$work/nomergebase"
+drop_lines "$work/nomergebase/SKILL.md" 'no common ancestor between'
+expect_fail "dropping the shallow-clone merge-base error fails" "$work/nomergebase" "Step 0 — Scope Selection is missing: \`no common ancestor between <base> and HEAD"
+
+make_copy "$work/readmeasks"
+replace_first "$work/readmeasks/README.md" 'The skill takes the scope from the argument, and detects it when there is none:' 'The skill will ask you to choose the review scope:'
+expect_fail "a README that says the skill always asks fails" "$work/readmeasks" "README still says the skill always asks for the scope"
+
+make_copy "$work/readmenoarg"
+drop_lines "$work/readmenoarg/README.md" '/code-review commit abc123'
+expect_fail "a README without the commit argument example fails" "$work/readmenoarg" "README is missing: /code-review commit abc123"
+
+make_copy "$work/noexamplescope"
+drop_lines "$work/noexamplescope/example-output.md" '**Scope:**'
+expect_fail "an example without the Scope line fails" "$work/noexamplescope" "example-output.md must have 2 **Scope:** lines (full report and compact mode), found 0"
+
+make_copy "$work/scopemismatch"
+replace_first "$work/scopemismatch/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch develop (git diff develop...HEAD)'
+expect_fail "full and compact Scope lines that disagree fail" "$work/scopemismatch" "the full-report and compact-mode **Scope:** lines must match"
+
+make_copy "$work/scopenocommand"
+replace_first "$work/scopenocommand/example-output.md" '**Scope:** branch main (git diff main...HEAD)' '**Scope:** branch main'
+expect_fail "a Scope line without its git command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<git command>)'"
+
+make_copy "$work/latescope"
+replace_first "$work/latescope/example-output.md" $'**Scope:** branch main (git diff main...HEAD)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** branch main (git diff main...HEAD)\n'
+expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
+
+make_copy "$work/shelltext"
+replace_first "$work/shelltext/SKILL.md" 'never as text inside a shell command' 'as text in a shell command'
+expect_fail "passing a value to git as shell text fails" "$work/shelltext" "Step 0 — Scope Selection is missing: never as text inside a shell command"
+
+make_copy "$work/noquoterule"
+replace_first "$work/noquoterule/SKILL.md" 'quote the whole value with POSIX single quotes' 'quote the value'
+expect_fail "dropping the POSIX quoting rule fails" "$work/noquoterule" "Step 0 — Scope Selection is missing: quote the whole value with POSIX single quotes"
+
+make_copy "$work/danglingdefault"
+replace_first "$work/danglingdefault/SKILL.md" 'a symbolic ref whose target is missing, as after a branch was pruned, does not count' ''
+expect_fail "accepting a dangling default branch fails" "$work/danglingdefault" "Step 0 — Scope Selection is missing: a symbolic ref whose target is missing"
+
+make_copy "$work/failedgit"
+replace_first "$work/failedgit/SKILL.md" 'Never read an unexpected failure as an empty result' 'Read the output'
+expect_fail "treating a failed git command as an empty result fails" "$work/failedgit" "Step 0 — Scope Selection is missing: Never read an unexpected failure as an empty result"
+
+make_copy "$work/probefatal"
+replace_first "$work/probefatal/SKILL.md" 'Those exits are results, not failures: they select the next rule' 'Those exits stop the run: they select the next rule'
+expect_fail "stopping on an absent origin/HEAD probe exit fails" "$work/probefatal" "Step 0 — Scope Selection is missing: Those exits are results, not failures"
+
+make_copy "$work/unbornhead"
+replace_first "$work/unbornhead/SKILL.md" 'Before the first commit, HEAD does not resolve' 'On a fresh repository'
+expect_fail "dropping the unborn HEAD rule fails" "$work/unbornhead" "Step 0 — Scope Selection is missing: Before the first commit, HEAD does not resolve"
+
+make_copy "$work/unbornscope"
+replace_first "$work/unbornscope/SKILL.md" '`uncommitted (git diff --cached + git diff + untracked files)`' '`uncommitted`'
+expect_fail "an unborn-HEAD Scope line without its commands fails" "$work/unbornscope" "Step 0 — Scope Selection is missing: \`uncommitted (git diff --cached + git diff + untracked files)\`"
+
+make_copy "$work/answerunvalidated"
+replace_first "$work/answerunvalidated/SKILL.md" 'An answer that names a base is validated like a `<base>` argument, as in **Invalid arguments**.' ''
+expect_fail "an interactive base answer that skips validation fails" "$work/answerunvalidated" "Step 0 — Scope Selection is missing: An answer that names a base is validated like a \`<base>\` argument"
+
+# quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
+quote_value() {
+  local s=${1//"'"/"'\''"}
+  printf "'%s'" "$s"
+}
+
+# Real git: the prescribed quoting keeps an apostrophe and a shell metacharacter in a ref name as one argument.
+probe="$work/gitprobe"
+git init -q "$probe"
+git -C "$probe" -c user.name=check -c user.email=check@example.com commit -q --allow-empty -m init
+probe_commit=$(git -C "$probe" rev-parse HEAD)
+for ref in "topic/o'brien" "topic/review';printf\${IFS}U09_QUOTE_PROBE;#"; do
+  git -C "$probe" branch -q "$ref" HEAD
+  out=$(cd "$probe" && sh -c "git rev-parse --verify --quiet $(quote_value "$ref^{commit}")" 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ "$out" = "$probe_commit" ]; then
+    printf 'PASS quoted ref %s resolves to the commit as one argument\n' "$ref"
+  else
+    printf 'FAIL quoted ref %s (exit %s; output: %s)\n' "$ref" "$rc" "$out"
+    failures=$((failures + 1))
+  fi
+done
+
+# Real git: a symbolic origin/HEAD whose target is missing must not pass the default-branch validation.
+git -C "$probe" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/old-default
+dangling=$(git -C "$probe" symbolic-ref --quiet --short refs/remotes/origin/HEAD)
+if [ "$dangling" = "origin/old-default" ] && ! git -C "$probe" rev-parse --verify --quiet 'origin/old-default^{commit}' > /dev/null; then
+  printf 'PASS a dangling origin/HEAD target is rejected by the commit check\n'
+else
+  printf 'FAIL a dangling origin/HEAD target was not rejected (symbolic-ref: %s)\n' "$dangling"
+  failures=$((failures + 1))
+fi
+
+# resolve_default_branch <repo>: the Default branch rule of SKILL.md Step 0, run with real git. Prints the default branch.
+resolve_default_branch() {
+  local ref cand
+  ref=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+  if [ -n "$ref" ] && git -C "$1" rev-parse --verify --quiet "$ref^{commit}" > /dev/null; then
+    printf '%s\n' "$ref"
+    return 0
+  fi
+  for cand in origin/main origin/master main master; do
+    if git -C "$1" rev-parse --verify --quiet "$cand^{commit}" > /dev/null; then
+      printf '%s\n' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Real git: with no origin/HEAD, the probes that exit 1 must fall through to local main, and the branch must count as ahead.
+fallback="$work/fallbackprobe"
+git init -q "$fallback"
+git -C "$fallback" -c user.name=check -c user.email=check@example.com -c commit.gpgsign=false commit -q --allow-empty -m base
+git -C "$fallback" branch -q -M main
+git -C "$fallback" switch -q -c feature
+git -C "$fallback" -c user.name=check -c user.email=check@example.com -c commit.gpgsign=false commit -q --allow-empty -m change
+if [ "$(resolve_default_branch "$fallback")" = "main" ] && [ "$(git -C "$fallback" rev-list --count main..HEAD)" = "1" ]; then
+  printf 'PASS with no origin/HEAD the default branch falls back to main and HEAD is one commit ahead\n'
+else
+  printf 'FAIL with no origin/HEAD the default branch did not fall back to main\n'
+  failures=$((failures + 1))
+fi
+
+# Real git: a dangling origin/HEAD target is skipped, and the fallback still reaches main.
+git -C "$fallback" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/old-default
+if [ "$(resolve_default_branch "$fallback")" = "main" ]; then
+  printf 'PASS a dangling origin/HEAD falls back to main\n'
+else
+  printf 'FAIL a dangling origin/HEAD did not fall back to main\n'
+  failures=$((failures + 1))
+fi
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
