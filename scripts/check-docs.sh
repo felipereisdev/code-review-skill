@@ -1136,6 +1136,44 @@ PY
   fi
 }
 
+check_docs_configuration() {
+  if python3 - <<'PY'
+import sys
+
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("**Repository Configuration and Custom Rules**", "### Repository configuration",
+          "`.code-review/config.yml`", "`.code-review/rules/*.md`", "`ignore_paths`", "`min_severity`",
+          "`max_findings_per_file`", "`disabled_categories`", "`references/configuration.md`",
+          "a Critical finding is never omitted", "never from your checkout", "an invalid one stops the review"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+text = open("example-output.md", encoding="utf-8").read()
+for s in ("## Repository Configuration",
+          "**Configuration:** `.code-review/config.yml` and 1 rule file from `.code-review/rules/`.",
+          "**Excluded by configuration:** ", "**Omitted by configuration:** ",
+          "(Rule: .code-review/rules/validate-request-bodies.md:L7-L8)"):
+    if s not in text:
+        errors.append(f"example-output.md is missing: {s}")
+if "## Repository Configuration" in text and "## Publishing Dry Run" in text \
+        and text.index("## Repository Configuration") > text.index("## Publishing Dry Run"):
+    errors.append("example-output.md must put ## Repository Configuration before ## Publishing Dry Run")
+publishing = open("references/publishing.md", encoding="utf-8").read()
+for s in ("**Omitted by configuration:**", "copy each one unchanged into the summary",
+          "When the report has the **No findings shown:** line"):
+    if s not in publishing:
+        errors.append(f"references/publishing.md is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README, example-output.md and the publishing summary show the .code-review configuration and its report lines"
+  else
+    fail "README and example-output.md repository configuration (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -1336,6 +1374,7 @@ check_example_findings
 check_docs_scope_usage
 check_docs_pr_scope
 check_docs_publishing
+check_docs_configuration
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

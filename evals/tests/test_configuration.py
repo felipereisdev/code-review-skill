@@ -1121,3 +1121,37 @@ class FixtureReportTests(unittest.TestCase):
             self.assertNotIn("attacker.example", text)
         self.assertEqual(self.conf["settings"]["min_severity"], "Warning")
 
+
+class DocsExampleTests(unittest.TestCase):
+    """README and example-output.md must show configurations and lines that the reference implementation accepts."""
+
+    def test_readme_example_config_is_valid(self):
+        readme = read_file("README.md")
+        start = readme.index("### Repository configuration")
+        blocks = fenced(readme[start:], "yaml")
+        self.assertTrue(blocks)
+        self.assertEqual(load_config(blocks[0]), {"ignore_paths": ["src/generated/**", "docs/"],
+                                                  "min_severity": "Warning", "max_findings_per_file": 5,
+                                                  "disabled_categories": ["Accessibility"]})
+
+    def test_example_output_section_is_consistent(self):
+        text = read_file("example-output.md")
+        section = text[text.index("## Repository Configuration"):text.index("## Publishing Dry Run")]
+        settings = load_config(fenced(section, "yaml")[0])
+        rule_blocks = [b for b in fenced(section, "markdown") if b.startswith("---\n")]
+        self.assertEqual(rule_blocks, [VALID_RULE])
+        rule = load_rule(rule_blocks[0])
+        lines = [line for b in fenced(section, "markdown") if not b.startswith("---\n") for line in b.splitlines()]
+        conf = {"has_config": True, "has_rules_dir": True, "rules": [rule]}
+        self.assertEqual(lines[0], configuration_line(conf))
+        self.assertTrue(is_excluded("src/generated/api-client.ts", "src/generated/api-client.ts",
+                                    settings["ignore_paths"]))
+        self.assertFalse(is_excluded("src/api/users.ts", "src/api/users.ts", settings["ignore_paths"]))
+        self.assertEqual(lines[1], excluded_line(["src/generated/api-client.ts"]))
+        cite = "(Rule: .code-review/rules/validate-request-bodies.md:L%d-L%d)" % rule["rule_lines"]
+        self.assertTrue(lines[2].startswith("- src/api/users.ts:12: Warning: ") and lines[2].endswith(cite))
+        self.assertTrue(any(match_path(p, "src/api/users.ts") for p in rule["paths"]))
+        self.assertEqual(lines[3], omitted_line(settings, {"min_severity": 2, "disabled_categories": 1,
+                                                           "max_findings_per_file": 0}))
+        self.assertEqual(len(lines), 4)
+

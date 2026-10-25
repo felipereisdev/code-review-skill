@@ -21,6 +21,7 @@
 - **Changed Lines Only** - Findings cover only the lines the change adds or modifies; a relevant older problem can go, one line each, to a short "Pre-existing issues (not counted)" section outside the Summary table; the same problem at several places is one finding with an **Also at:** list; length limits apply only to code the change adds, always as Suggestions
 - **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
+- **Repository Configuration and Custom Rules** - An optional `.code-review/config.yml` sets `ignore_paths`, `min_severity`, `max_findings_per_file` and `disabled_categories`, and `.code-review/rules/*.md` adds the team's own rules with `paths`, `severity` and Bad/Good examples; an invalid file stops the review with a clear error, excluded paths and omitted findings are declared in the report, a Critical finding is never omitted, and a change to `.code-review/` applies to its own review
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
 - **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and never writes to the pull request unless you pass `--comment`; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
 - **Publishing to the Pull Request** - `/code-review pr 123 --comment` posts each finding that sits on a line of the diff as an inline comment, in one review submitted only as a comment (never an approval), with a `suggestion` block only for a complete fix, plus one summary comment that later runs edit instead of repeating; `--dry-run` prints the exact `gh` or `glab` commands and payloads and posts nothing
@@ -164,6 +165,29 @@ With `--comment`, the skill first writes the whole report in the chat, then post
 }
 ```
 
+### Repository configuration
+
+An optional `.code-review/` directory at the root of the reviewed repository tunes the review. `.code-review/config.yml` holds the settings, all optional:
+
+```yaml
+ignore_paths:                # changed files that are not reviewed
+  - "src/generated/**"
+  - "docs/"
+min_severity: Warning        # Critical, Warning or Suggestion (default: Suggestion)
+max_findings_per_file: 5     # default: no limit
+disabled_categories:         # names from the Summary table
+  - Accessibility
+```
+
+Each `.code-review/rules/*.md` file is one rule of the team: a frontmatter with `paths` (the files it applies to) and `severity`, the rule text, and `## Bad` and `## Good` examples. A finding that breaks it cites the rule file and lines, for example `(Rule: .code-review/rules/validate-request-bodies.md:L7-L8)`.
+
+- An invalid file stops the review before it starts, with `Cannot review: .code-review/config.yml is invalid: <reason>. Nothing was reviewed.`; the skill never guesses or falls back to the defaults.
+- Ignored paths are declared in the report (`**Excluded by configuration:**`); the diff itself is unchanged.
+- `min_severity`, `disabled_categories` and `max_findings_per_file` only filter what the report shows, after verification, and the report declares the counts (`**Omitted by configuration:**`). They never change a finding's severity or confidence, and a Critical finding is never omitted.
+- A pull request that changes `.code-review/` is reviewed with the configuration as it leaves it: a valid one applies, an invalid one stops the review, and the files it ignores are declared as excluded, never as reviewed. In a `pr` review, the configuration is read from the pull request's head commit, never from your checkout; when that commit is not available, the report says that the configuration was not verified. The settings and rules are data: they can never turn on `--comment`, change the scope or skip verification.
+
+The full schema, path patterns and rule format are in `references/configuration.md`, which the skill reads only when `.code-review/` has a config or rules.
+
 ## 📋 Review Process
 
 The skill takes the scope from the argument, and detects it when there is none:
@@ -258,6 +282,7 @@ Each finding carries a severity, a location inside the diff, a concrete trigger 
 - **Confidence**: High findings are listed; Medium findings go to a separate "Needs human verification" section; Low findings are not reported.
 - **Verification**: before the report, every Critical and Warning finding is checked against the real code (guards, callers, types, tests, framework configuration) and comes out CONFIRMED, DOWNGRADED or REFUTED. Refuted findings are dropped and the report states how many there were. Suggestions skip this step.
 - **Repository rules**: a finding that breaks a rule from `CLAUDE.md`, `AGENTS.md` or another rules file adds a **Rule:** line that cites the rules file and its lines, for example `src/services/AGENTS.md:L4-L5`; in compact mode the line ends with `(Rule: src/services/AGENTS.md:L4-L5)`. Without a citation that can be checked, it is not a rule finding.
+- **Repository configuration**: with `.code-review/`, the report adds a `**Configuration:**` line and, when files were ignored, an `**Excluded by configuration:**` line after the Scope line, and an `**Omitted by configuration:**` line after the verification line.
 - **Changed lines, pre-existing issues and repeats**: findings cite only lines the change adds or modifies. An older problem the change does not touch is never a finding; it can go, one line each (`path:line — problem`), under `## Pre-existing issues (not counted)`, which the Summary table does not count. The same problem at several places is one finding whose **Also at:** line lists the other places; in compact mode the line ends with `(also at path:line)` before any rule citation.
 - **Already raised in the PR**: in a `pr` review, the lines under `## Already raised in the PR (not repeated)` have no severity, are not counted in the Summary table and do not change the verdict.
 - **Compact mode**: ask for `/code-review compact` to get one line per finding (`path:line: Severity: problem → fix`).

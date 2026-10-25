@@ -981,6 +981,22 @@ make_copy "$work/cfgnofile"
 rm "$work/cfgnofile/references/configuration.md"
 expect_fail "deleting the configuration reference fails" "$work/cfgnofile" "SKILL.md cites missing file: references/configuration.md"
 
+make_copy "$work/readmenoconfig"
+drop_lines "$work/readmenoconfig/README.md" '### Repository configuration'
+expect_fail "a README without the configuration section fails" "$work/readmenoconfig" "README is missing: ### Repository configuration"
+
+make_copy "$work/readmechanged"
+replace_first "$work/readmechanged/README.md" 'an invalid one stops the review' 'an invalid one is skipped'
+expect_fail "a README that skips an invalid changed configuration fails" "$work/readmechanged" "README is missing: an invalid one stops the review"
+
+make_copy "$work/examplenoomitted"
+drop_lines "$work/examplenoomitted/example-output.md" '**Omitted by configuration:** '
+expect_fail "an example without the omitted-findings line fails" "$work/examplenoomitted" "example-output.md is missing: **Omitted by configuration:** "
+
+make_copy "$work/pubnoconfiglines"
+drop_lines "$work/pubnoconfiglines/references/publishing.md" 'copy each one unchanged into the summary'
+expect_fail "a summary comment that drops the configuration lines fails" "$work/pubnoconfiglines" "references/publishing.md is missing: copy each one unchanged into the summary"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}
