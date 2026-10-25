@@ -1480,6 +1480,36 @@ check_api_validation() {
   fi
 }
 
+check_triage_references() {
+  local missing=0 s
+  for s in \
+    '**Ready to merge:** <verdict>' \
+    '**Audit:** <audit>' \
+    'Copy the four triage lines unchanged from the report' \
+    'never in an inline comment' \
+    'the **Secrets** rule applies to them' \
+    'it never approves, requests changes or blocks the pull request'; do
+    if ! grep -qF -- "$s" references/publishing.md; then
+      printf '  references/publishing.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  for s in \
+    'counts the findings before these filters' \
+    'never count an excluded file as reviewed' \
+    'an exclusion is not a limit of the review'; do
+    if ! grep -qF -- "$s" references/configuration.md; then
+      printf '  references/configuration.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if [ "$missing" -eq 0 ]; then
+    pass "the publishing summary carries the triage lines and the audit line, never inline, and the configuration filters never hide a finding from the verdict"
+  else
+    fail "publishing and configuration triage (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -1498,6 +1528,7 @@ check_skill_publishing
 check_skill_configuration
 check_skill_triage_audit
 check_api_validation
+check_triage_references
 check_stack_precedents
 check_readme_counts
 check_example_output

@@ -1109,6 +1109,26 @@ make_copy "$work/apiinjection"
 replace_first "$work/apiinjection/SKILL.md" 'Do not infer that a value bound through the query builder' 'Report a value bound through the query builder as injectable'
 expect_fail "reporting query-builder bindings as injectable fails" "$work/apiinjection" "SKILL.md is missing: Do not infer that a value bound through the query builder"
 
+make_copy "$work/pubnoverdict"
+drop_lines "$work/pubnoverdict/references/publishing.md" '**Ready to merge:** <verdict>'
+expect_fail "a summary comment without the verdict fails" "$work/pubnoverdict" "references/publishing.md is missing: **Ready to merge:** <verdict>"
+
+make_copy "$work/pubverdictinline"
+replace_first "$work/pubverdictinline/references/publishing.md" 'never in an inline comment' 'and in every inline comment'
+expect_fail "a verdict in every inline comment fails" "$work/pubverdictinline" "references/publishing.md is missing: never in an inline comment"
+
+make_copy "$work/pubauditsecrets"
+replace_first "$work/pubauditsecrets/references/publishing.md" 'the **Secrets** rule applies to them' 'they are copied as they are'
+expect_fail "triage and audit lines outside the secrets rule fail" "$work/pubauditsecrets" "references/publishing.md is missing: the **Secrets** rule applies to them"
+
+make_copy "$work/cfgverdictfilters"
+replace_first "$work/cfgverdictfilters/references/configuration.md" 'counts the findings before these filters' 'counts the findings these filters leave'
+expect_fail "a verdict that only sees filtered findings fails" "$work/cfgverdictfilters" "references/configuration.md is missing: counts the findings before these filters"
+
+make_copy "$work/cfgexcludedlimit"
+replace_first "$work/cfgexcludedlimit/references/configuration.md" 'an exclusion is not a limit of the review' 'an exclusion is a material limit'
+expect_fail "an exclusion treated as a material limit fails" "$work/cfgexcludedlimit" "references/configuration.md is missing: an exclusion is not a limit of the review"
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}
