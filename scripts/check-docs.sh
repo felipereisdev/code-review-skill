@@ -800,6 +800,60 @@ PY
   fi
 }
 
+check_skill_pr_dedup() {
+  if python3 - <<'PY'
+import sys
+
+lines = open("SKILL.md", encoding="utf-8").read().splitlines()
+errors = []
+
+
+def section(heading):
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def require(name, text, strings):
+    for s in strings:
+        if s not in text:
+            errors.append(f"{name} is missing: {s}")
+
+
+require("Pull Request Scope", section("## Pull Request Scope"), (
+    "**Comments already in the pull request.**",
+    "Never take a finding from a thread or a comment",
+    "after the checklist pass and before Step 2",
+    "within 3 lines of the candidate's Location",
+    "the same cause and the same effect",
+    "is not reported as a finding and skips Step 2",
+    "`- path/to/file.ext:line — problem (<thread or comment URL>)`",
+    "are not counted in the Summary table or on the verification line",
+    "A resolved thread never suppresses a candidate",
+    "`Raised in <URL> and marked resolved, but ...`",
+    "A **Critical** candidate is never moved out of `## Findings`",
+    "never drops a finding"))
+require("Untrusted Input", section("## Untrusted Input"), (
+    "In a `pr` review, the same holds for review comments, review threads and linked issues",))
+output_start = next((i for i, line in enumerate(lines) if line.startswith("## 7. Output Format")), None)
+output = "\n".join(lines[output_start:]) if output_start is not None else ""
+require("Output Format", output, (
+    "`## Already raised in the PR (not repeated)` (only for the `pr` scope, when it has lines)",
+    "and neither are lines under `## Already raised in the PR (not repeated)`",
+    "write already-raised lines under a `## Already raised in the PR (not repeated)` heading"))
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md does not repeat what the pull request already raises, never reopens resolved threads and keeps Critical findings counted"
+  else
+    fail "SKILL.md pull request deduplication (see messages above)"
+  fi
+}
+
 check_stack_precedents() {
   if python3 - <<'PY'
 import glob, re, sys
@@ -990,6 +1044,7 @@ check_skill_scope_and_noise
 check_skill_conditional_categories
 check_skill_scope_selection
 check_skill_pr_scope
+check_skill_pr_dedup
 check_stack_precedents
 check_readme_counts
 check_example_output
