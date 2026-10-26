@@ -416,6 +416,7 @@ code-review-skill/
 │   ├── configuration.md # Settings and custom rules from .code-review/ (not a review category)
 │   ├── database-migrations.md
 │   ├── dimensions.md    # Dimension review with subagents (not a review category)
+│   ├── fix.md           # Approved fixes and their re-review for --fix (not a review category)
 │   ├── i18n.md
 │   ├── intent.md        # Intent and requirements of every review (not a review category)
 │   ├── json-output.md   # JSON document and merge gate for --format json (not a review category)
