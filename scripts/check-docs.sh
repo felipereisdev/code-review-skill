@@ -2254,6 +2254,131 @@ PY
   fi
 }
 
+check_skill_json_output() {
+  if python3 - <<'PY'
+import re, sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, "scripts")
+PATH = "references/json-output.md"
+AGENT_NAMES = ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot", "mcp__")
+STEP0 = (
+    "The flags `--format` and `--fail-on` are not part of the scope either, and the word after each one is its value",
+    "`--fail-on critical`, which needs `--format json`, adds a merge gate to that document",
+    "When the arguments include `--format json`, read `./references/json-output.md` before you check the other "
+    "arguments",
+    "every reply of this run is the JSON document it describes, a `Cannot review` or `Nothing to review` line included",
+    "`--format needs json`",
+    "`--fail-on needs critical`",
+    "`--fail-on needs --format json`",
+    "`compact cannot be combined with --format json; choose one output format`",
+    "`--comment cannot be combined with --format json; publish from a Markdown review`",
+    "A run with `--format json` is headless too, whoever started it.",
+)
+SKILL_REQUIRED = (
+    "Nor is `./references/json-output.md`: read it only as **Arguments** in Step 0 says, never list it in the "
+    "Summary table, and list it under **Read for context** whenever you read it.",
+    "With `--format json`, the verdict and the gate are fields of the JSON document of `./references/json-output.md`: "
+    "they are text too, and they never change the exit status of your agent.",
+    "Only the delivery changes: in place of the report above, write those facts as one JSON document and nothing else.",
+    "before the filters of `./references/configuration.md`, so a filter never hides a fact that the verdict or the "
+    "gate counts",
+)
+REQUIRED = (
+    "Read this file only when the arguments include `--format json`",
+    "It never runs a second review and never publishes anything.",
+    "Your whole reply is one JSON document: no code fence, no heading, no line before or after it, and never the "
+    "Markdown report as well.",
+    "no comments, no trailing commas, no `NaN` or `Infinity`, and no key twice in one object",
+    "Never write a partial document, and never write a complete one with fewer findings than the review has.",
+    "An empty, cut-off or wrapped reply is not a document, and a consumer must never read it as zero findings.",
+    "| `schema` | always `\"code-review-skill/review\"` |",
+    "| `version` | always `1`, the version of this contract |",
+    "the findings omitted by the configuration included",
+    "A grouped finding is one object",
+    "A Critical finding always has `omitted_by` `null`",
+    "This file is listed on **Read for context** as `skill:references/json-output.md`",
+    "The reviewed, excluded, binary and whole-file unread files add up to `changed`, and no file is counted twice.",
+    "A changed file is never in `read_for_context`.",
+    "4. `\"fail\"` when the verdict row is 2",
+    "5. `\"incomplete\"` when the verdict row is 1 or 3",
+    "The gate counts only the findings under `## Findings`, before the filters",
+    "A Critical finding under `## Needs human verification` is not verified: it never fails the gate",
+    "A review that is not complete never passes the gate, and a run that stopped with `Cannot review` is an error, "
+    "never a pass.",
+    "It never changes the exit status of your agent",
+    "it cannot check that the review read what the document says, or that its evidence and judgments are right",
+)
+# The gate status of each json example of the reference, in order.
+EXAMPLE_GATES = ("fail", "error", "pass")
+errors = []
+
+
+def section(lines, heading):
+    start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+skill = open("SKILL.md", encoding="utf-8").read()
+lines = skill.splitlines()
+step0 = section(lines, "## Step 0 — Scope Selection")
+for s in STEP0:
+    if s not in step0:
+        errors.append(f"Step 0 — Scope Selection is missing: {s}")
+for s in SKILL_REQUIRED:
+    if s not in skill:
+        errors.append(f"SKILL.md is missing: {s}")
+compact = next((i for i, line in enumerate(lines) if line == "### Compact mode"), None)
+json_heading = next((i for i, line in enumerate(lines) if line == "### JSON output"), None)
+if json_heading is None or compact is None or json_heading < compact:
+    errors.append("SKILL.md must have a '### JSON output' section after '### Compact mode'")
+try:
+    ref = open(PATH, encoding="utf-8").read()
+except OSError:
+    ref = ""
+    errors.append(f"{PATH} is missing")
+if ref and not ref.startswith("# JSON Output\n"):
+    errors.append(f"{PATH} must start with '# JSON Output'")
+for s in REQUIRED:
+    if s not in ref:
+        errors.append(f"{PATH} is missing: {s}")
+for name in AGENT_NAMES:
+    if name in ref:
+        errors.append(f"{PATH} names an agent-specific tool: {name}")
+try:
+    import review_gate
+except Exception as exc:
+    review_gate = None
+    errors.append(f"scripts/review_gate.py cannot be imported: {exc}")
+blocks = re.findall(r"^```json\n(.*?)^```$", ref, re.M | re.S)
+if len(blocks) != len(EXAMPLE_GATES):
+    errors.append(f"{PATH} must have {len(EXAMPLE_GATES)} json examples, found {len(blocks)}")
+elif review_gate is not None:
+    for i, (block, gate) in enumerate(zip(blocks, EXAMPLE_GATES), 1):
+        try:
+            doc = review_gate.load(block.encode("utf-8"))
+        except review_gate.GateInputError as exc:
+            errors.append(f"{PATH} example {i}: {exc}")
+            continue
+        problems = review_gate.contract_errors(doc)
+        for problem in problems:
+            errors.append(f"{PATH} example {i}: {problem}")
+        if not problems and doc["gate"]["status"] != gate:
+            errors.append(f"{PATH} example {i} must show the gate {gate}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "references/json-output.md delivers the same review as one valid JSON document with every finding before the filters, and --fail-on critical fails only on verified Critical findings, never passes an incomplete review or an error, and never sets an exit status"
+  else
+    fail "JSON output and merge gate (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -2277,6 +2402,7 @@ check_skill_dimensions
 check_skill_large_diffs
 check_skill_intent
 check_skill_removed_history
+check_skill_json_output
 check_stack_precedents
 check_readme_counts
 check_example_output
