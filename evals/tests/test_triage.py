@@ -20,7 +20,8 @@ TRIAGE = ("Review effort", "Relevant tests", "Look first", "Ready to merge")
 TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified")
 WEIGHTS = ("material", "not material")
 LINE_RES = {
-    "Review effort": re.compile(r"^\*\*Review effort:\*\* ([1-5])/5 — \d+ changed lines? in (\d+) files?; \S.*\.$"),
+    "Review effort": re.compile(r"^\*\*Review effort:\*\* ([1-5])/5 — (at least )?(\d+) changed lines? in (\d+) files?"
+                                r"( \(the total could not be measured: [^()]+\))?; \S.*\.$"),
     "Relevant tests": re.compile(
         r"^\*\*Relevant tests:\*\* (changed|existing|missing|not applicable|not verified) — (\S.*?)\. "
         r"Execution: (not run|ran `[^`]+`(?:, `[^`]+`)*; \S.*|partly ran `[^`]+`(?:, `[^`]+`)*; \S.*; not run: \S.*)\.$"),
@@ -36,6 +37,7 @@ CLEAN_RE = re.compile(r"^\*\*Checked with no findings:\*\* (.+)\.$")
 RAISED_RE = re.compile(r"^\*\*Already raised, not verified:\*\* (.+)\.$")
 RAISED_ENTRY_RE = re.compile(r"`([^`]+)` \(([^)]+)\)")
 EXCLUDED_RE = re.compile(r"^\*\*Excluded by configuration:\*\* (\d+) changed files?\b")
+DIFF_HEADER_RE = re.compile(r"^diff --git a/(.+) b/(.+)$")
 RAISED_HEADING = "## Already raised in the PR (not repeated)"
 
 FINDING_BLOCKS = ("### Security — Critical", "### Potential Bugs — Warning", "### Performance — Warning")
@@ -131,6 +133,25 @@ def effort_level(changed_lines, risk_areas):
     else:
         base = 5
     return min(base + min(risk_areas, 2), 5)
+
+
+def diff_line_count(diff, excluded=()):
+    """Measured stats of a unified diff: (added plus removed lines, changed files) without the `excluded` paths.
+    Only lines after a file's first @@ line count, so its --- and +++ headers never do; a binary file counts as a
+    changed file with no lines."""
+    lines = files = 0
+    path, in_hunk = None, False
+    for line in diff.split("\n"):
+        header = DIFF_HEADER_RE.match(line)
+        if header:
+            path, in_hunk = header.group(2), False
+            files += path not in excluded
+        elif path is not None and path not in excluded:
+            if line.startswith("@@"):
+                in_hunk = True
+            elif in_hunk and line[:1] in ("+", "-"):
+                lines += 1
+    return lines, files
 
 
 def find_line(lines, prefix):
@@ -267,7 +288,7 @@ def raised_locations(lines):
     return locations
 
 
-def _check_files(audit, excluded):
+def _check_files(audit, excluded, excluded_paths=()):
     reviewed, changed, paths = audit["reviewed"], audit["changed"], audit["paths"]
     context = audit["context"]
     errors = []
@@ -287,6 +308,14 @@ def _check_files(audit, excluded):
         m = re.search(r"`([^`]+)`", what)
         if m and m.group(1) in paths:
             errors.append(f"Files reviewed lists `{m.group(1)}`, which the Audit also lists as {tag}")
+    changed_paths = set(paths) | set(excluded_paths)
+    for what, _tag, _weight, _detail in unread + binary:
+        changed_paths.update(re.findall(r"`([^`]+)`", what))
+    for path in context:
+        if path in changed_paths:
+            errors.append(f"Read for context names `{path}`, which is a changed file")
+        if path == "skill:SKILL.md":
+            errors.append("Read for context names `skill:SKILL.md`, the instructions of the review")
     u, b = len(unread), len(binary)
     if reviewed + excluded + b + u != changed:
         errors.append(f"Files reviewed: {reviewed} reviewed, {excluded} excluded, {b} binary and {u} not read "
@@ -329,7 +358,7 @@ def _check_raised(audit, is_pr, lines):
     return errors
 
 
-def _check_triage(triage, audit, excluded, tests_not_verified):
+def _check_triage(triage, audit, excluded, tests_not_verified, changed_lines=None):
     errors = []
     paths, reviewed = audit["paths"], audit["reviewed"]
     look = triage["Look first"]
@@ -342,9 +371,24 @@ def _check_triage(triage, audit, excluded, tests_not_verified):
                 errors.append(f"Look first names {path}, which is not a reviewed file")
 
     effort = LINE_RES["Review effort"].match(triage["Review effort"])
-    if effort and int(effort.group(2)) != audit["changed"] - excluded:
-        errors.append(f"Review effort counts {effort.group(2)} files, but {audit['changed'] - excluded} "
+    if effort and int(effort.group(4)) != audit["changed"] - excluded:
+        errors.append(f"Review effort counts {effort.group(4)} files, but {audit['changed'] - excluded} "
                       "changed files are not excluded by configuration")
+    if effort:
+        level, at_least, counted, why = int(effort.group(1)), effort.group(2), int(effort.group(3)), effort.group(5)
+        if at_least and not why:
+            errors.append(f"Review effort counts at least {counted} changed lines without saying why the total "
+                          "could not be measured")
+        if why and not at_least:
+            errors.append(f"Review effort counts exactly {counted} changed lines, but says the total could not "
+                          "be measured")
+        if at_least and level != 5:
+            errors.append(f"Review effort counts at least {counted} changed lines, so its level must be 5/5")
+        if changed_lines is not None and at_least:
+            errors.append(f"Review effort counts at least {counted} changed lines, but the diff has {changed_lines}, "
+                          "a complete measured total")
+        if changed_lines is not None and not at_least and counted != changed_lines:
+            errors.append(f"Review effort counts {counted} changed lines, but the diff has {changed_lines}")
 
     relevant = LINE_RES["Relevant tests"].match(triage["Relevant tests"])
     if relevant:
@@ -356,7 +400,7 @@ def _check_triage(triage, audit, excluded, tests_not_verified):
     return errors
 
 
-def check_report(text, *, omitted_warning=0, omitted_needs=0):
+def check_report(text, *, omitted_warning=0, omitted_needs=0, changed_lines=None):
     """Return the consistency errors of a canonical report; [] when its triage, Audit and findings agree."""
     errors = []
     lines = text.split("\n")
@@ -387,11 +431,11 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0):
     if relevant and relevant.group(3) == "not run" and RESULT_RE.search(relevant.group(2)):
         errors.append("**Relevant tests:** claims a test result, but Execution is not run")
 
-    excluded = 0
+    excluded, excluded_paths = 0, []
     for line in lines:
         m = EXCLUDED_RE.match(line)
         if m:
-            excluded = int(m.group(1))
+            excluded, excluded_paths = int(m.group(1)), re.findall(r"`([^`]+)`", line)
             break
 
     audit_at = lines.index("## Audit") if "## Audit" in lines else None
@@ -412,10 +456,10 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0):
     items = audit["items"]
     tests_not_verified = any(tag == "tests not verified" for _what, tag, _weight, _detail in items)
 
-    errors += _check_files(audit, excluded)
+    errors += _check_files(audit, excluded, excluded_paths)
     errors += _check_clean(audit, finding_categories, tests_not_verified)
     errors += _check_raised(audit, is_pr, lines)
-    errors += _check_triage(triage, audit, excluded, tests_not_verified)
+    errors += _check_triage(triage, audit, excluded, tests_not_verified, changed_lines)
 
     want = verdict_line(
         reviewed=audit["reviewed"], critical=critical, warning=warning, needs=needs_count,
@@ -929,6 +973,130 @@ class HeadlineTests(Base):
     def test_two_headlines_are_rejected(self):
         text = after_first_bullet(with_verdict(clean_report(FIXTURE)), HEADLINE_PASSED)
         self.assertError(headline_errors(after_first_bullet(text, HEADLINE_PASSED)), "more than one headline")
+
+
+SAMPLE_DIFF = "\n".join([
+    "diff --git a/src/a.sql b/src/a.sql",
+    "index 1111111..2222222 100644",
+    "--- a/src/a.sql",
+    "+++ b/src/a.sql",
+    "@@ -1,2 +1,3 @@",
+    " SELECT 1;",
+    "--- old comment",
+    "+-- new comment",
+    "+++ counter",
+    "diff --git a/assets/logo.png b/assets/logo.png",
+    "index 3333333..4444444 100644",
+    "Binary files a/assets/logo.png and b/assets/logo.png differ",
+    "diff --git a/src/generated/client.ts b/src/generated/client.ts",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/src/generated/client.ts",
+    "@@ -0,0 +1,2 @@",
+    "+export const a = 1;",
+    "+export const b = 2;",
+    "",
+])
+CONTEXT_LINE = "**Read for context:** 2 files: `package.json`, `tests/orders.test.js`."
+EXCLUDED_SCOPE = ("**Scope:** staged (git diff --cached)\n**Excluded by configuration:** 2 changed files match "
+                  "ignore_paths and were not reviewed: `docs/a.md`, `docs/b.md`.\n")
+UNMEASURED = " (the total could not be measured: the diff output was cut off and no source counts the whole diff)"
+
+
+class ConsistencyProbeTests(Base):
+    """Synthetic probes for four contradiction shapes (headline, context, effort count), each with its consistent counterpart."""
+
+    def test_s1_headline_above_a_listed_warning_is_rejected(self):
+        text = with_verdict(drop_block(FIXTURE, FINDING_BLOCKS[0]), warning=1)
+        self.assertEqual(check_report(text), [])
+        bad = after_first_bullet(text, HEADLINE_INCOMPLETE + "\n\nThat headline is wrong for this report.")
+        self.assertError(check_report(bad), "contradicts the findings listed in the report")
+        self.assertError(headline_errors(compact_form(bad)), "contradicts the findings listed in the report")
+
+    def test_incomplete_headline_without_main_findings_stays_valid(self):
+        text = drop_block(drop_block(FIXTURE, FINDING_BLOCKS[0]), FINDING_BLOCKS[1])
+        text = after_first_bullet(with_verdict(drop_heading(text, "## Findings"), needs=1), HEADLINE_INCOMPLETE)
+        self.assertEqual(check_report(text), [])
+
+    def test_s2_context_count_must_match_its_paths(self):
+        bad = replace_once(FIXTURE, CONTEXT_LINE, CONTEXT_LINE.replace("2 files:", "3 files:"))
+        self.assertError(check_report(bad), "Read for context lists 2 paths but counts 3")
+
+    def test_s2_changed_file_is_never_context(self):
+        bad = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, `src/orders.js`, "
+                           "`tests/orders.test.js`.")
+        self.assertError(check_report(bad), "Read for context names `src/orders.js`, which is a changed file")
+        text = replace_once(FIXTURE, "**Scope:** staged (git diff --cached)\n", EXCLUDED_SCOPE)
+        text = with_verdict(replace_once(text, "**Files reviewed:** 2 of 2", "**Files reviewed:** 2 of 4"),
+                            critical=1, excluded=2)
+        self.assertEqual(check_report(text), [])
+        bad = replace_once(text, CONTEXT_LINE, "**Read for context:** 3 files: `docs/a.md`, `package.json`, "
+                           "`tests/orders.test.js`.")
+        self.assertError(check_report(bad), "Read for context names `docs/a.md`, which is a changed file")
+
+    def test_same_relative_path_in_repo_and_skill_is_two_files(self):
+        text = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 4 files: `package.json`, "
+                            "`references/configuration.md`, `skill:references/configuration.md`, `tests/orders.test.js`.")
+        self.assertEqual(check_report(text), [])
+        dup = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 2 files: `skill:stacks/node.md`, "
+                           "`skill:stacks/node.md`.")
+        self.assertError(check_report(dup), "Read for context paths must be unique and in alphabetical order")
+
+    def test_context_identities(self):
+        text = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 4 files: `/home/dev/.config/git/attributes`, "
+                            "`SKILL.md`, `package.json`, `tests/orders.test.js`.")
+        self.assertEqual(check_report(text), [])
+        active = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, `skill:SKILL.md`, "
+                              "`tests/orders.test.js`.")
+        self.assertError(check_report(active), "Read for context names `skill:SKILL.md`, the instructions of the review")
+        changed = replace_once(FIXTURE, "**Files reviewed:** 2 of 2 changed files: `src/orders.js`",
+                               "**Files reviewed:** 3 of 3 changed files: `SKILL.md`, `src/orders.js`")
+        changed = set_line(changed, "Review effort", "**Review effort:** 3/5 — 120 changed lines in 3 files; payments.")
+        own = replace_once(changed, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, "
+                           "`skill:stacks/node.md`, `tests/orders.test.js`.")
+        self.assertEqual(check_report(own), [])
+        bad = replace_once(changed, CONTEXT_LINE, "**Read for context:** 3 files: `SKILL.md`, `package.json`, "
+                           "`tests/orders.test.js`.")
+        self.assertError(check_report(bad), "Read for context names `SKILL.md`, which is a changed file")
+
+    def test_context_line_forms(self):
+        self.assertEqual(check_report(replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** none.")), [])
+        for bad in ("**Read for context:** 0 files: none.",
+                    CONTEXT_LINE[:-1] + ". I also read the skill files."):
+            with self.subTest(line=bad):
+                self.assertError(check_report(replace_once(FIXTURE, CONTEXT_LINE, bad)),
+                                 "**Read for context:** line is malformed")
+
+    def test_s3_material_limit_with_critical_needs_the_suffix(self):
+        text = with_items(FIXTURE, MATERIAL_CONTEXT)
+        self.assertError(check_report(with_verdict(text, critical=1)), "Ready to merge line is")
+        self.assertEqual(check_report(with_verdict(text, critical=1, material=[CTX])), [])
+
+    def test_s4_effort_count_must_match_the_diff(self):
+        self.assertEqual(check_report(FIXTURE), [])
+        self.assertEqual(check_report(FIXTURE, changed_lines=120), [])
+        exact = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — 711 changed lines in 2 files; payments.")
+        self.assertEqual(check_report(exact, changed_lines=711), [])
+        bad = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — 668 changed lines in 2 files; payments.")
+        self.assertError(check_report(bad, changed_lines=711), "Review effort counts 668 changed lines, but the diff has 711")
+
+    def test_lower_bound_only_when_the_total_is_not_measured(self):
+        bound = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — at least 600 changed lines in 2 files"
+                         + UNMEASURED + "; payments.")
+        self.assertEqual(check_report(bound), [])
+        self.assertError(check_report(bound, changed_lines=711),
+                         "Review effort counts at least 600 changed lines, but the diff has 711, a complete measured total")
+        self.assertError(check_report(bound.replace("5/5 — at least", "3/5 — at least")),
+                         "Review effort counts at least 600 changed lines, so its level must be 5/5")
+        self.assertError(check_report(bound.replace(UNMEASURED, "")),
+                         "Review effort counts at least 600 changed lines without saying why the total could not be measured")
+        self.assertError(check_report(bound.replace("at least 600", "600")),
+                         "Review effort counts exactly 600 changed lines, but says the total could not be measured")
+
+    def test_diff_line_count(self):
+        self.assertEqual(diff_line_count(SAMPLE_DIFF), (5, 3))
+        self.assertEqual(diff_line_count(SAMPLE_DIFF, excluded=("src/generated/client.ts",)), (3, 2))
+        self.assertEqual(diff_line_count(""), (0, 0))
 
 
 class MatrixTests(Base):
