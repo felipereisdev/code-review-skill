@@ -387,6 +387,12 @@ Rules in `.code-review/rules/` at the repository root are repository rules too, 
 
 ---
 
+## Step 1.7 — Dimension Review
+
+Decide here how to run the checklist pass: sections 1 to 5 and the conditional categories. When your agent can start subagents, read `./references/dimensions.md`, using the path relative to this skill file's directory, and follow it: up to four subagents review the bugs, security, repository rules and tests dimensions, each with only the checklist of its dimension, and you keep the other categories, consolidate their candidates, and run the comparison with the comments already in a pull request, Step 2, Step 3 and any publishing yourself. When your agent cannot start subagents, never read `./references/dimensions.md`, and run the single pass that this file describes. Never ask the user for subagents, a tool or another mode, and never install one for this step.
+
+---
+
 ## 1. Security
 
 - **Injection vulnerabilities**: SQL injection, command injection, XSS, LDAP injection
@@ -500,7 +506,7 @@ The checklists below apply only to some changes, so each one lives in its own fi
 - **Internationalization (i18n)** — `./references/i18n.md`: load when the project supports multiple languages or locales (translation files or an i18n library) and the diff adds or changes user-facing text, date, time, number or currency formatting, locale handling, or UI layout or styles that could break right-to-left (RTL) layouts.
 - **Privacy & Data Compliance** — `./references/privacy.md`: load when the diff collects, stores, logs, exports or shares user data or personal data (PII), such as names, emails, addresses, documents, payment or health data, or changes how such data is stored, retained or deleted.
 
-One more file under `references/`, `./references/publishing.md`, is not a review category: read it only as **Publishing** under Pull Request Scope says, and never list it in the Summary table; when you read it, list it under **Read for context** like any other file of this skill. Neither is `./references/configuration.md`: read it only as **Repository configuration** in Step 0 says, and never list it in the Summary table.
+One more file under `references/`, `./references/publishing.md`, is not a review category: read it only as **Publishing** under Pull Request Scope says, and never list it in the Summary table; when you read it, list it under **Read for context** like any other file of this skill. Neither is `./references/configuration.md`: read it only as **Repository configuration** in Step 0 says, and never list it in the Summary table. Nor is `./references/dimensions.md`: read it only as Step 1.7 says, never list it in the Summary table, and list it under **Read for context** whenever you read it.
 
 ---
 
@@ -634,11 +640,12 @@ Never say that a test passes or fails unless you ran it and saw the result, and 
   - The SKILL.md you are following is the instructions of this review, not context: never list it, under `skill:<path>` or any other identity, and never take it for a repository file with the same name.
   - Any other file outside the repository: its absolute path.
   - Instructions that reached you without a file you opened, such as text your agent loaded for you, are not listed, and you never invent a path for them.
+  - In a dimension review (Step 1.7), a file that a subagent reports having seen counts as seen for this review, under the same identities, and a file that you and a subagent both saw is listed once.
   - A directory listing or a search that shows only file names reads no file. A search result that shows lines of a file is a partial read of that file: list each file outside the diff whose lines it showed, and not the files the search only scanned.
   - A changed file is never on this line, even when you open it again, read its old version or see its lines in a search result: it is one changed file, counted once under **Files reviewed** or among the excluded, binary or unread files, and its changed lines you did not read stay `not read` items.
   - Reading a file for context never makes its unchanged lines reviewable: findings still cite only changed lines (see Changed Lines and Grouping).
 - List every path on both lines, however many there are. Each line ends with its last path and a period: no note, annotation or sentence after it. Only compact mode and the summary comment shorten the Audit, to one line.
-- **Checked with no findings**: the categories of the Summary table that you applied (not N/A) and that have no finding under `## Findings` or `## Needs human verification` before the filters and no Warning candidate already raised, in the table's order, or `none`. Leave out Tests/Coverage when the relevant tests are `not verified`. A category on this line had no finding in what you reviewed; it says nothing about the limits under **Not verified**.
+- **Checked with no findings**: the categories of the Summary table that you applied (not N/A) and that have no finding under `## Findings` or `## Needs human verification` before the filters and no Warning candidate already raised, in the table's order, or `none`. Leave out Tests/Coverage when the relevant tests are `not verified`. Leave out the categories of a dimension that a `dimension not reviewed` item names. A category on this line had no finding in what you reviewed; it says nothing about the limits under **Not verified**.
 - **Already raised, not verified**: only in a `pr` review, and always there. List each Warning candidate that an open thread already raised, at the place of its line under `## Already raised in the PR (not repeated)`, with its category, or write `none`. They are candidates pending verification, not findings, and they stay out of the Summary table and the verification line.
 - **Not verified**: one item per limit (see **Limits**), or `**Not verified:** nothing.` when there is none. Each item has one tag:
   - `not read`: changed lines you could not read, for example because the diff output was cut off or the file could not be opened. `<what>` is `` `<path>` lines <a>-<b> `` for part of a reviewed file, or `` `<path>` (whole file) `` for a changed file you could not read at all, which is not reviewed.
@@ -646,6 +653,7 @@ Never say that a test passes or fails unless you ran it and saw the result, and 
   - `context not read`: code outside the diff that you could not read, such as in a `pr` review whose head commit is not in this repository.
   - `API not validated`: an API or version claim you could not check (see **API Validation** in Step 1).
   - `tests not verified`: the relevant tests could not be checked; `<what>` is `relevant tests`.
+  - `dimension not reviewed`: only in a dimension review (Step 1.7), when a subagent failed and you could not complete its dimension yourself; `<what>` is `bugs dimension`, `security dimension` or `repository rules dimension`, as `./references/dimensions.md` says.
 - Never claim coverage you did not have: unread lines, files excluded by configuration, binary files, API behavior you did not validate and tests you did not run are never called reviewed, clean or passing.
 
 **Reconcile before you deliver.** The report is written from the top, but its headline and its verdict depend on facts that Step 2 and this step settle at the end.

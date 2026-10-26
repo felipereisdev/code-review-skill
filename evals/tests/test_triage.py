@@ -17,7 +17,7 @@ CATEGORIES = ("Security", "Performance", "Tests/Coverage", "Architecture", "Code
               "Accessibility", "Observability", "API Design", "Resilience", "DB Migrations", "Concurrency", "i18n",
               "Privacy/Compliance", "Architecture Patterns", "Stack-Specific")
 TRIAGE = ("Review effort", "Relevant tests", "Look first", "Ready to merge")
-TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified")
+TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified", "dimension not reviewed")
 WEIGHTS = ("material", "not material")
 SIZES = ("up to 50", "51 to 200", "201 to 500", "501 to 1000", "more than 1000")
 RISK_AREAS = ("authentication", "authorization", "payments", "personal data", "database schema or migrations",
@@ -37,7 +37,7 @@ LINE_RES = {
     "Ready to merge": re.compile(r"^\*\*Ready to merge:\*\* (?:Yes|No|With fixes) — \S.*\.$"),
 }
 RESULT_RE = re.compile(r"(?i)(?:\b(?:tests?|suites?|specs?)\b|`[^`]*(?:test|spec)[^`]*`)\s+(?:all\s+)?(?:pass(?:es|ed)?|fail(?:s|ed)?)\b")
-ITEM_RE = re.compile(r"^- (.+?) — (not read|binary|context not read|API not validated|tests not verified), (material|not material): (\S.*)$")
+ITEM_RE = re.compile(r"^- (.+?) — (not read|binary|context not read|API not validated|tests not verified|dimension not reviewed), (material|not material): (\S.*)$")
 COMPACT_AUDIT = re.compile(r"^\*\*Audit:\*\* (\d+) of (\d+) changed files? reviewed; (\d+) files? read for context; no findings in (.+?); (?:already raised, not verified: (\d+) Warning candidates?; )?not verified: (.+)\.$")
 FILES_RE = re.compile(r"^\*\*Files reviewed:\*\* (\d+) of (\d+) changed files?(?:: (.+))?\.$")
 CONTEXT_RE = re.compile(r"^\*\*Read for context:\*\* (?:none|(\d+) files?: (.+)|(`.+))\.$")
@@ -81,6 +81,8 @@ def read(name):
 FIXTURE = read("fixtures/triage/report.md")
 EXAMPLE = read(os.path.join("..", "..", "example-output.md"))
 SKILL = read(os.path.join("..", "..", "SKILL.md"))
+DIMENSIONS = read(os.path.join("..", "..", "references", "dimensions.md"))
+DIMENSION_ITEM_RE = re.compile(r"^(bugs|security|repository rules) dimension$")
 REPORT_END = "The report ends with the Audit above."
 CRITICAL_VERDICT = ("**Ready to merge:** No — 2 Critical findings must be fixed before merging. "
                     "Not fully reviewed: see the Audit.")
@@ -92,6 +94,21 @@ def example_full():
 
 def plural(n, word):
     return f"{n} {word}" + ("s" if n != 1 else "")
+
+
+def dimension_owners(text):
+    """{owner: categories} from the Dimensions table of references/dimensions.md; the repository rules row owns none."""
+    owners, in_table = {}, False
+    for line in text.split("\n"):
+        if line == "## Dimensions":
+            in_table = True
+        elif line.startswith("## "):
+            in_table = False
+        if not in_table or not line.startswith("| ") or line.startswith("| Owner ") or line.startswith("| ---"):
+            continue
+        owner, _checklist, cats = [c.strip() for c in line.strip().strip("|").split("|")]
+        owners[owner] = () if cats.startswith("none of its own") else tuple(cats.split(", "))
+    return owners
 
 
 def verdict_line(*, reviewed=1, critical=0, warning=0, needs=0, raised=0, material=(),
@@ -387,7 +404,7 @@ def _check_audit_lines(text):
     return errors
 
 
-def _check_clean(audit, finding_categories, tests_not_verified):
+def _check_clean(audit, finding_categories, tests_not_verified, unreviewed=frozenset()):
     raised_categories = {cat for _loc, cat in audit["raised"] or []}
     errors = []
     for cat in audit["clean"]:
@@ -400,6 +417,8 @@ def _check_clean(audit, finding_categories, tests_not_verified):
             errors.append(f"Checked with no findings names {cat}, which has a Warning candidate already raised")
         if cat == "Tests/Coverage" and tests_not_verified:
             errors.append("Checked with no findings names Tests/Coverage, but the relevant tests were not verified")
+        if cat in unreviewed:
+            errors.append(f"Checked with no findings names {cat}, but its dimension was not reviewed")
     order = [CATEGORIES.index(cat) for cat in audit["clean"] if cat in CATEGORIES]
     if order != sorted(order):
         errors.append("Checked with no findings must follow the Summary table order")
@@ -548,9 +567,19 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0, changed_lines=None
     is_pr = scope is not None and lines[scope].startswith("**Scope:** pr ")
     items = audit["items"]
     tests_not_verified = any(tag == "tests not verified" for _what, tag, _weight, _detail in items)
+    unreviewed, owners = set(), dimension_owners(DIMENSIONS)
+    for what, tag, _weight, _detail in items:
+        if tag != "dimension not reviewed":
+            continue
+        m = DIMENSION_ITEM_RE.match(what)
+        if m is None:
+            errors.append(f"dimension not reviewed names {what!r}; it must be the bugs, security or repository "
+                          "rules dimension")
+        else:
+            unreviewed.update(owners[m.group(1)])
 
     errors += _check_files(audit, excluded, excluded_paths)
-    errors += _check_clean(audit, finding_categories, tests_not_verified)
+    errors += _check_clean(audit, finding_categories, tests_not_verified, unreviewed)
     errors += _check_raised(audit, is_pr, lines)
     errors += _check_triage(triage, audit, excluded, tests_not_verified)
 
@@ -1514,6 +1543,47 @@ class ToolTests(Base):
     def test_eval_runner_keeps_mcp_off(self):
         self.assertIn("--strict-mcp-config", run.DEFAULT_AGENT_CMD)
         self.assertIn("--safe-mode", run.DEFAULT_AGENT_CMD)
+
+
+SECURITY_DIM = ("security dimension", "dimension not reviewed")
+SECURITY_DIM_ITEM = ("- security dimension — dimension not reviewed, material: the security subagent stopped without a "
+                     "result, and the changed query in `src/orders.js` was not checked for injection.")
+
+
+class DimensionTests(Base):
+    """The dimension review limit of references/dimensions.md, as Step 3 of SKILL.md lists it."""
+
+    def test_dimension_table_owns_every_category_once(self):
+        owners = dimension_owners(DIMENSIONS)
+        self.assertEqual(list(owners), ["bugs", "security", "repository rules", "tests", "coordinator"])
+        self.assertEqual(owners["repository rules"], ())
+        self.assertEqual(sorted(cat for cats in owners.values() for cat in cats), sorted(CATEGORIES))
+
+    def test_skill_lists_every_audit_tag(self):
+        for tag in TAGS:
+            self.assertIn(f"  - `{tag}`: ", SKILL)
+
+    def test_material_dimension_item_blocks(self):
+        text = with_items(no_findings(FIXTURE), SECURITY_DIM_ITEM)
+        self.assertEqual(check_report(with_verdict(text, material=[SECURITY_DIM])), [])
+        self.assertError(check_report(with_verdict(text)), "Ready to merge line is")
+
+    def test_nonmaterial_dimension_item_does_not_block(self):
+        text = with_items(no_findings(FIXTURE), "- repository rules dimension — dimension not reviewed, not material: the "
+                          "subagent stopped without a result, and the only changed lines it would check are comments.")
+        self.assertEqual(check_report(with_verdict(text)), [])
+
+    def test_unreviewed_dimension_category_is_not_clean(self):
+        text = with_items(no_findings(FIXTURE), SECURITY_DIM_ITEM)
+        text = set_line(text, "Checked with no findings", "**Checked with no findings:** Security, Architecture, "
+                        "Code & File Size.")
+        self.assertError(check_report(with_verdict(text, material=[SECURITY_DIM])),
+                         "names Security, but its dimension was not reviewed")
+
+    def test_dimension_item_must_name_a_subagent_dimension(self):
+        text = with_items(no_findings(FIXTURE), "- tests dimension — dimension not reviewed, not material: the "
+                          "subagent stopped without a result.")
+        self.assertError(check_report(with_verdict(text)), "it must be the bugs, security or repository rules dimension")
 
 
 if __name__ == "__main__":
