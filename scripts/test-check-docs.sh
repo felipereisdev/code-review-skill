@@ -1516,6 +1516,174 @@ replace_first "$work/dimprovisional/references/dimensions.md" 'never keeping a s
 expect_fail "keeping a subagent severity without judging it fails" "$work/dimprovisional" "references/dimensions.md is missing: never keeping a severity because a subagent gave it"
 # End of dimension review tests.
 
+# Large diff strategy (references/large-diffs.md, SKILL.md Step 0 and references/dimensions.md).
+make_copy "$work/lgthreshold"
+replace_first "$work/lgthreshold/SKILL.md" 'When the total is more than 500 changed lines' 'When the total is more than 800 changed lines'
+expect_fail "a large diff threshold other than 500 changed lines fails" "$work/lgthreshold" "SKILL.md Step 0 is missing: When the total is more than 500 changed lines, or no source measures the whole diff, read \`./references/large-diffs.md\`"
+
+make_copy "$work/lgsmall"
+replace_first "$work/lgsmall/SKILL.md" 'With 500 changed lines or fewer, never read it' 'With 500 changed lines or fewer, read it too'
+expect_fail "applying the large diff strategy to a small diff fails" "$work/lgsmall" "SKILL.md Step 0 is missing: With 500 changed lines or fewer, never read it"
+
+make_copy "$work/lgorder"
+grep -F '**Large diffs.**' "$work/lgorder/SKILL.md" > "$work/lgorder.par"
+drop_lines "$work/lgorder/SKILL.md" '**Large diffs.**'
+cat "$work/lgorder.par" >> "$work/lgorder/SKILL.md"
+expect_fail "deciding the large diff strategy outside Step 0 fails" "$work/lgorder" "'**Large diffs.**' must come after '**Repository configuration.**' and before '**Scope line.**' in Step 0"
+
+make_copy "$work/lgtag"
+replace_first "$work/lgtag/SKILL.md" ', or that a review of a large diff skipped or left unread, as `./references/large-diffs.md` says' ''
+expect_fail "a not read tag that leaves out large diff skips fails" "$work/lgtag" "SKILL.md is missing: or that a review of a large diff skipped or left unread"
+
+make_copy "$work/lgtotals"
+replace_first "$work/lgtotals/references/large-diffs.md" 'never the part you reviewed' 'or the part you reviewed'
+expect_fail "counting only the reviewed part of a large diff fails" "$work/lgtotals" "references/large-diffs.md is missing: never the part you reviewed"
+
+make_copy "$work/lgrun"
+replace_first "$work/lgrun/references/large-diffs.md" 'never by running a script, a build or a generator' 'or by running the generator'
+expect_fail "running a generator to find generated files fails" "$work/lgrun" "references/large-diffs.md is missing: never by running a script, a build or a generator"
+
+make_copy "$work/lgmarker"
+replace_first "$work/lgmarker/references/large-diffs.md" ' A marker never makes a file `not material` by itself.' ''
+expect_fail "trusting a generated marker for materiality fails" "$work/lgmarker" "references/large-diffs.md is missing: A marker never makes a file \`not material\` by itself."
+
+make_copy "$work/lgaddedmarker"
+replace_first "$work/lgaddedmarker/references/large-diffs.md" ', and that line is not one that the diff adds to a file that existed before the change' ''
+expect_fail "trusting a generated marker that the diff adds fails" "$work/lgaddedmarker" "references/large-diffs.md is missing: and that line is not one that the diff adds to a file that existed before the change"
+
+make_copy "$work/lglockmaterial"
+replace_first "$work/lglockmaterial/references/large-diffs.md" 'A skipped file is `material`: its changed lines were not read.' 'A skipped file is `not material` when its manifest changes.'
+expect_fail "a skipped file that is not material by default fails" "$work/lglockmaterial" "references/large-diffs.md is missing: A skipped file is \`material\`: its changed lines were not read."
+
+make_copy "$work/lgmanifest"
+replace_first "$work/lgmanifest/references/large-diffs.md" '`package-lock.json`, ' '`package.json`, `package-lock.json`, '
+expect_fail "listing a manifest as a lockfile fails" "$work/lgmanifest" "references/large-diffs.md: a manifest is listed as a lockfile: package.json"
+
+make_copy "$work/lglockmissing"
+replace_first "$work/lglockmissing/references/large-diffs.md" '`go.sum`, ' ''
+expect_fail "dropping a common lockfile from the list fails" "$work/lglockmissing" "references/large-diffs.md: Lockfiles is missing: go.sum"
+
+make_copy "$work/lgallskipped"
+replace_first "$work/lgallskipped/references/large-diffs.md" 'skip none of them: review them in batches like any other file' 'skip them all'
+expect_fail "skipping every reviewable file of a large diff fails" "$work/lgallskipped" "references/large-diffs.md is missing: When every changed file that is not excluded and not binary is a lockfile or a generated file, skip none of them"
+
+make_copy "$work/lgsplit"
+replace_first "$work/lgsplit/references/large-diffs.md" ' Never split a file or a hunk between batches.' ''
+expect_fail "splitting a hunk between batches fails" "$work/lgsplit" "references/large-diffs.md is missing: Never split a file or a hunk between batches."
+
+make_copy "$work/lgpathspec"
+replace_first "$work/lgpathspec/references/large-diffs.md" 'Never run the diff again with paths, pathspecs or exclusions' 'Run the diff again with the paths of each batch'
+expect_fail "rerunning the diff per batch fails" "$work/lgpathspec" "references/large-diffs.md is missing: Never run the diff again with paths, pathspecs or exclusions"
+
+make_copy "$work/lgcontext"
+replace_first "$work/lgcontext/references/large-diffs.md" 'Reading a changed file of another batch this way does not review it' 'Reading a changed file of another batch this way reviews it'
+expect_fail "counting a cross-module read as review fails" "$work/lgcontext" "references/large-diffs.md is missing: Reading a changed file of another batch this way does not review it"
+
+make_copy "$work/lgcritical"
+replace_first "$work/lgcritical/references/large-diffs.md" 'a candidate that you find in a batch is never dropped because a later batch is not reviewed' 'a candidate of a batch may be dropped when a later batch is not reviewed'
+expect_fail "dropping a batch candidate fails" "$work/lgcritical" "references/large-diffs.md is missing: a candidate that you find in a batch is never dropped because a later batch is not reviewed"
+
+make_copy "$work/lgonce"
+replace_first "$work/lgonce/references/large-diffs.md" 'do each of these once, for all batches together, never per batch' 'do each of these for each batch'
+expect_fail "verifying or publishing per batch fails" "$work/lgonce" "references/large-diffs.md is missing: do each of these once, for all batches together, never per batch"
+
+make_copy "$work/lgremainder"
+replace_first "$work/lgremainder/references/large-diffs.md" 'stop starting new batches and record what is left' 'stop and report only the batches you reviewed'
+expect_fail "leaving unread batches undeclared fails" "$work/lgremainder" "references/large-diffs.md is missing: stop starting new batches and record what is left"
+
+make_copy "$work/lgclean"
+replace_first "$work/lgclean/references/large-diffs.md" 'Never call a file, a batch or a category reviewed or clean because the risk order put it last.' ''
+expect_fail "calling a deprioritized file clean fails" "$work/lgclean" "references/large-diffs.md is missing: Never call a file, a batch or a category reviewed or clean because the risk order put it last."
+
+make_copy "$work/lgexcluded"
+replace_first "$work/lgexcluded/references/large-diffs.md" 'a file that this strategy skips or leaves unread is an Audit item and never on that line' 'a file that this strategy skips goes on that line too'
+expect_fail "mixing strategy skips with configuration exclusions fails" "$work/lgexcluded" "references/large-diffs.md is missing: a file that this strategy skips or leaves unread is an Audit item and never on that line"
+
+make_copy "$work/lgperbatch"
+replace_first "$work/lgperbatch/references/dimensions.md" 'never one job per batch' 'one job per batch'
+expect_fail "one dimension job per batch fails" "$work/lgperbatch" "references/dimensions.md is missing: never one job per batch"
+
+make_copy "$work/lgskipopen"
+replace_first "$work/lgskipopen/references/dimensions.md" 'the skipped paths, which it must not open' 'the skipped paths'
+expect_fail "letting a subagent open skipped files fails" "$work/lgskipopen" "references/dimensions.md is missing: the skipped paths, which it must not open"
+
+make_copy "$work/lgtool"
+printf 'Run the Task tool for each batch.\n' >> "$work/lgtool/references/large-diffs.md"
+expect_fail "naming an agent-specific tool in the large diff strategy fails" "$work/lgtool" "references/large-diffs.md or the Large diffs paragraph names an agent-specific tool: Task tool"
+
+make_copy "$work/lgmanifestauto"
+printf -- '- A lockfile is `not material` when the diff also changes the manifest in the same directory and you reviewed that change.\n' >> "$work/lgmanifestauto/references/large-diffs.md"
+expect_fail "a lockfile made not material by its reviewed manifest fails" "$work/lgmanifestauto" "references/large-diffs.md makes a skipped file not material automatically: is \`not material\` when the diff also changes"
+
+make_copy "$work/lgsourceauto"
+printf -- '- A generated file is `not material` when the diff also changes the file it is generated from and you reviewed that change.\n' >> "$work/lgsourceauto/references/large-diffs.md"
+expect_fail "a generated file made not material by its reviewed source fails" "$work/lgsourceauto" "references/large-diffs.md makes a skipped file not material automatically: is \`not material\` when the diff also changes"
+
+make_copy "$work/lgmanifestproof"
+replace_first "$work/lgmanifestproof/references/large-diffs.md" 'never shows by itself that the resolved dependencies or the generated output match that change, even when you reviewed it' 'shows that the resolved dependencies or the generated output match that change when you reviewed it'
+expect_fail "treating a reviewed manifest or source as proof fails" "$work/lgmanifestproof" "references/large-diffs.md is missing: never shows by itself that the resolved dependencies or the generated output match that change, even when you reviewed it"
+
+make_copy "$work/lgevidence"
+replace_first "$work/lgevidence/references/large-diffs.md" ' Name that evidence in the reason and say why it is enough.' ''
+expect_fail "a not material skip that names no evidence fails" "$work/lgevidence" "references/large-diffs.md is missing: Name that evidence in the reason and say why it is enough."
+
+make_copy "$work/lgcontextdecides"
+replace_first "$work/lgcontextdecides/references/large-diffs.md" 'can inform that judgement, but never decides it' 'decides that judgement'
+expect_fail "letting a nearby manifest or source decide materiality fails" "$work/lgcontextdecides" "references/large-diffs.md is missing: can inform that judgement, but never decides it"
+
+make_copy "$work/lgcheckout"
+replace_first "$work/lgcheckout/references/large-diffs.md" 'Never read the checkout in place of that snapshot.' 'When that snapshot is not available, read the checkout.'
+expect_fail "reading a header from the checkout fails" "$work/lgcheckout" "references/large-diffs.md is missing: Never read the checkout in place of that snapshot."
+
+make_copy "$work/lgdeleted"
+replace_first "$work/lgdeleted/references/large-diffs.md" 'The header is unavailable when the diff deletes the file, when that snapshot does not have the file, and when **Code around the diff** says to review the diff alone.' 'The header is unavailable when that snapshot does not have the file.'
+expect_fail "probing the header of a deleted file or a diff-only review fails" "$work/lgdeleted" "references/large-diffs.md is missing: The header is unavailable when the diff deletes the file, when that snapshot does not have the file, and when **Code around the diff** says to review the diff alone."
+
+make_copy "$work/lgguess"
+replace_first "$work/lgguess/references/large-diffs.md" ' Never guess that a file is generated.' ''
+expect_fail "guessing that a file is generated fails" "$work/lgguess" "references/large-diffs.md is missing: Never guess that a file is generated."
+
+make_copy "$work/lgheaderreview"
+replace_first "$work/lgheaderreview/references/large-diffs.md" 'they never make it a reviewed file' 'they make it a reviewed file'
+expect_fail "counting a header probe as review fails" "$work/lgheaderreview" "references/large-diffs.md is missing: they are not changed lines you checked, they never make it a reviewed file, and the file is never on **Read for context**"
+
+make_copy "$work/lginferbatch"
+replace_first "$work/lginferbatch/references/large-diffs.md" 'never a file, a range or a count that you infer' 'and the files you expect after it'
+expect_fail "batching files the diff does not show fails" "$work/lginferbatch" "references/large-diffs.md is missing: Batch only the changed files and lines that the diff Step 0 read shows, never a file, a range or a count that you infer"
+
+make_copy "$work/lginvent"
+replace_first "$work/lginvent/references/large-diffs.md" 'Never invent a total, a file or a batch.' 'Estimate the total of the rest.'
+expect_fail "inventing a total for a cut-off diff fails" "$work/lginvent" "references/large-diffs.md is missing: Never invent a total, a file or a batch."
+
+make_copy "$work/lgfailfast"
+replace_first "$work/lgfailfast/references/large-diffs.md" 'stop: never review part of the diff instead' 'review the files you can read instead'
+expect_fail "replacing a Cannot review stop with a partial review fails" "$work/lgfailfast" "references/large-diffs.md is missing: never review part of the diff instead"
+
+make_copy "$work/lgprobecount"
+replace_first "$work/lgprobecount/references/large-diffs.md" ', even when you read its first lines to classify it' ''
+expect_fail "counting a classified skipped file as reviewed fails" "$work/lgprobecount" "references/large-diffs.md is missing: even when you read its first lines to classify it"
+
+make_copy "$work/lgunlisted"
+replace_first "$work/lgunlisted/references/large-diffs.md" 'reply `Cannot review: the diff output was cut off and no source lists every changed file. Nothing was reviewed.` and stop, before any report.' 'review the files that the diff shows.'
+expect_fail "a partial report when no source lists every changed file fails" "$work/lgunlisted" "references/large-diffs.md is missing: reply \`Cannot review: the diff output was cut off and no source lists every changed file. Nothing was reviewed.\` and stop, before any report."
+
+make_copy "$work/lglowerbound"
+replace_first "$work/lglowerbound/references/large-diffs.md" 'Never write the changed files that the diff shows as `<m>` of **Files reviewed**' 'Write the changed files that the diff shows as `<m>` of **Files reviewed**'
+expect_fail "a lower bound written as the number of changed files fails" "$work/lglowerbound" "references/large-diffs.md is missing: Never write the changed files that the diff shows as \`<m>\` of **Files reviewed**: more may follow, and a lower bound is not the number of changed files."
+
+make_copy "$work/lglisted"
+replace_first "$work/lglisted/references/large-diffs.md" '`<m>` of **Files reviewed** is the number of changed files that it lists' '`<m>` of **Files reviewed** is the number of changed files that the diff shows'
+expect_fail "counting only the shown files of a listed cut-off diff fails" "$work/lglisted" "references/large-diffs.md is missing: \`<m>\` of **Files reviewed** is the number of changed files that it lists"
+
+make_copy "$work/lgheaderscopes"
+replace_first "$work/lgheaderscopes/references/large-diffs.md" 'Read those 5 lines only for the `uncommitted` and `pr` scopes' 'Read those 5 lines in every scope'
+expect_fail "reading headers in every scope fails" "$work/lgheaderscopes" "references/large-diffs.md is missing: Read those 5 lines only for the \`uncommitted\` and \`pr\` scopes"
+
+make_copy "$work/lgheaderlocal"
+replace_first "$work/lgheaderlocal/references/large-diffs.md" ' For `staged`, `commit`, `range` and `branch`, never read a header to classify a file, because the working tree can differ from the files that the diff selects: only the file name rules above apply, and a file that they do not match is reviewed in its batch.' ''
+expect_fail "classifying a staged, commit, range or branch diff by a working tree header fails" "$work/lgheaderlocal" "references/large-diffs.md is missing: For \`staged\`, \`commit\`, \`range\` and \`branch\`, never read a header to classify a file"
+# End of large diff tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
