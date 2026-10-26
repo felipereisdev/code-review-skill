@@ -1,0 +1,9 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "error",
+  "message": "Cannot review: --comment cannot be combined with --format json; publish from a Markdown review. Nothing was reviewed.",
+  "scope": null,
+  "gate": {"fail_on": "critical", "status": "error", "reason": "Cannot review: --comment cannot be combined with --format json; publish from a Markdown review. Nothing was reviewed."},
+  "review": null
+}

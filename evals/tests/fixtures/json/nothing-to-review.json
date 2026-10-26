@@ -1,0 +1,9 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "nothing_to_review",
+  "message": "Nothing to review: git diff --cached shows no changes.",
+  "scope": "staged (git diff --cached)",
+  "gate": {"fail_on": "critical", "status": "pass", "reason": "nothing to review"},
+  "review": null
+}

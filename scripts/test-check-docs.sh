@@ -1950,6 +1950,110 @@ replace_first "$work/rhdimpass/references/dimensions.md" 'you read it during you
 expect_fail "history read after consolidation fails" "$work/rhdimpass" "references/dimensions.md is missing: you read it during your own pass, before consolidation, and a candidate it leads to enters consolidation with the candidates of the subagents"
 # End of removed code history tests.
 
+# JSON output and merge gate (references/json-output.md, SKILL.md Step 0, Step 3 and Output Format).
+make_copy "$work/jsflag"
+replace_first "$work/jsflag/SKILL.md" ' `--fail-on critical` without `--format json`: `--fail-on needs --format json`.' ''
+expect_fail "a gate without --format json fails" "$work/jsflag" "Step 0 — Scope Selection is missing: \`--fail-on needs --format json\`"
+
+make_copy "$work/jscompact"
+replace_first "$work/jscompact/SKILL.md" '`compact cannot be combined with --format json; choose one output format`' '`compact applies to the JSON document`'
+expect_fail "compact mode inside a JSON document fails" "$work/jscompact" "Step 0 — Scope Selection is missing: \`compact cannot be combined with --format json; choose one output format\`"
+
+make_copy "$work/jscomment"
+replace_first "$work/jscomment/SKILL.md" '`--format json` with `--comment`: `--comment cannot be combined with --format json; publish from a Markdown review`.' ''
+expect_fail "publishing from a JSON run fails" "$work/jscomment" "Step 0 — Scope Selection is missing: \`--comment cannot be combined with --format json; publish from a Markdown review\`"
+
+make_copy "$work/jsask"
+replace_first "$work/jsask/SKILL.md" ' A run with `--format json` is headless too, whoever started it.' ''
+expect_fail "a JSON run that asks a question fails" "$work/jsask" "Step 0 — Scope Selection is missing: A run with \`--format json\` is headless too, whoever started it."
+
+make_copy "$work/jslate"
+replace_first "$work/jslate/SKILL.md" 'read `./references/json-output.md` before you check the other arguments' 'read `./references/json-output.md` after the review'
+expect_fail "a Cannot review line outside the JSON document fails" "$work/jslate" "Step 0 — Scope Selection is missing: When the arguments include \`--format json\`, read \`./references/json-output.md\` before you check the other arguments"
+
+make_copy "$work/jsfilter"
+replace_first "$work/jsfilter/SKILL.md" ', so a filter never hides a fact that the verdict or the gate counts' ''
+expect_fail "a JSON document that drops filtered findings fails" "$work/jsfilter" "SKILL.md is missing: before the filters of \`./references/configuration.md\`, so a filter never hides a fact that the verdict or the gate counts"
+
+make_copy "$work/jsexit"
+replace_first "$work/jsexit/SKILL.md" ': they are text too, and they never change the exit status of your agent' ': the agent exits 1 when the gate fails'
+expect_fail "claiming that the gate sets the agent's exit status fails" "$work/jsexit" "SKILL.md is missing: With \`--format json\`, the verdict and the gate are fields of the JSON document"
+
+make_copy "$work/jsheading"
+replace_first "$work/jsheading/SKILL.md" '### JSON output' '### Machine output'
+expect_fail "a missing JSON output section fails" "$work/jsheading" "SKILL.md must have a '### JSON output' section after '### Compact mode'"
+
+make_copy "$work/jscritical"
+replace_first "$work/jscritical/references/json-output.md" 'A Critical finding always has `omitted_by` `null`' 'A Critical finding may have any `omitted_by`'
+expect_fail "a Critical finding hidden by a filter fails" "$work/jscritical" "references/json-output.md is missing: A Critical finding always has \`omitted_by\` \`null\`"
+
+make_copy "$work/jsunverified"
+replace_first "$work/jsunverified/references/json-output.md" ': it never fails the gate' ': it fails the gate'
+expect_fail "an unverified Critical finding that fails the gate fails" "$work/jsunverified" "references/json-output.md is missing: A Critical finding under \`## Needs human verification\` is not verified: it never fails the gate"
+
+make_copy "$work/jszero"
+replace_first "$work/jszero/references/json-output.md" ', and a consumer must never read it as zero findings' ''
+expect_fail "reading an empty reply as zero findings fails" "$work/jszero" "references/json-output.md is missing: An empty, cut-off or wrapped reply is not a document, and a consumer must never read it as zero findings."
+
+make_copy "$work/jsagent"
+printf 'Claude prints the document.\n' >> "$work/jsagent/references/json-output.md"
+expect_fail "naming an agent in the JSON guide fails" "$work/jsagent" "references/json-output.md names an agent-specific tool: Claude"
+
+make_copy "$work/jsgate"
+replace_first "$work/jsgate/references/json-output.md" '"status": "fail"' '"status": "pass"'
+expect_fail "an example whose gate contradicts its findings fails" "$work/jsgate" "references/json-output.md example 1: gate status \"pass\" does not match the facts (\"fail\")"
+
+make_copy "$work/jsversion"
+replace_first "$work/jsversion/references/json-output.md" '"version": 1,' '"version": 2,'
+expect_fail "an example of another version fails" "$work/jsversion" "references/json-output.md example 1: version must be 1; this gate reads only version 1"
+
+make_copy "$work/jsomitted"
+replace_first "$work/jsomitted/references/json-output.md" '"omitted_by": null' '"omitted_by": "disabled_categories"'
+expect_fail "an example that omits its Critical finding fails" "$work/jsomitted" "references/json-output.md example 1: review.findings[0]: a Critical finding is never omitted by a filter"
+
+make_copy "$work/jsduplicate"
+replace_first "$work/jsduplicate/references/json-output.md" '"rule": null,' '"rule": null, "rule": null,'
+expect_fail "an example with a duplicate key fails" "$work/jsduplicate" "references/json-output.md example 1: duplicate key \"rule\""
+
+make_copy "$work/jsguide"
+replace_first "$work/jsguide/references/json-output.md" '"skill:references/json-output.md", ' ''
+expect_fail "an example that hides the JSON guide from the Audit fails" "$work/jsguide" "references/json-output.md example 1: review.audit.read_for_context must list skill:references/json-output.md"
+
+make_copy "$work/jsaccount"
+replace_first "$work/jsaccount/references/json-output.md" '"changed": 2,' '"changed": 3,'
+expect_fail "an example with an unaccounted changed file fails" "$work/jsaccount" "references/json-output.md example 1: review.audit.files_reviewed: 2 reviewed + 0 excluded by configuration + 0 binary + 0 not read as a whole make 2, not the 3 changed files"
+# End of JSON output tests.
+
+# README JSON output and merge gate (README.md and scripts/review_gate.py).
+make_copy "$work/jrexit"
+replace_first "$work/jrexit/README.md" 'fixtures/json/critical.json     # exit 1' 'fixtures/json/critical.json     # exit 0'
+expect_fail "a README gate example with the wrong exit status fails" "$work/jrexit" "README.md says the gate exits 0 for python3 scripts/review_gate.py evals/tests/fixtures/json/critical.json, it exits 1"
+
+make_copy "$work/jrmissing"
+replace_first "$work/jrmissing/README.md" 'fixtures/json/pass.json' 'fixtures/json/passed.json'
+expect_fail "a README gate example on a missing file fails" "$work/jrmissing" "README.md runs the gate on a missing file: evals/tests/fixtures/json/passed.json"
+
+make_copy "$work/jrinvalid"
+drop_lines "$work/jrinvalid/README.md" "printf '' | python3 scripts/review_gate.py -"
+expect_fail "README without a local invalid-input example fails" "$work/jrinvalid" "README.md has no local gate example that exits 3"
+
+make_copy "$work/jrcli"
+replace_first "$work/jrcli/README.md" "The skill's text cannot change the exit status of your agent's CLI" "The gate sets the exit status of your agent's CLI"
+expect_fail "claiming that the skill sets the agent's exit status fails" "$work/jrcli" "README.md is missing: The skill's text cannot change the exit status of your agent's CLI"
+
+make_copy "$work/jrzero"
+replace_first "$work/jrzero/README.md" 'as invalid, never as zero findings' 'as zero findings'
+expect_fail "reading a wrapped reply as zero findings fails" "$work/jrzero" "README.md is missing: it reads an empty, cut-off or wrapped reply as invalid, never as zero findings"
+
+make_copy "$work/jrci"
+replace_first "$work/jrci/README.md" "This repository's CI runs only the offline fixtures, never an agent" "This repository's CI runs the agent"
+expect_fail "claiming an agent run in CI fails" "$work/jrci" "README.md is missing: This repository's CI runs only the offline fixtures, never an agent"
+
+make_copy "$work/jrstructure"
+drop_lines "$work/jrstructure/README.md" '── review_gate.py'
+expect_fail "README Project Structure without the gate script fails" "$work/jrstructure" "README Project Structure is missing: scripts/review_gate.py"
+# End of README JSON output tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

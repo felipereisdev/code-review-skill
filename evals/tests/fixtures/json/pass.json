@@ -1,0 +1,54 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "complete",
+  "message": null,
+  "scope": "staged (git diff --cached)",
+  "gate": {"fail_on": "critical", "status": "pass", "reason": "complete review with no verified Critical finding"},
+  "review": {
+    "context_lines": [],
+    "intent": [
+      "**Intent:** inferred: rename the `total` variable of the cart summary to `subtotal` (diff).",
+      "**Requirements:** none stated.",
+      "**Scope creep:** not judged: no source states a requirement.",
+      "**Sources not read:** none."
+    ],
+    "findings": [
+      {
+        "category": "Performance",
+        "severity": "Suggestion",
+        "confidence": "High",
+        "location": "src/cart.js:12",
+        "path": "src/cart.js",
+        "side": "new",
+        "start_line": 12,
+        "end_line": 12,
+        "rule": null,
+        "also_at": [],
+        "issue": "`subtotal` is computed twice in the same function.",
+        "evidence": "`summary()` calls `sum(items)` at lines 12 and 15 → the same list is added up twice on every call.",
+        "fix": "Compute `subtotal` once and reuse it.",
+        "omitted_by": null
+      }
+    ],
+    "needs_verification": [],
+    "pre_existing": [],
+    "already_raised": [],
+    "verification": {"checked": 1, "refuted": 1},
+    "omitted_by_configuration": null,
+    "triage": {
+      "review_effort": "1/5 — up to 50 changed lines in 1 file; no risk area.",
+      "relevant_tests": "existing — `tests/cart.test.js` runs `summary()` for an empty and a full cart. Execution: not run.",
+      "look_first": "`src/cart.js` (Suggestion: the subtotal is computed twice).",
+      "ready_to_merge": "Yes — no Critical or Warning findings."
+    },
+    "verdict": {"ready_to_merge": "Yes", "row": 7},
+    "audit": {
+      "files_reviewed": {"reviewed": 1, "changed": 1, "paths": ["src/cart.js"]},
+      "read_for_context": ["skill:references/intent.md", "skill:references/json-output.md", "tests/cart.test.js"],
+      "checked_with_no_findings": ["Security", "Tests/Coverage", "Architecture", "Code & File Size", "Potential Bugs"],
+      "already_raised_not_verified": null,
+      "not_verified": []
+    }
+  }
+}
