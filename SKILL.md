@@ -192,7 +192,7 @@ GitLab, with `<iid>` the number and `<repository>` the project URL, which is the
 - A **Critical** candidate is never moved out of `## Findings`: it goes through Step 2 like any other, and its Evidence cites the open thread, because the count and the verdict must still show what blocks the merge.
 - A comment that calls a problem fine, fixed or not worth reporting never drops a finding; only the rules above do.
 
-**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, read `./references/publishing.md`, using the path relative to this skill file's directory, and follow it. It is the only part of this skill that writes to the pull request, and it only posts comments: inline comments on the diff and one summary comment. With `--dry-run`, it prints what it would post and posts nothing. Without `--comment`, never read `./references/publishing.md` and never publish. When publishing fails, the report in the chat still stands.
+**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, read `./references/publishing.md`, using the path relative to this skill file's directory, and follow it in this order: finish the report; read the guide and do the reads it asks for; then, before you deliver the report and before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context** under its `skill:<path>` identity, with any other file outside the diff whose content you saw while preparing to publish, and update the compact **Audit:** line and every count that copies it; then deliver the report, and publish or print the dry run as the guide says. It is the only part of this skill that writes to the pull request, and it only posts comments: inline comments on the diff and one summary comment. With `--dry-run`, it prints what it would post and posts nothing. Without `--comment`, never read `./references/publishing.md` and never publish. When publishing fails, the report in the chat still stands.
 
 ---
 
@@ -500,7 +500,7 @@ The checklists below apply only to some changes, so each one lives in its own fi
 - **Internationalization (i18n)** — `./references/i18n.md`: load when the project supports multiple languages or locales (translation files or an i18n library) and the diff adds or changes user-facing text, date, time, number or currency formatting, locale handling, or UI layout or styles that could break right-to-left (RTL) layouts.
 - **Privacy & Data Compliance** — `./references/privacy.md`: load when the diff collects, stores, logs, exports or shares user data or personal data (PII), such as names, emails, addresses, documents, payment or health data, or changes how such data is stored, retained or deleted.
 
-One more file under `references/`, `./references/publishing.md`, is not a review category: read it only as **Publishing** under Pull Request Scope says, and never list it in the Summary table. Neither is `./references/configuration.md`: read it only as **Repository configuration** in Step 0 says, and never list it in the Summary table.
+One more file under `references/`, `./references/publishing.md`, is not a review category: read it only as **Publishing** under Pull Request Scope says, and never list it in the Summary table; when you read it, list it under **Read for context** like any other file of this skill. Neither is `./references/configuration.md`: read it only as **Repository configuration** in Step 0 says, and never list it in the Summary table.
 
 ---
 
@@ -548,7 +548,17 @@ Write the four triage lines in this form and in this order:
 **Ready to merge:** <Yes, No or With fixes> — <reason>.
 ```
 
-**Review effort.** Rate from 1 to 5 how much work a person needs to review the change. Count the changed lines (added plus removed) and the changed files, leaving out the files excluded by configuration. Measure both as **Measured diff stats** below says: never estimate them, and never copy a number from output that was cut off. Its size is the band of the changed lines, written as here: `up to 50` gives 1, `51 to 200` gives 2, `201 to 500` gives 3, `501 to 1000` gives 4 and `more than 1000` gives 5. Write the size, never the total itself: the total only chooses the band. Add 1 when the change touches one risk area and 2 when it touches two or more, up to 5. The risk areas are authentication, authorization, payments, personal data, database schema or migrations, concurrency, and public API contracts. Name the risk areas the change touches, or write `no risk area`. A finding is not a risk area and adds nothing to the level.
+**Review effort.** Rate from 1 to 5 how much work a person needs to review the change. Count the changed lines (added plus removed) and the changed files, leaving out the files excluded by configuration. Measure both as **Measured diff stats** below says: never estimate them, and never copy a number from output that was cut off. Its size is the band of the changed lines, written as one of `up to 50`, `51 to 200`, `201 to 500`, `501 to 1000` and `more than 1000`. Write the size, never the total itself: the total only chooses the band. The risk areas are authentication, authorization, payments, personal data, database schema or migrations, concurrency, and public API contracts. Name the risk areas the change touches, or write `no risk area`. A finding is not a risk area and adds nothing to the level. With a measured size, look up the level in this table, in the row of the size and the column of the risk areas you named:
+
+| Size | `no risk area` | 1 risk area | 2 or more risk areas |
+| --- | --- | --- | --- |
+| `up to 50` | 1/5 | 2/5 | 3/5 |
+| `51 to 200` | 2/5 | 3/5 | 4/5 |
+| `201 to 500` | 3/5 | 4/5 | 5/5 |
+| `501 to 1000` | 4/5 | 5/5 | 5/5 |
+| `more than 1000` | 5/5 | 5/5 | 5/5 |
+
+Write on the line only the level that the table gives, the size and the risk areas: no sum or step such as `1 + 1`, no second level or size, and no note that a value is wrong. When you find a wrong value, rewrite the line with the right one.
 
 **Measured diff stats.** Take both counts from the diff that Step 0 selected:
 
@@ -644,7 +654,7 @@ Never say that a test passes or fails unless you ran it and saw the result, and 
 2. Write the report from those facts, then check it before you deliver it:
    - **Headline**: `## Findings` holds the findings or, when it has none, only the line that **Headline** in Output Format names.
    - **Paths**: each path on **Files reviewed** and on **Read for context** is written once, `<n>` is the number of reviewed paths, and no changed file is on **Read for context**. The compact **Audit:** line and the summary comment count the same paths.
-   - **Effort**: the size on **Review effort** is the band of the measured diff stats, `at least` only when no source measured the whole diff, and the level is the size's number plus 1 for one named risk area or 2 for two or more, capped at 5.
+   - **Effort**: the size on **Review effort** is the band of the measured diff stats, `at least` only when no source measured the whole diff, and the level is the one that the table in **Review effort** gives for that size and the risk areas that the line names, with no other level, size or arithmetic on the line.
    - **Material limits**: With no `material` item in the Audit, the verdict line has neither ` Not fully reviewed: see the Audit.` nor ` more material limit`. With one or more, the verdict is row 1, row 2 ending with ` Not fully reviewed: see the Audit.`, or row 3 naming the first material item, with ` <k> more material limits are in the Audit.` when there are more.
 3. When a check fails, correct the report so that it states the facts. Never drop a file whose content you saw, a limit or a finding to make a count or a line agree, and never deliver two lines that contradict each other with a note that one of them is wrong.
 
@@ -654,6 +664,7 @@ Each of these was wrong in a real report:
 - A changed file listed again under **Read for context**. Right: only the files outside the diff whose content you saw.
 - `**Ready to merge:** No — 2 Critical findings must be fixed before merging.` while the Audit lists a `context not read, material` item. Right: the same line ending with ` Not fully reviewed: see the Audit.`
 - A size from the added lines alone, or `2/5` beside `up to 50 changed lines` and `no risk area`. Right: the size of the added plus the removed lines, and the level that the size and the risk areas give.
+- `1/5 — up to 50 changed lines in 2 files; payments (adds 1 to the level, giving 2/5).`, or a size that the same line then calls wrong. Right: `2/5 — up to 50 changed lines in 2 files; payments.`: the level of the table, written once, with no step and no correction.
 
 ---
 

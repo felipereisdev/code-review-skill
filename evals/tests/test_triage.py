@@ -24,6 +24,9 @@ RISK_AREAS = ("authentication", "authorization", "payments", "personal data", "d
               "concurrency", "public API contracts")
 EFFORT_CLAIM = r"^\*\*Review effort:\*\* ([1-5])/5 — (?:(at least )?(\d+)|(" + "|".join(SIZES) + r")) changed lines?"
 EFFORT_CLAIM_RE = re.compile(EFFORT_CLAIM)
+EFFORT_LEVEL_RE = re.compile(r"\b[1-5]/5\b")
+EFFORT_SIZE_RE = re.compile("|".join(re.escape(size) for size in SIZES))
+EFFORT_TABLE_RE = re.compile(r"^\| `(" + "|".join(SIZES) + r")` \| ([1-5])/5 \| ([1-5])/5 \| ([1-5])/5 \|$", re.M)
 LINE_RES = {
     "Review effort": re.compile(EFFORT_CLAIM + r" in (\d+) files?( \(the total could not be measured: [^()]+\))?; "
                                 r"(\S.*)\.$"),
@@ -77,6 +80,7 @@ def read(name):
 
 FIXTURE = read("fixtures/triage/report.md")
 EXAMPLE = read(os.path.join("..", "..", "example-output.md"))
+SKILL = read(os.path.join("..", "..", "SKILL.md"))
 REPORT_END = "The report ends with the Audit above."
 CRITICAL_VERDICT = ("**Ready to merge:** No — 2 Critical findings must be fixed before merging. "
                     "Not fully reviewed: see the Audit.")
@@ -143,6 +147,11 @@ def effort_level(changed_lines, risk_areas):
 def size_of(changed_lines):
     """The size band of SIZES that a measured total falls in."""
     return SIZES[effort_level(changed_lines, 0) - 1]
+
+
+def effort_table(text):
+    """The level table of SKILL.md Step 3: {size: (no risk area, 1 risk area, 2 or more risk areas)}, in its order."""
+    return {m.group(1): (int(m.group(2)), int(m.group(3)), int(m.group(4))) for m in EFFORT_TABLE_RE.finditer(text)}
 
 
 def risk_count(text):
@@ -416,10 +425,16 @@ def _check_raised(audit, is_pr, lines):
 def _check_effort(line, changed_lines=None):
     """The Review effort rules. The count or size is checked even when the rest of the line is malformed; the level
     is checked against the size and the named risk areas, and skipped when the line names none in those words."""
+    errors = []
+    levels = list(dict.fromkeys(EFFORT_LEVEL_RE.findall(line)))
+    sizes = list(dict.fromkeys(EFFORT_SIZE_RE.findall(line)))
+    if len(levels) > 1:
+        errors.append(f"Review effort states different levels: {', '.join(levels)}")
+    if len(sizes) > 1:
+        errors.append(f"Review effort names different sizes: {', '.join(sizes)}")
     claim = EFFORT_CLAIM_RE.match(line)
     if not claim:
-        return []
-    errors = []
+        return errors
     full = LINE_RES["Review effort"].match(line)
     level, at_least, size = int(claim.group(1)), claim.group(2), claim.group(4)
     counted = int(claim.group(3)) if claim.group(3) else None
@@ -1299,6 +1314,29 @@ class RepairProbeTests(Base):
         changed = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** `package.json`, `src/routes.js`.")
         self.assertError(check_report(changed), "Read for context names `src/routes.js`, which is a changed file")
 
+    def test_effort_line_states_only_the_final_values(self):
+        for line, wants in (
+                ("**Review effort:** 2/5 — 51 to 200 changed lines is wrong here; the diff has 13 changed lines, so the "
+                 "size is up to 50 changed lines in 2 files; payments. Level: 1 + 1 = 2/5.",
+                 ("Review effort names different sizes: 51 to 200, up to 50",)),
+                ("**Review effort:** 1/5 — up to 50 changed lines in 2 files; payments (adds 1 to the level, giving 2/5).",
+                 ("Review effort states different levels: 1/5, 2/5",
+                  "Review effort is 1/5, but up to 50 changed lines with 1 risk area give 2/5")),
+                ("**Review effort:** 2/5 — up to 50 changed lines in 2 files; payments (giving 3/5).",
+                 ("Review effort states different levels: 2/5, 3/5",)),
+                ("**Review effort:** 1/5 + 1 — up to 50 changed lines in 2 files; payments. Level: 2/5.",
+                 ("Review effort states different levels: 1/5, 2/5",))):
+            errors = check_report(set_line(FIXTURE, "Review effort", line))
+            for want in wants:
+                with self.subTest(line=line, want=want):
+                    self.assertError(errors, want)
+        for line in ("**Review effort:** 2/5 — up to 50 changed lines in 2 files; payments.",
+                     "**Review effort:** 5/5 — at least 400 changed lines in 2 files" + UNMEASURED + "; payments."):
+            with self.subTest(line=line):
+                self.assertEqual(check_report(set_line(FIXTURE, "Review effort", line)), [])
+        same = "**Review effort:** 2/5 — up to 50 changed lines in 2 files; payments (adds 1 to the level, giving 2/5)."
+        self.assertEqual([e for e in check_report(set_line(FIXTURE, "Review effort", same)) if "different" in e], [])
+
 
 class MatrixTests(Base):
     def test_rows(self):
@@ -1347,6 +1385,16 @@ class EffortTests(Base):
         for (changed_lines, risks), level in cases.items():
             with self.subTest(changed_lines=changed_lines, risks=risks):
                 self.assertEqual(effort_level(changed_lines, risks), level)
+
+    def test_skill_table_gives_effort_level(self):
+        table = effort_table(SKILL)
+        self.assertEqual(list(table), list(SIZES))
+        for n in (0, 50, 51, 200, 201, 500, 501, 1000, 1001):
+            with self.subTest(changed_lines=n):
+                self.assertEqual(table[size_of(n)], tuple(effort_level(n, r) for r in (0, 1, 2)))
+                self.assertEqual(table[size_of(n)][2], effort_level(n, 3))
+        drifted = SKILL.replace("| `51 to 200` | 2/5 | 3/5 | 4/5 |", "| `51 to 200` | 2/5 | 2/5 | 4/5 |")
+        self.assertNotEqual(effort_table(drifted), table)
 
 
 class ParserTests(Base):
@@ -1444,8 +1492,13 @@ class ExampleOutputTests(Base):
         self.assertIn("judged from the code", tests[0][1])
 
     def test_dry_run_summary(self):
-        full = example_full()
+        full = replace_once(example_full(), "`skill:references/observability.md`, ",
+                            "`skill:references/observability.md`, `skill:references/publishing.md`, ")
+        self.assertEqual(check_report(full), [])
         compact = compact_audit_line(parse_audit(full))
+        self.assertIn("; 11 files read for context;", compact)
+        intro = EXAMPLE[EXAMPLE.index("## Publishing Dry Run"):EXAMPLE.index("## Dry run — nothing was published")]
+        self.assertIn("`skill:references/publishing.md`", intro)
         dry = EXAMPLE[EXAMPLE.index("## Dry run — nothing was published"):]
         payloads = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", dry, re.S)]
         summaries = [p["body"] for p in payloads if p["body"].startswith("<!-- code-review-skill:summary -->")]

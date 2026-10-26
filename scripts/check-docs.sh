@@ -966,9 +966,13 @@ require("Pull Request Scope", section("## Pull Request Scope"), (
     "**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, "
     "read `./references/publishing.md`",
     "Without `--comment`, never read `./references/publishing.md` and never publish",
+    "and follow it in this order: finish the report; read the guide and do the reads it asks for",
+    "before you deliver the report and before you build the summary comment, a payload or the dry-run printout, "
+    "add the publishing guide to **Read for context**",
     "When publishing fails, the report in the chat still stands"))
 require("Conditional Categories", section("## Conditional Categories"), (
-    "`./references/publishing.md`, is not a review category",))
+    "`./references/publishing.md`, is not a review category",
+    "when you read it, list it under **Read for context** like any other file of this skill",))
 try:
     publishing = open("references/publishing.md", encoding="utf-8").read()
 except OSError:
@@ -1391,7 +1395,11 @@ else:
 for s in (
         "before the filters of `./references/configuration.md`",
         "**Review effort:** <n>/5 — <size> changed lines in <files> files; <risk areas, or no risk area>.",
-        "`up to 50` gives 1, `51 to 200` gives 2, `201 to 500` gives 3, `501 to 1000` gives 4 and `more than 1000` gives 5",
+        "written as one of `up to 50`, `51 to 200`, `201 to 500`, `501 to 1000` and `more than 1000`",
+        "| Size | `no risk area` | 1 risk area | 2 or more risk areas |",
+        "Write on the line only the level that the table gives, the size and the risk areas",
+        "no sum or step such as `1 + 1`, no second level or size, and no note that a value is wrong",
+        "the level is the one that the table in **Review effort** gives",
         "Write the size, never the total itself",
         "A finding is not a risk area and adds nothing to the level.",
         "never estimate them, and never copy a number from output that was cut off",

@@ -1150,8 +1150,8 @@ replace_first "$work/refusedask/SKILL.md" 'Never ask for a permission, a tool or
 expect_fail "asking for a permission in a headless run fails" "$work/refusedask" "Step 0 — Scope Selection is missing: Never ask for a permission, a tool or another mode in a headless run"
 
 make_copy "$work/effortbands"
-replace_first "$work/effortbands/SKILL.md" '`up to 50` gives 1, `51 to 200` gives 2, `201 to 500` gives 3, `501 to 1000` gives 4 and `more than 1000` gives 5' 'a small change gives 1'
-expect_fail "an effort without its size bands fails" "$work/effortbands" "Step 3 is missing: \`up to 50\` gives 1, \`51 to 200\` gives 2, \`201 to 500\` gives 3, \`501 to 1000\` gives 4 and \`more than 1000\` gives 5"
+replace_first "$work/effortbands/SKILL.md" 'written as one of `up to 50`, `51 to 200`, `201 to 500`, `501 to 1000` and `more than 1000`' 'written as a small or a large change'
+expect_fail "an effort without its size bands fails" "$work/effortbands" "Step 3 is missing: written as one of \`up to 50\`, \`51 to 200\`, \`201 to 500\`, \`501 to 1000\` and \`more than 1000\`"
 
 make_copy "$work/effortsize"
 replace_first "$work/effortsize/SKILL.md" 'Write the size, never the total itself' 'Write the total'
@@ -1192,6 +1192,34 @@ expect_fail "missing code described as an unread file fails" "$work/nhvtruth" "S
 make_copy "$work/ctxnocount"
 replace_first "$work/ctxnocount/SKILL.md" '**Read for context:** `<path>`, `<path>`.' '**Read for context:** <k> files: `<path>`, `<path>`.'
 expect_fail "a context line with a count fails" "$work/ctxnocount" "Step 3 is missing: **Read for context:** \`<path>\`, \`<path>\`."
+
+make_copy "$work/efforttable"
+replace_first "$work/efforttable/SKILL.md" '| Size | `no risk area` | 1 risk area | 2 or more risk areas |' '| Size | Level |'
+expect_fail "an effort without its level table fails" "$work/efforttable" "Step 3 is missing: | Size | \`no risk area\` | 1 risk area | 2 or more risk areas |"
+
+make_copy "$work/effortfinal"
+replace_first "$work/effortfinal/SKILL.md" 'Write on the line only the level that the table gives, the size and the risk areas' 'Write the level and how you computed it'
+expect_fail "an effort line that shows how the level was computed fails" "$work/effortfinal" "Step 3 is missing: Write on the line only the level that the table gives, the size and the risk areas"
+
+make_copy "$work/effortmath"
+replace_first "$work/effortmath/SKILL.md" 'no sum or step such as `1 + 1`, no second level or size, and no note that a value is wrong' 'show each step of the sum'
+expect_fail "an effort line with arithmetic or a correction note fails" "$work/effortmath" "Step 3 is missing: no sum or step such as \`1 + 1\`, no second level or size, and no note that a value is wrong"
+
+make_copy "$work/effortreconcile"
+replace_first "$work/effortreconcile/SKILL.md" 'the level is the one that the table in **Review effort** gives' 'the level is the size plus the risk areas'
+expect_fail "a reconcile check that recomputes the level fails" "$work/effortreconcile" "Step 3 is missing: the level is the one that the table in **Review effort** gives"
+
+make_copy "$work/puborder"
+replace_first "$work/puborder/SKILL.md" 'and follow it in this order: finish the report; read the guide and do the reads it asks for' 'and follow it'
+expect_fail "publishing without its phase order fails" "$work/puborder" "Pull Request Scope is missing: and follow it in this order: finish the report; read the guide and do the reads it asks for"
+
+make_copy "$work/pubcontext"
+replace_first "$work/pubcontext/SKILL.md" 'before you deliver the report and before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context**' 'after you publish, you may add the publishing guide to **Read for context**'
+expect_fail "a publishing guide left off Read for context fails" "$work/pubcontext" "Pull Request Scope is missing: before you deliver the report and before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context**"
+
+make_copy "$work/pubcontextlist"
+replace_first "$work/pubcontextlist/SKILL.md" 'when you read it, list it under **Read for context** like any other file of this skill' 'never list it under **Read for context**'
+expect_fail "a publishing guide never listed as context fails" "$work/pubcontextlist" "Conditional Categories is missing: when you read it, list it under **Read for context** like any other file of this skill"
 
 make_copy "$work/triagenostep"
 replace_first "$work/triagenostep/SKILL.md" '## Step 3 — Triage, Verdict and Audit' '## Step 3 — Summary'
