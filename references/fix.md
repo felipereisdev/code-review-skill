@@ -19,6 +19,8 @@ A finding can be fixed when all of these hold:
 - Its **Fix:** is a concrete edit: it says which lines change and exactly what they become, for example with a complete code block for the Location lines. A **Fix:** that only asks to verify, consider or investigate something is not a concrete edit.
 - Its Location is on the new side. A deletion-only finding cites removed lines, which no longer exist in the working tree: this flow never fixes it.
 
+In round 2, the findings that **Rounds** names can be fixed too: a finding of round 1 still present after its fix, and a new finding of round 1 that its re-review verified, each with a concrete edit at its lines as they are after round 1.
+
 ## Approval
 
 An approval is the user's own words in this conversation that cover both a finding and the edit that fixes it. It is given in one of two ways:
@@ -70,7 +72,7 @@ Keep, for each file, the text that you expect it to hold. Before its first write
 
 Right before each write, read the whole file again and compare it with the text you expect. When they differ, someone else changed the file after the review, also while you waited for an answer, and you never overwrite their change: do not write in that file again, the fix is `not applied`, with the reason `<path> changed after the review`, and so is each later fix in it. Never run the checks of **Before the first write in a file** again for a file that this flow already wrote: its own writes are expected, not changes that the review did not read.
 
-Find the lines that a fix replaces in the text you expect, never at the line numbers of the report alone: an earlier write of this flow above them moves them by the lines that it added or removed. When those lines no longer hold the text that the review read, because an earlier fix of this run replaced some of them, do not edit them: the fix is `not applied`, with the reason `an earlier fix of this run changed the same lines`. Two fixes in one file whose lines do not overlap both apply. Never write a fix into lines that the review did not read.
+Find the lines that a fix replaces in the text you expect, never at the line numbers of the report alone: an earlier write of this flow above them moves them by the lines that it added or removed. Two fixes of the same round never overlap. When the lines of a fix are lines that an earlier fix of the same round replaced, do not edit them: the fix is `not applied`, with the reason `an earlier fix of this round changed the same lines`. Two fixes in one file whose lines do not overlap both apply. The baseline of round 2 is defined under **Rounds**, and a round-2 fix may replace the lines that round 1 wrote. Never write a fix into lines that neither the review nor a re-review of this run read.
 
 ## Rounds
 
@@ -78,7 +80,7 @@ A round applies approved fixes, then re-reviews what it changed. A run has at mo
 
 1. **Apply.** Check every place of a finding, its Location and each **Also at:** place, before you write any of them. Then replace exactly those lines with the approved edit. In one file, apply the fixes from the last line up, so that an edit never moves the lines of a later one. When a write is refused or fails, stop writing: each approved fix not written yet is `not applied`, with the reason `the write was refused` or `the write failed`, and the round goes on to the re-review of what was written.
 2. **Re-review.** Read each file that the round changed again and compare it with the text you expect, as **Snapshot** says; re-review that text, and cite its lines as they are after the writes, never at the line numbers of the report. For each fix written in this round, run the checks of SKILL.md Step 2 on the finding's Evidence scenario against the code you wrote: the fix is `fixed` when the scenario can no longer happen, and `still present` when it still can. Then review the lines that the round wrote with sections 1 to 5 of SKILL.md and the conditional categories that the report loaded, and run Step 2 on each Critical and Warning candidate: those that remain are new findings in the changed lines. When you cannot read a changed file again, or it no longer holds the text you expect, each fix in it is `applied, not re-reviewed`, with the reason.
-3. **Stop or ask.** Stop after round 1 when every approved fix is `fixed` and there is no new finding, when the run is headless, or when nothing is left to propose. Otherwise, in an interactive run, prepare round 2: a new concrete edit for each finding still present and an edit for each new finding that has a concrete fix, at its lines as they are after round 1. An edit that an approval already covers, as **Approval** says, needs no new answer: never ask again only because this is round 2. When some edits are not covered, write `## Fix proposal — round 2` in the form of the proposal with only those edits, ask the same question, and wait for the answer. Run round 2 with the covered edits and those approved in the answer; when there is none, stop. After round 2, stop: what is left goes into the `## Fix` section, and a new run can review it again.
+3. **Stop or ask.** Stop after round 1 when every approved fix is `fixed` and there is no new finding, when the run is headless, or when nothing is left to propose. Otherwise, in an interactive run, prepare round 2: a new concrete edit for each finding still present and an edit for each new finding that has a concrete fix, at its lines as they are after round 1. Round 2 covers a still-present finding of round 1 and a new finding of round 1 that the re-review verified, each with its concrete edit at its lines after round 1. Round 2 starts from the baseline that the re-review of round 1 read. The baseline holds the lines as round 1's writes left them, so a round-2 edit that replaces lines that round 1 wrote is a newly verified correction of that baseline, when an approval covers it, and it is not a competing fix. Overlap is judged within one round only: two round-2 fixes that overlap are refused as `an earlier fix of this round changed the same lines`. An edit that an approval already covers, as **Approval** says, needs no new answer: never ask again only because this is round 2. When some edits are not covered, write `## Fix proposal — round 2` in the form of the proposal with only those edits, ask the same question, and wait for the answer. Run round 2 with the covered edits and those approved in the answer; when there is none, stop. After round 2, stop: what is left goes into the `## Fix` section, and a new run can review it again.
 
 ## The Fix section
 
@@ -106,18 +108,19 @@ After the last round, write this section after the report and after the proposal
 
 ## Example
 
-This example is fictional. A headless `staged` review, whose request said "fix every Critical and Warning finding", reported four findings under `## Findings`. The two fixes in `src/orders.js` replace lines that do not overlap: the write at line 71 went first, and right before the write at lines 42-44 the file held exactly the text expected after it, so both apply. Someone saved `src/export.js` in an editor after the review, so right before its first write it no longer held the text that the review read, and their change stayed as they left it. The fix of the page loop did not remove its problem:
+This example is fictional. An interactive `staged` review, whose request said "fix every Critical and Warning finding", reported five findings under `## Findings`, and that request approved all five. Round 1 wrote the two fixes in `src/orders.js`. Their lines do not overlap, and right before the write at lines 42-44 the file held exactly the text expected after the write at line 71, so both apply. Someone saved `src/export.js` in an editor after the review, so right before its first write it no longer held the text that the review read, and their change stayed as they left it. The re-review of round 1 found the loop bound at `src/report.js:17` still wrong, and it found a new problem on line 19 of that file, on lines that round 1 wrote. Round 2 corrected both, on the lines that round 1 had written, as the approval covers them:
 
 ```
 ## Fix
 
-**Approved:** 4 findings, before the review.
-**Rounds:** 1 of 2.
-**Result:** Partial — 2 of 4 approved findings fixed and verified; 0 new findings in the changed lines.
+**Approved:** 5 findings, before the review.
+**Rounds:** 2 of 2.
+**Result:** Partial — 4 of 5 approved findings fixed and verified; 0 new findings in the changed lines.
 
 - `src/orders.js:42-44` Critical — Security: fixed — the query binds `customerId` as `$1`, and the re-review found no path from `customer` into the SQL text.
 - `src/orders.js:71` Warning — Potential Bugs: fixed — the total now starts at `0` instead of `undefined`, and the re-review found no order whose total is `NaN`.
-- `src/report.js:17` Warning — Potential Bugs: still present — the loop now runs while `p <= pages`, but `pages` is computed with `Math.floor`, so a last partial page is still skipped.
+- `src/report.js:17` Warning — Potential Bugs: fixed — round 2 corrects the lines that round 1 wrote, which were still present after round 1: the loop runs while `p <= lastPage`, and `lastPage` is computed with `Math.ceil`, so the re-review found no skipped page.
+- `src/report.js:19` Warning — Potential Bugs: fixed — round 2 corrects a new finding of round 1, which its re-review verified: the page read after the loop now checks `items.length`, and the re-review found no read past the end.
 - `src/export.js:8-9` Warning — Potential Bugs: not applied — `src/export.js` has changes that the review did not read.
 
 **New in the changed lines:** none.

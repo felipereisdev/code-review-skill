@@ -2160,7 +2160,7 @@ printf 'Claude applies the edits.\n' >> "$work/fxagent/references/fix.md"
 expect_fail "naming an agent in the fix guide fails" "$work/fxagent" "references/fix.md names an agent-specific tool: Claude"
 
 make_copy "$work/fxresult"
-replace_first "$work/fxresult/references/fix.md" '**Result:** Partial — 2 of 4' '**Result:** Fixed — 2 of 4'
+replace_first "$work/fxresult/references/fix.md" '**Result:** Partial — 4 of 5' '**Result:** Fixed — 4 of 5'
 expect_fail "an example result that contradicts its items fails" "$work/fxresult" "references/fix.md example: **Result:** is Fixed, the items give Partial"
 
 make_copy "$work/fxfiles"
@@ -2168,24 +2168,60 @@ replace_first "$work/fxfiles/references/fix.md" '**Files changed:** `src/orders.
 expect_fail "an example that hides a changed file fails" "$work/fxfiles" "references/fix.md example: **Files changed:** must be \`src/orders.js\`, \`src/report.js\`."
 
 make_copy "$work/fxapproved"
-replace_first "$work/fxapproved/references/fix.md" '**Approved:** 4 findings, before the review.' '**Approved:** 3 findings, before the review.'
-expect_fail "an example whose approvals do not add up fails" "$work/fxapproved" "references/fix.md example approves 3 findings but lists 4"
+replace_first "$work/fxapproved/references/fix.md" '**Approved:** 5 findings, before the review.' '**Approved:** 4 findings, before the review.'
+expect_fail "an example whose approvals do not add up fails" "$work/fxapproved" "references/fix.md example approves 4 findings but lists 5"
 
 make_copy "$work/fxstatus"
-replace_first "$work/fxstatus/references/fix.md" 'Potential Bugs: still present — the loop' 'Potential Bugs: mostly fixed — the loop'
+replace_first "$work/fxstatus/references/fix.md" 'Potential Bugs: fixed — round 2 corrects the lines' 'Potential Bugs: mostly fixed — round 2 corrects the lines'
 expect_fail "an example item with an unknown status fails" "$work/fxstatus" "references/fix.md example item does not match"
 
 make_copy "$work/fxoverlap"
 replace_first "$work/fxoverlap/references/fix.md" '`src/orders.js:71` Warning' '`src/orders.js:43` Warning'
-expect_fail "an example that applies two overlapping fixes fails" "$work/fxoverlap" "references/fix.md example: two written fixes in \`src/orders.js\` overlap: lines 42-44 and 43-43"
+expect_fail "an example that applies two overlapping fixes of one round fails" "$work/fxoverlap" "references/fix.md example: two written fixes in \`src/orders.js\` overlap: lines 42-44 and 43-43 in round 1"
 
 make_copy "$work/fxsamefile"
 replace_first "$work/fxsamefile/references/fix.md" '`src/orders.js:71` Warning' '`src/totals.js:71` Warning'
+replace_first "$work/fxsamefile/references/fix.md" '`src/report.js:19` Warning' '`src/items.js:19` Warning'
 expect_fail "an example without two applied fixes in one file fails" "$work/fxsamefile" "references/fix.md example must show two fixes in one file, on lines that do not overlap, that both apply"
 
 make_copy "$work/fxexternal"
 replace_first "$work/fxexternal/references/fix.md" 'not applied — `src/export.js` has changes that the review did not read.' 'not applied — the write failed.'
 expect_fail "an example without a file that someone else changed fails" "$work/fxexternal" "references/fix.md example must show a fix not applied because someone else changed its file"
+make_copy "$work/fxrunwide"
+replace_first "$work/fxrunwide/references/fix.md" 'an earlier fix of this round changed the same lines' 'an earlier fix of this run changed the same lines'
+expect_fail "a run-wide overlap prohibition that blocks round 2 fails" "$work/fxrunwide" "references/fix.md still contains: an earlier fix of this run"
+
+make_copy "$work/fxsameround"
+drop_lines "$work/fxsameround/references/fix.md" 'Two fixes of the same round never overlap.'
+expect_fail "dropping the same-round overlap refusal fails" "$work/fxsameround" "references/fix.md is missing: Two fixes of the same round never overlap."
+
+make_copy "$work/fxbaseline"
+replace_first "$work/fxbaseline/references/fix.md" 'Round 2 starts from the baseline that the re-review of round 1 read.' 'Round 2 starts from the original report.'
+expect_fail "a round 2 that ignores the round 1 baseline fails" "$work/fxbaseline" "references/fix.md is missing: Round 2 starts from the baseline that the re-review of round 1 read."
+
+make_copy "$work/fxcrossrule"
+replace_first "$work/fxcrossrule/references/fix.md" 'may replace the lines that round 1 wrote' 'may not replace the lines that round 1 wrote'
+expect_fail "forbidding round 2 corrections of round 1 lines fails" "$work/fxcrossrule" "references/fix.md is missing: may replace the lines that round 1 wrote"
+
+make_copy "$work/fxcrossok"
+replace_first "$work/fxcrossok/references/fix.md" '`src/report.js:19` Warning' '`src/orders.js:42-44` Warning'
+expect_pass "a round 2 fix on lines that round 1 replaced passes the example" "$work/fxcrossok"
+
+make_copy "$work/fxroundtwo"
+replace_first "$work/fxroundtwo/references/fix.md" '`src/report.js:19` Warning' '`src/report.js:17` Warning'
+expect_fail "two fixes of round 2 on the same lines fail" "$work/fxroundtwo" "references/fix.md example: two written fixes in \`src/report.js\` overlap: lines 17-17 and 17-17 in round 2"
+
+make_copy "$work/fxrounds"
+replace_first "$work/fxrounds/references/fix.md" '**Rounds:** 2 of 2.' '**Rounds:** 1 of 2.'
+expect_fail "an example that marks round 2 items as round 1 fails" "$work/fxrounds" "references/fix.md example: **Rounds:** 1 of 2. does not match its round 2 items"
+
+make_copy "$work/fxrbaseline"
+replace_first "$work/fxrbaseline/references/fix.md" 'round 2 corrects the lines that round 1 wrote' 'round 2 corrects the lines round 1 replaced'
+expect_fail "an example without a same-line round 2 correction fails" "$work/fxrbaseline" "references/fix.md example must show a round 2 fix of lines that round 1 wrote"
+
+make_copy "$work/fxrnew"
+replace_first "$work/fxrnew/references/fix.md" 'round 2 corrects a new finding of round 1' 'round 2 corrects a finding'
+expect_fail "an example without a new round 1 finding corrected in round 2 fails" "$work/fxrnew" "references/fix.md example must show a new finding of round 1 corrected in round 2"
 # End of fix flow tests.
 
 # Second opinion (references/second-opinion.md, SKILL.md Step 0, Step 1.7, Step 3 and Output Format).
@@ -2263,7 +2299,52 @@ expect_fail "an example with more findings than candidates fails" "$work/socount
 
 make_copy "$work/soforms"
 drop_lines "$work/soforms/references/second-opinion.md" '**Second opinion:** gemini unavailable: gemini is not installed.'
+drop_lines "$work/soforms/references/second-opinion.md" '**Second opinion:** codex unavailable:'
 expect_fail "examples that do not tell unavailable from no candidates fail" "$work/soforms" "references/second-opinion.md examples must show the form: unavailable"
+make_copy "$work/soboundary"
+replace_first "$work/soboundary/references/second-opinion.md" 'Context absent from this prompt is unavailable to the second reviewer' 'The second reviewer may read the working tree'
+expect_fail "a second reviewer that may read the working tree fails" "$work/soboundary" "references/second-opinion.md is missing: Context absent from this prompt is unavailable to the second reviewer"
+
+make_copy "$work/soreads"
+printf 'Read the files themselves at the head commit.\n' >> "$work/soreads/references/second-opinion.md"
+expect_fail "a second reviewer that may read the files themselves fails" "$work/soreads" "references/second-opinion.md still contains: the files themselves"
+
+make_copy "$work/sogitshow"
+printf "Read it with \`git show '<sha>:<path>'\`.\n" >> "$work/sogitshow/references/second-opinion.md"
+expect_fail "a second reviewer that reads git objects fails" "$work/sogitshow" "references/second-opinion.md still contains: git show"
+
+make_copy "$work/socaller"
+replace_first "$work/socaller/references/second-opinion.md" 'an excluded or binary file that a changed file calls or imports' 'an excluded file'
+expect_fail "dropping the excluded file reached from a changed caller fails" "$work/socaller" "references/second-opinion.md is missing: an excluded or binary file that a changed file calls or imports"
+
+make_copy "$work/sosecret"
+replace_first "$work/sosecret/references/second-opinion.md" 'Secrets outside the changed hunks are replaced too, because' 'Secrets are replaced in the changed hunks, because'
+replace_first "$work/sosecret/references/second-opinion.md" 'Secrets outside the changed hunks are replaced too.' 'Secrets are replaced in the changed hunks.'
+expect_fail "a secret outside the changed hunk that is not replaced fails" "$work/sosecret" "references/second-opinion.md is missing: Secrets outside the changed hunks are replaced too"
+
+make_copy "$work/sopatterns"
+replace_first "$work/sopatterns/references/second-opinion.md" 'the ignore_paths patterns of `.code-review/config.yml`' 'the configured paths'
+expect_fail "dropping the configured exclusion patterns fails" "$work/sopatterns" "references/second-opinion.md is missing: the ignore_paths patterns of \`.code-review/config.yml\`"
+
+make_copy "$work/socontext"
+replace_first "$work/socontext/references/second-opinion.md" 'each context file of the bundle is read again and compared with the text that the review read' 'the diff is read again'
+expect_fail "a drift check that ignores unstaged context bytes fails" "$work/socontext" "references/second-opinion.md is missing: each context file of the bundle is read again and compared with the text that the review read"
+
+make_copy "$work/sodigest"
+replace_first "$work/sodigest/references/second-opinion.md" 'Record the SHA-256 of `<dir>/prompt.md` before the call, and compare it after the call' 'Read the prompt again after the call'
+expect_fail "a drift check without a digest of the supplied content fails" "$work/sodigest" "references/second-opinion.md is missing: Record the SHA-256 of \`<dir>/prompt.md\` before the call, and compare it after the call"
+
+make_copy "$work/socanbeinvalid"
+replace_first "$work/socanbeinvalid/references/second-opinion.md" 'invalidates the answer' 'is noted in the answer'
+expect_fail "a changed bundle that does not invalidate the answer fails" "$work/socanbeinvalid" "references/second-opinion.md is missing: A change to the bundle, to the diff or to the refs while it ran invalidates the answer"
+
+make_copy "$work/socli"
+replace_first "$work/socli/references/second-opinion.md" 'This guide establishes no limit on what `codex` or `gemini` reads' 'This guide trusts what `codex` or `gemini` reads'
+expect_fail "a CLI that is trusted to read only the bundle without a limit fails" "$work/socli" "references/second-opinion.md is missing: This guide establishes no limit on what \`codex\` or \`gemini\` reads"
+
+make_copy "$work/soreason"
+replace_first "$work/soreason/references/second-opinion.md" '**Second opinion:** codex unavailable: codex cannot be limited to the supplied content.' '**Second opinion:** codex unavailable: codex is slow.'
+expect_fail "an unavailable reason outside the defined forms fails" "$work/soreason" "references/second-opinion.md example line matches no form of The Second opinion line: **Second opinion:** codex unavailable: codex is slow."
 # End of second opinion tests.
 
 # README fix and second opinion (README.md).
@@ -2309,6 +2390,13 @@ expect_fail "README with an approval that expires after one message fails" "$wor
 make_copy "$work/rfexpected"
 replace_first "$work/rfexpected/README.md" 'compares it with the reviewed text plus its own earlier edits' 'compares it with the last commit'
 expect_fail "README that refuses the skill's own earlier edits fails" "$work/rfexpected" "README.md is missing: Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits"
+make_copy "$work/rfboundary"
+replace_first "$work/rfboundary/README.md" 'the skill establishes no limit on what `codex` or `gemini` reads' 'the skill trusts what `codex` or `gemini` reads'
+expect_fail "README that trusts the CLI reads fails" "$work/rfboundary" "README.md is missing: the skill establishes no limit on what \`codex\` or \`gemini\` reads"
+
+make_copy "$work/rfsamer"
+replace_first "$work/rfsamer/README.md" 'two fixes of one round never overlap' 'two fixes never overlap'
+expect_fail "README that forbids overlap across rounds fails" "$work/rfsamer" "README.md is missing: a second round may correct lines that the first round wrote, but two fixes of one round never overlap"
 # End of README fix and second opinion tests.
 
 if [ "$failures" -gt 0 ]; then

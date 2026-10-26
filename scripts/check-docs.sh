@@ -2504,14 +2504,21 @@ REQUIRED = (
     "`<path> changed after the review`",
     "Never run the checks of **Before the first write in a file** again for a file that this flow already wrote",
     "Find the lines that a fix replaces in the text you expect, never at the line numbers of the report alone",
-    "`an earlier fix of this run changed the same lines`",
+    "`an earlier fix of this round changed the same lines`",
     "Two fixes in one file whose lines do not overlap both apply.",
+    "Two fixes of the same round never overlap.",
+    "Round 2 starts from the baseline that the re-review of round 1 read.",
+    "a newly verified correction of that baseline",
+    "may replace the lines that round 1 wrote",
+    "a still-present finding of round 1 and a new finding of round 1 that the re-review verified",
     "A run has at most 2 rounds.",
     "never ask again only because this is round 2",
     "**Not re-reviewed:** the lines the fixes did not change keep the result of the report above, whose verdict "
     "describes the code before the fixes.",
 )
 # The only git commands of the guide: they read, and never write.
+# The run-wide prohibition: round 2 may need the lines that round 1 replaced, so it must not return.
+FORBIDDEN_FIX_TEXT = ("an earlier fix of this run",)
 GIT_ALLOWED = {"diff", "rev-parse"}
 GIT_WRITES = re.compile(r"\bgit (add|commit|push|stash|checkout|switch|reset|restore|merge|rebase|tag|branch|clean|rm|"
                         r"mv|apply|cherry-pick|fetch|pull|config)\b")
@@ -2556,19 +2563,27 @@ def check_example(ref):
         if item.group("status") != "not applied":
             written.append(path)
             start = int(item.group("start"))
-            places.append((path, start, int(item.group("end") or start)))
+            round_no = 2 if item.group("detail").startswith("round 2") else 1
+            places.append((path, start, int(item.group("end") or start), round_no, item.group("detail")))
         elif item.group("detail") in (f"`{path}` has changes that the review did not read",
                                       f"`{path}` changed after the review"):
             external = True
-    # Two written fixes in one file never overlap: the second would find its lines changed by the first.
+    # Two fixes written in the same round never overlap: the second would find its lines changed by the first.
+    # A later round starts from the baseline that the re-review read, so it may replace the lines an earlier round wrote.
     pairs = [(a, b) for i, a in enumerate(places) for b in places[i + 1:] if a[0] == b[0]]
     for a, b in pairs:
-        if a[1] <= b[2] and b[1] <= a[2]:
-            errors.append(f"{PATH} example: two written fixes in `{a[0]}` overlap: lines {a[1]}-{a[2]} and {b[1]}-{b[2]}")
+        if a[3] == b[3] and a[1] <= b[2] and b[1] <= a[2]:
+            errors.append(f"{PATH} example: two written fixes in `{a[0]}` overlap: lines {a[1]}-{a[2]} and {b[1]}-{b[2]} "
+                          f"in round {a[3]}")
     if not any(a[2] < b[1] or b[2] < a[1] for a, b in pairs):
         errors.append(f"{PATH} example must show two fixes in one file, on lines that do not overlap, that both apply")
     if not external:
         errors.append(f"{PATH} example must show a fix not applied because someone else changed its file")
+    round2 = [p[4] for p in places if p[3] == 2]
+    if not any("lines that round 1 wrote" in d for d in round2):
+        errors.append(f"{PATH} example must show a round 2 fix of lines that round 1 wrote, after a still-present finding")
+    if not any("a new finding of round 1" in d for d in round2):
+        errors.append(f"{PATH} example must show a new finding of round 1 corrected in round 2")
     approved = re.match(r"^(\d+) findings?, (?:before the review|in answer to the proposal|before the review and in "
                         r"answer to the proposal)\.$", field(block, "Approved"))
     if approved is None:
@@ -2577,8 +2592,11 @@ def check_example(ref):
                       "'<k> findings, before the review and in answer to the proposal.'")
     elif int(approved.group(1)) != len(items):
         errors.append(f"{PATH} example approves {approved.group(1)} findings but lists {len(items)}")
-    if re.match(r"^[12] of 2\.$", field(block, "Rounds")) is None:
+    rounds = field(block, "Rounds")
+    if rounds not in ("1 of 2.", "2 of 2."):
         errors.append(f"{PATH} example **Rounds:** must be '1 of 2.' or '2 of 2.'")
+    elif (rounds == "2 of 2.") != any(p[3] == 2 for p in places):
+        errors.append(f"{PATH} example: **Rounds:** {rounds} does not match its round 2 items")
     new = field(block, "New in the changed lines")
     n = 0 if new == "none." else sum(1 for line in block if line.startswith("### "))
     fixed, k = statuses.count("fixed"), len(items)
@@ -2634,6 +2652,9 @@ if ref:
     for s in REQUIRED:
         if s not in ref:
             errors.append(f"{PATH} is missing: {s}")
+    for s in FORBIDDEN_FIX_TEXT:
+        if s in ref:
+            errors.append(f"{PATH} still contains: {s}")
     for name in AGENT_NAMES:
         if name in ref:
             errors.append(f"{PATH} names an agent-specific tool: {name}")
@@ -2703,7 +2724,24 @@ REQUIRED = (
     "`**Second opinion:** <cli> returned no candidates.`",
     "`**Second opinion:** <cli> unavailable: <reason>.`",
     "`**Second opinion:** <cli> failed: <reason>.`",
+    "The CLI reads nothing but the prompt that this guide writes.",
+    "they do not limit what it reads",
+    "This guide establishes no limit on what `codex` or `gemini` reads",
+    "`<cli> cannot be limited to the supplied content`",
+    "Context absent from this prompt is unavailable to the second reviewer",
+    "A file whose diff is in the prompt is not thereby open for reading in full",
+    "Secrets outside the changed hunks are replaced too",
+    "an excluded or binary file that a changed file calls or imports",
+    "the ignore_paths patterns of `.code-review/config.yml`",
+    "each context file of the bundle is read again and compared with the text that the review read",
+    "Record the SHA-256 of `<dir>/prompt.md` before the call, and compare it after the call",
+    "A change to the bundle, to the diff or to the refs while it ran invalidates the answer",
+    "no channel reads a live file while it runs",
+    "`the supplied content changed while it ran`",
+    "`the reviewed snapshot is not the current one`",
 )
+# Text that the guide must never contain again: the reads that the bundle replaces.
+FORBIDDEN_TEXT = ("the files themselves", "git show", "git ls-tree", "Read code outside the diff only from the snapshot")
 # Each command must keep these flags, and never add a flag that widens access, trusts the repository or sets it up.
 REQUIRED_FLAGS = {"codex": ("codex exec ", "--sandbox read-only", "--ephemeral", "--output-last-message", " - < "),
                   "gemini": ("gemini ", "--approval-mode plan", "--prompt ", " < ")}
@@ -2716,9 +2754,11 @@ FORMS = {
                            r"like the review's own, and (\d+) (is|are) in this report\.$"),
     "no candidates": re.compile(r"^\*\*Second opinion:\*\* (codex|gemini) returned no candidates\.$"),
     "unavailable": re.compile(r"^\*\*Second opinion:\*\* (codex|gemini) unavailable: (?:\1 is not installed|the call "
-                              r"was refused)\.$"),
+                              r"was refused|\1 cannot be limited to the supplied content|the reviewed snapshot is not "
+                              r"the current one)\.$"),
     "failed": re.compile(r"^\*\*Second opinion:\*\* (codex|gemini) failed: (?:\1 exited \d+|it did not finish|it "
-                         r"returned no answer|its answer has no Candidates part|the diff changed while it ran)\.$"),
+                         r"returned no answer|its answer has no Candidates part|the diff changed while it ran|the "
+                         r"supplied content changed while it ran)\.$"),
 }
 errors = []
 
@@ -2756,6 +2796,9 @@ except OSError:
 if ref:
     if not ref.startswith("# Second Opinion\n"):
         errors.append(f"{PATH} must start with '# Second Opinion'")
+    for s in FORBIDDEN_TEXT:
+        if s in ref:
+            errors.append(f"{PATH} still contains: {s}")
     for s in REQUIRED:
         if s not in ref:
             errors.append(f"{PATH} is missing: {s}")
@@ -2825,6 +2868,11 @@ README_REQUIRED = (
     "changed it.",
     "a headless run stops after one round",
     "a run never has more than 2 rounds",
+    "a second round may correct lines that the first round wrote, but two fixes of one round never overlap",
+    "The skill would send it only a bundle of the change and the code around it, with secrets replaced by `[REDACTED]`",
+    "The read-only flags limit writes and shell commands, not what a CLI reads",
+    "the skill establishes no limit on what `codex` or `gemini` reads",
+    "`codex cannot be limited to the supplied content`",
     "It never stages, commits, pushes or publishes, and never rewrites the report above it",
     "Agreement between the two reviews is never a vote, a candidate outside the diff never becomes a finding",
     "they cannot promise anything about other tools you configured for it",
