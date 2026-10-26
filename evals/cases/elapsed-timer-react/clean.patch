@@ -1,8 +1,8 @@
 diff --git a/src/components/QuizHeader.test.tsx b/src/components/QuizHeader.test.tsx
-index e9774d8..5392036 100644
+index d65d530..0fb21a0 100644
 --- a/src/components/QuizHeader.test.tsx
 +++ b/src/components/QuizHeader.test.tsx
-@@ -7,4 +7,9 @@ describe('QuizHeader', () => {
+@@ -11,4 +11,9 @@ describe('QuizHeader', () => {
      render(<QuizHeader title="Capitals" />);
      expect(screen.getByRole('heading', { name: 'Capitals' })).toBeTruthy();
    });

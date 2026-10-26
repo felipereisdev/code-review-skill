@@ -21,6 +21,7 @@ variants do not expand it.
 import hashlib
 import json
 import os
+import shutil
 import sys
 import unittest
 
@@ -542,6 +543,43 @@ class BaselineBugReportTest(unittest.TestCase):
                 bug = load_bug(case)
                 self.assertTrue(score_bug(report, bug["patterns"], bug["min_severity"])["detected"],
                                 "baseline bug report no longer detected: " + case)
+
+
+class ElapsedTimerFixtureTest(unittest.TestCase):
+    """Both after-trees of elapsed-timer-react clean up between tests; only the state update differs."""
+
+    UPDATES = {
+        "bug": "setInterval(() => setSeconds(seconds + 1), 1000);",
+        "clean": "setInterval(() => setSeconds((s) => s + 1), 1000);",
+    }
+
+    def after_tree(self, kind):
+        pair_dir = os.path.join(CASES_DIR, "elapsed-timer-react")
+        repo = eval_run.prepare_repo(pair_dir, os.path.join(pair_dir, kind + ".patch"))
+        self.addCleanup(shutil.rmtree, repo, True)
+        files = {}
+        for name in ("QuizHeader.test.tsx", "QuizHeader.tsx"):
+            with open(os.path.join(repo, "src", "components", name), encoding="utf-8") as handle:
+                files[name] = handle.read()
+        return files
+
+    def test_both_after_trees_clean_up_between_tests(self):
+        with open(os.path.join(CASES_DIR, "elapsed-timer-react", "base", "vitest.config.ts"), encoding="utf-8") as handle:
+            self.assertNotIn("globals", handle.read())
+        for kind, update in self.UPDATES.items():
+            with self.subTest(kind=kind):
+                files = self.after_tree(kind)
+                test = files["QuizHeader.test.tsx"]
+                self.assertIn("import { cleanup, render, screen } from '@testing-library/react';", test)
+                self.assertIn("import { afterEach, describe, expect, it } from 'vitest';", test)
+                self.assertIn("afterEach(() => {\n  cleanup();\n});", test)
+                self.assertLess(test.index("afterEach("), test.index("describe("))
+                self.assertEqual(test.count("render(<QuizHeader"), 2)
+                self.assertIn("expect(screen.getByText('Time: 0s')).toBeTruthy();", test)
+                component = files["QuizHeader.tsx"]
+                self.assertIn(update, component)
+                self.assertNotIn(self.UPDATES["clean" if kind == "bug" else "bug"], component)
+                self.assertIn("return () => clearInterval(id);\n  }, []);", component)
 
 
 if __name__ == "__main__":
