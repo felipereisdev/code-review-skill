@@ -51,12 +51,19 @@ Read this file only when the arguments include `--comment` and the scope is `pr`
 - <path>:<lines>: <Severity>: <problem> → <fix>
 
 **Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.
+
+**Review effort:** <effort>
+**Relevant tests:** <tests>
+**Look first:** <files>
+**Ready to merge:** <verdict>
+**Audit:** <audit>
 ```
 
 - The counts are those of the Summary table; `<k>` is the number of inline comments this run posts.
-- Write one line per finding under `## Findings`, in report order, in the compact-mode form, ending with its tag: `(inline)`, `(already commented)` or `(not on a diff line)`. When there is none, write `Code review passed — no issues found.` instead of the list.
+- Write one line per finding under `## Findings`, in report order, in the compact-mode form, ending with its tag: `(inline)`, `(already commented)` or `(not on a diff line)`. When there is none, write the headline that SKILL.md Step 3 selects from its **Ready to merge:** line (the passed sentence only for **Yes**, otherwise the incomplete sentence) instead of the list.
 - Leave out the **Needs human verification** part when that section of the report is empty. Copy the verification line from the report.
-- When the report has **Configuration:**, **Excluded by configuration:** or **Omitted by configuration:** lines (see `references/configuration.md`), copy each one unchanged into the summary: the first two right after the **Scope:** line, the last right after the verification line. When the report has the **No findings shown:** line, write it instead of `Code review passed — no issues found.`. Only the findings the report shows are published.
+- Copy the four triage lines unchanged from the report (SKILL.md Step 3) after the verification line, and after the **Omitted by configuration:** line when there is one. Then write the report's Audit as the one **Audit:** line of compact mode. These lines go only in the summary comment, never in an inline comment, and the **Secrets** rule applies to them. The **Ready to merge:** line is text: it never approves, requests changes or blocks the pull request.
+- When the report has **Configuration:**, **Excluded by configuration:** or **Omitted by configuration:** lines (see `references/configuration.md`), copy each one unchanged into the summary: the first two right after the **Scope:** line, the last right after the verification line. When the report has the **No findings shown:** line, write it instead of the headline. Only the findings the report shows are published.
 - Keep the body under 60,000 characters: when the list is longer, stop it and add the line `- … <n> more findings in the chat report`.
 
 ## GitHub

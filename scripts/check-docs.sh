@@ -265,7 +265,7 @@ output_start = first("## 7. Output Format")
 output = "\n".join(lines[output_start:]) if output_start is not None else ""
 for s in ("**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.",
           "Do not list refuted findings unless the user asks for them.",
-          "but end with the verification line"):
+          "but keep the verification line"):
     if s not in output:
         errors.append(f"Output Format is missing: {s}")
 for error in errors:
@@ -1358,6 +1358,199 @@ PY
   fi
 }
 
+check_skill_triage_audit() {
+  if python3 - <<'PY'
+import sys
+
+text = open("SKILL.md", encoding="utf-8").read()
+lines = text.splitlines()
+errors = []
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+heading = "## Step 3 — Triage, Verdict and Audit"
+step2, step3, done_well = first("## Step 2 — Verify Findings"), first(heading), first("## 6. What Was Done Well")
+section = ""
+if step3 is None:
+    errors.append(f"SKILL.md has no '{heading}' section")
+else:
+    if step2 is None or done_well is None or not step2 < step3 < done_well:
+        errors.append(f"'{heading}' must come after Step 2 and before '## 6. What Was Done Well'")
+    end = next((i for i in range(step3 + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    section = "\n".join(lines[step3:end])
+for s in (
+        "before the filters of `./references/configuration.md`",
+        "**Review effort:** <n>/5 — <lines> changed lines in <files> files; <risk areas, or no risk area>.",
+        "**Relevant tests:** <status> — <tests and what they cover>. Execution: <execution>.",
+        "- `not verified`: you could not check which tests run the changed code",
+        "A status you could not check is never `missing` or `not applicable`.",
+        "this step does not change whether you run tests",
+        "When you ran no test, write `Execution: not run.`",
+        "Execution: partly ran `<command>`; <result>; not run: <what>.",
+        "Never say that a test passes or fails unless you ran it and saw the result",
+        "**Look first:** `<path>` (<reason>), `<path>` (<reason>).",
+        "- `material`: the limit leaves a changed behavior, or a contract the change relies on, that you could not judge.",
+        "The tag does not decide: any limit can be either.",
+        "a finding under `## Needs human verification` never makes a material limit not material",
+        "A limit is never a finding",
+        "Files excluded by configuration are not limits.",
+        "**Ready to merge:** No — not fully reviewed: no changed file was reviewed.",
+        "**Ready to merge:** No — <c> Critical findings must be fixed before merging.",
+        "**Ready to merge:** No — not fully reviewed (<tag>): <what>.",
+        "**Ready to merge:** With fixes — <w> Warning findings should be fixed; none blocks the merge.",
+        "**Ready to merge:** With fixes — a person must check <v> findings under Needs human verification before merging.",
+        "**Ready to merge:** With fixes — <r> Warning candidates already raised in open threads still need verification before merging.",
+        "**Ready to merge:** Yes — no Critical or Warning findings.",
+        "<k> more material limits are in the Audit.",
+        "it neither confirms the problem nor shows that it is still present",
+        "the verdict never calls them confirmed or fixed",
+        "<e> changed files excluded by configuration were not reviewed.",
+        "It never approves, requests changes, blocks or changes the status of a pull request.",
+        "**Files reviewed:** <n> of <m> changed files: `<path>`, `<path>`.",
+        "**Read for context:** <k> files: `<path>`, `<path>`.",
+        "**Already raised, not verified:** `<path>:<line>` (<category>), `<path>:<line>` (<category>).",
+        "- <what> — <tag>, <material or not material>: <detail>",
+        "`` `<path>` (whole file) ``",
+        "List every path on both lines, however many there are.",
+        "`## Audit` is the last section of the report",
+        "never makes its unchanged lines reviewable",
+        "and last `## Audit` (Step 3)",
+        "but keep the verification line",
+        "**Audit:** <n> of <m> changed files reviewed; <k> files read for context; no findings in "
+        "<categories, or no category>; already raised, not verified: <r> Warning candidates; not verified: "
+        "<what> (<tag>, <material or not material>), <what> (<tag>, <material or not material>).",
+        "change the verdict only through row 6 of Step 3"):
+    if s not in text:
+        errors.append(f"Step 3 is missing: {s}")
+for s in ("Never run the tests", "never runs tests", "Not run by this review"):
+    if s in text:
+        errors.append(f"SKILL.md forbids running tests or claims they never run: {s}")
+for s in ("at most 20", "and <k> more"):
+    if s in section:
+        errors.append(f"Step 3 caps the Audit path lists: {s}")
+if "on the verification line, and do not change the verdict" in text:
+    errors.append("SKILL.md still says: already-raised lines do not change the verdict")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "SKILL.md Step 3 rates effort, states relevant tests and what ran, names files to look at first, decides the verdict from a fixed table with material limits and ends with a complete audit"
+  else
+    fail "SKILL.md triage, verdict and audit (see messages above)"
+  fi
+}
+
+check_api_validation() {
+  local missing=0 s rc
+  git grep -n 'mcp__' -- '*.md'; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    printf '  a Markdown file names an agent-specific MCP tool (lines above)\n'
+    missing=$((missing + 1))
+  elif [ "$rc" -ne 1 ]; then
+    printf '  git grep failed (run the script inside a git checkout)\n'
+    missing=$((missing + 1))
+  fi
+  for s in \
+    'Use a documentation tool your agent has, for example the Context7 MCP server' \
+    "read the library's official documentation" \
+    'do not report a finding that depends on it' \
+    'A bug whose Evidence follows from code you read needs no documentation' \
+    'list it in the Audit as `API not validated`' \
+    'Behavior that a loaded stack or pattern file already documents' \
+    'When a claim is version-specific or uncertain' \
+    'mark it `material` when a changed behavior or a contract the change relies on depends on the claim, and `not material` otherwise' \
+    'Do not infer that a value bound through the query builder'; do
+    if ! grep -qF -- "$s" SKILL.md; then
+      printf '  SKILL.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if ! grep -qF -- 'with any documentation tool the agent has' README.md; then
+    printf '  README.md is missing: with any documentation tool the agent has\n'
+    missing=$((missing + 1))
+  fi
+  if [ "$missing" -eq 0 ]; then
+    pass "API validation names no agent-specific tool, falls back to the official documentation and never reports an unvalidated API claim"
+  else
+    fail "API validation portability (see messages above)"
+  fi
+}
+
+check_triage_references() {
+  local missing=0 s
+  for s in \
+    '**Ready to merge:** <verdict>' \
+    '**Audit:** <audit>' \
+    'Copy the four triage lines unchanged from the report' \
+    'never in an inline comment' \
+    'the **Secrets** rule applies to them' \
+    'it never approves, requests changes or blocks the pull request'; do
+    if ! grep -qF -- "$s" references/publishing.md; then
+      printf '  references/publishing.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  for s in \
+    'counts the findings before these filters' \
+    'never count an excluded file as reviewed' \
+    'an exclusion is not a limit of the review'; do
+    if ! grep -qF -- "$s" references/configuration.md; then
+      printf '  references/configuration.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if [ "$missing" -eq 0 ]; then
+    pass "the publishing summary carries the triage lines and the audit line, never inline, and the configuration filters never hide a finding from the verdict"
+  else
+    fail "publishing and configuration triage (see messages above)"
+  fi
+}
+
+check_docs_triage() {
+  if python3 - <<'PY'
+import sys
+
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in ("**Triage, Verdict and Audit**", "`**Ready to merge:** Yes / No / With fixes`", "- **Triage and verdict**:",
+          "- **Audit**: the report ends with `## Audit`", "never approves or blocks a pull request",
+          "an open thread does not prove the problem",
+          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit"):
+    if s not in readme:
+        errors.append(f"README is missing: {s}")
+for s in ("are not counted in the Summary table and do not change the verdict", "which the skill never runs"):
+    if s in readme:
+        errors.append(f"README still says: {s}")
+text = open("example-output.md", encoding="utf-8").read()
+for s in ("## Coverage Limits", "**Audit:** 6 of 6 changed files reviewed;", "The report ends with the Audit above."):
+    if s not in text:
+        errors.append(f"example-output.md is missing: {s}")
+verdict = "**Ready to merge:** No — 2 Critical findings must be fixed before merging."
+if "## Code Review Report" in text and "The report ends with the Audit above." in text:
+    full = text[text.index("## Code Review Report"):text.index("The report ends with the Audit above.")]
+    if verdict not in full:
+        errors.append(f"example-output.md full report is missing: {verdict}")
+if all(h in text for h in ("## Compact Mode", "## Coverage Limits", "## Repository Configuration")) and not (
+        text.index("## Compact Mode") < text.index("## Coverage Limits") < text.index("## Repository Configuration")):
+    errors.append("example-output.md must put ## Coverage Limits between ## Compact Mode and ## Repository Configuration")
+if all(h in text for h in ("## Audit", "The report ends with the Audit above.", "## Action Items")) and not (
+        text.index("## Audit") < text.index("The report ends with the Audit above.") < text.index("## Action Items")):
+    errors.append("example-output.md must end the report with ## Audit before ## Action Items")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README and example-output.md show the triage lines, the verdict, the audit and the coverage limits"
+  else
+    fail "README and example-output.md triage (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -1374,6 +1567,9 @@ check_skill_pr_scope
 check_skill_pr_dedup
 check_skill_publishing
 check_skill_configuration
+check_skill_triage_audit
+check_api_validation
+check_triage_references
 check_stack_precedents
 check_readme_counts
 check_example_output
@@ -1382,6 +1578,7 @@ check_docs_scope_usage
 check_docs_pr_scope
 check_docs_publishing
 check_docs_configuration
+check_docs_triage
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"
