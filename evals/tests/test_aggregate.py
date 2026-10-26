@@ -344,5 +344,15 @@ class RescoreTest(unittest.TestCase):
                       + ORIGINAL_MANIFEST_SHA256[:12], summary)
 
 
+class CommittedRescoreTest(unittest.TestCase):
+    def test_committed_rescore_matches_the_original_study(self):
+        directory = os.path.join(EVALS, "baseline", "expanded-rescored")
+        result = aggregate.build(ORIGINAL_STUDY, rescore=True)
+        with open(os.path.join(directory, "aggregate.json"), encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle), result)
+        with open(os.path.join(directory, "summary.md"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), aggregate.summary_markdown(result))
+
+
 if __name__ == "__main__":
     unittest.main()
