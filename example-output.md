@@ -289,7 +289,7 @@ Its Audit marks each limit `material` or `not material`, and says why:
 ## Audit
 
 **Files reviewed:** 3 of 4 changed files: `src/legacy/report.ts`, `src/report/format.ts`, `tests/report.test.ts`.
-**Read for context:** `package.json`, `skill:stacks/typescript.md`, `src/report/index.ts`.
+**Read for context:** `package.json`, `skill:references/intent.md`, `skill:references/large-diffs.md`, `skill:stacks/typescript.md`, `src/report/index.ts`.
 **Checked with no findings:** Security, Performance, Architecture, Potential Bugs.
 **Not verified:**
 - `src/legacy/report.ts` lines 1201-2310 — not read, material: the diff output was cut off at line 1200 of this file.

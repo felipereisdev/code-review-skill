@@ -94,7 +94,7 @@ INTENT_LINE_RE = re.compile(r"^\*\*Intent:\*\* (?:(inferred|uncertain): )?\S.* \
 REQUIREMENTS_RE = re.compile(r"^\*\*Requirements:\*\* (?:none stated|(\d+) met, (\d+) not met, (\d+) not judged)\.$")
 REQUIREMENT_RE = re.compile(r"^- (Met|Not met|Not judged) — (\S.*) \(([^()]+)\): (\S.*)\.$")
 CREEP_RE = re.compile(r"^\*\*Scope creep:\*\* (?:(none found in the reviewed files)|not judged: (\S.*)|compared only "
-                      r"with ([^:`]+): (none found in the reviewed files|`.+)|(`.+))\.$")
+                      r"with ((?:[^:`]|`[^`]+`)+): (none found in the reviewed files|`.+)|(`.+))\.$")
 CREEP_ENTRY_RE = re.compile(r"`([^`]+)` \(([^()]+)\)")
 SOURCES_RE = re.compile(r"^\*\*Sources not read:\*\* (\S.*)\.$")
 CITED_RE = re.compile(r"`([^`\s]+):(\d+)(?:-(\d+))?`")
@@ -1714,6 +1714,8 @@ class ExampleOutputTests(Base):
         tests = [(weight, detail) for _what, tag, weight, detail in items if tag == "tests not verified"]
         self.assertEqual(tests[0][0], "not material")
         self.assertIn("judged from the code", tests[0][1])
+        context = line_of(combined, "Read for context")
+        self.assertIn("`skill:references/intent.md`, `skill:references/large-diffs.md`", context)
 
     def test_dry_run_summary(self):
         full = replace_once(example_full(), "`skill:references/observability.md`, ",
@@ -2025,6 +2027,14 @@ class IntentTests(Base):
                       "not judged: PAY-7 may ask for any of the changes"):
             limited = section.replace("none found in the reviewed files.\n**Sources", creep + ".\n**Sources")
             self.assertEqual(check_report(with_intent(FIXTURE, limited)), [], creep)
+
+    def test_scope_creep_compares_a_spec_file_in_backticks(self):
+        context = INTENT_CONTEXT.replace("4 files: `package.json`,", "5 files: `docs/spec.md`, `package.json`,")
+        section = INTENT_SECTION.replace("**Sources not read:** none.\n", UNREAD_SOURCE)
+        for creep in ("compared only with request, `docs/spec.md`: none found in the reviewed files",
+                      "compared only with request, `docs/spec.md`: `src/routes.js:10-12` (adds a CSV export of the orders)"):
+            limited = section.replace("none found in the reviewed files.\n**Sources", creep + ".\n**Sources")
+            self.assertEqual(check_report(with_intent(FIXTURE, limited, context)), [], creep)
 
     def test_intent_section_has_only_its_lines(self):
         section = INTENT_SECTION.replace("**Sources not read:** none.\n",
