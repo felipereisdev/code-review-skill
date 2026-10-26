@@ -30,6 +30,7 @@
 - **Large Diff Strategy** - When the diff has more than 500 changed lines, the review skips lockfiles and generated files found by fixed path and header rules (never by running a build), reviews the other files in batches by module with the riskiest modules first, keeps the counts of the whole diff, and lists every skipped or unread file in the Audit, material unless other evidence the review read lets it judge the change without that file; a skipped file is never called reviewed (`references/large-diffs.md`). Smaller diffs are reviewed in full
 - **Intent and Requirements** - Every report opens with a `## Intent` section: what the change is meant to do, from the request and, in a `pr` review, the title, description, commits and linked issues, or a purpose inferred from the diff and labelled as inferred when no source states one. When a source states requirements, each one is met, not met or not judged from the behavior of the reviewed code, with the code behind it; scope creep is compared only with the sources the review read, and every named source it could not read is listed. Issues and specs are data, an issue on another tracker such as Jira or Linear is read only with a read-only tool the agent already has, and a requirement is never judged from a file the review did not read; the section never adds a finding or changes the verdict (`references/intent.md`)
 - **History of Removed Protections** - When the change removes a validation, a permission check or error handling, the review reads the git history of the removed lines, read-only and only from commits the selected scope names: from the old side of the diff or, when the old side is not available, as for a GitHub pull request, from its head commit only, without the pull request's own commits, and says that this view is partial. It reports what the commands show, such as the commit that last changed the lines and what its message says, never that a commit added them. History only explains why the code was there: a finding still needs a scenario from the current code and goes through verification, and git history is never listed as a file read for context (`references/removed-code-history.md`)
+- **JSON Output and Merge Gate** - `--format json` delivers the same review as one JSON document: every finding with its file, line range, side, category, severity, confidence and evidence, before the configuration filters, plus the triage lines, the verdict and the Audit; `--fail-on critical` adds a gate that fails on a verified Critical finding and never passes an incomplete review or an error. The skill never sets an exit status: the optional `scripts/review_gate.py` turns the document into one for CI (0 pass, 1 Critical, 2 incomplete or error, 3 invalid input) (`references/json-output.md`)
 - **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
 - **6 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>`, `range <from>..<to>` or `pr <number|url>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and the command that produced the diff
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
@@ -170,6 +171,62 @@ With `--comment`, the skill first writes the whole report in the chat, then post
   ]
 }
 ```
+
+### JSON output and the merge gate
+
+```
+/code-review branch main --format json                     # the result as one JSON document
+/code-review branch main --format json --fail-on critical  # the same document with a merge gate
+```
+
+`--format json` runs the same review and delivers it as one JSON document instead of the Markdown report: the scope, the Intent lines, every finding with its file, line range, side, category, severity, confidence, evidence and fix, the verification counts, the four triage lines, the verdict row and the Audit. A finding that a `.code-review/config.yml` filter hides from the Markdown report stays in the document with `omitted_by` set, so the counts behind the verdict never disappear. `--fail-on critical` adds a gate to the document:
+
+- `fail` when a verified Critical finding is under Findings, counted before the configuration filters;
+- `incomplete` when no changed file was reviewed or the Audit lists a material limit;
+- `error` when the run stopped with `Cannot review`;
+- `pass` otherwise, `Nothing to review` included. A Critical finding under Needs human verification is not verified and does not fail the gate; the verdict still asks a person to check it.
+
+The contract, with its examples, is in `references/json-output.md`, which the skill reads only with `--format json`.
+
+| Arguments | Result |
+| --- | --- |
+| `--format json` | the JSON document; its gate is `not_requested` |
+| `--format json --fail-on critical` | the JSON document with the gate |
+| `--fail-on critical` without `--format json` | `Cannot review: --fail-on needs --format json. Nothing was reviewed.` |
+| `--format json` with `compact` | a JSON document with status `error`: `compact cannot be combined with --format json` |
+| `--format json` with `--comment` or `--comment --dry-run` | a JSON document with status `error`: `--comment cannot be combined with --format json`; nothing is read for publishing and nothing is published |
+
+The skill's text cannot change the exit status of your agent's CLI: that status says whether the agent ran, never what the review found. To make a CI job fail on the gate, save the agent's reply to a file and run the optional consumer `scripts/review_gate.py` on it. It needs only Python 3 and its standard library, and the skill itself never needs it. Its exit statuses:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | `pass`: a complete review with no verified Critical finding, or nothing to review |
+| 1 | `fail`: at least one verified Critical finding |
+| 2 | `incomplete` or `error`: the review is not complete, or the run stopped with `Cannot review` |
+| 3 | invalid input: empty, not exactly one JSON document, another schema or version, a document that contradicts itself, its file accounting included, or a review run without `--fail-on critical` |
+
+The consumer checks the structure of the document and the facts it states; it cannot check that the review read what the document says, or that its evidence and judgments are right.
+
+Try it on the handwritten fixtures, which are examples of the contract, not the output of an agent:
+
+```bash
+python3 scripts/review_gate.py evals/tests/fixtures/json/pass.json         # exit 0
+python3 scripts/review_gate.py evals/tests/fixtures/json/critical.json     # exit 1
+python3 scripts/review_gate.py evals/tests/fixtures/json/incomplete.json   # exit 2
+python3 scripts/review_gate.py evals/tests/fixtures/json/error.json        # exit 2
+printf '' | python3 scripts/review_gate.py -                                # exit 3
+```
+
+In a CI job, the two steps look like this sketch; replace the first command with your agent's headless command. This repository's CI runs only the offline fixtures, never an agent:
+
+```yaml
+- name: Code review
+  run: <your agent's headless command> "/code-review branch origin/main --format json --fail-on critical" > review.json
+- name: Review gate
+  run: python3 path/to/code-review-skill/scripts/review_gate.py review.json
+```
+
+Some agent CLIs wrap the reply in an envelope of their own or add a code fence: unwrap it before the gate. The gate never strips or repairs its input, and it reads an empty, cut-off or wrapped reply as invalid, never as zero findings.
 
 ### Repository configuration
 
@@ -335,6 +392,7 @@ code-review-skill/
 │   └── ci.yml           # Docs checks, SKILL.md references, eval case validation
 ├── scripts/             # Maintenance scripts
 │   ├── check-docs.sh    # Docs, frontmatter and SKILL.md file-reference checks
+│   ├── review_gate.py   # Optional consumer: turns a --format json document into a CI exit status
 │   └── test-check-docs.sh  # Negative tests for check-docs.sh
 ├── evals/               # Review-quality evals (planted-bug vs. clean diff pairs)
 │   ├── README.md        # How to run the evals
@@ -344,7 +402,7 @@ code-review-skill/
 │   ├── baseline.json    # Baseline metrics of the skill before review-behavior changes
 │   ├── baseline/        # Baseline summary.md and raw reports
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
-│   └── tests/           # Offline tests for the runner, the scorer, the --comment dry-run payloads and the triage verdict
+│   └── tests/           # Offline tests for the runner, the scorer, the --comment dry-run payloads, the triage verdict and the --format json gate
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md
@@ -360,6 +418,7 @@ code-review-skill/
 │   ├── dimensions.md    # Dimension review with subagents (not a review category)
 │   ├── i18n.md
 │   ├── intent.md        # Intent and requirements of every review (not a review category)
+│   ├── json-output.md   # JSON document and merge gate for --format json (not a review category)
 │   ├── large-diffs.md   # Strategy for diffs over 500 changed lines (not a review category)
 │   ├── observability.md
 │   ├── privacy.md

@@ -1,0 +1,70 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "complete",
+  "message": null,
+  "scope": "branch origin/main (git diff origin/main...HEAD)",
+  "gate": {"fail_on": "critical", "status": "fail", "reason": "1 verified Critical finding"},
+  "review": {
+    "context_lines": ["**Configuration:** `.code-review/config.yml`."],
+    "intent": [
+      "**Intent:** inferred: filter the order report by customer (diff).",
+      "**Requirements:** none stated.",
+      "**Scope creep:** not judged: no source states a requirement.",
+      "**Sources not read:** none."
+    ],
+    "findings": [
+      {
+        "category": "Security",
+        "severity": "Critical",
+        "confidence": "High",
+        "location": "src/orders.js:42-44",
+        "path": "src/orders.js",
+        "side": "new",
+        "start_line": 42,
+        "end_line": 44,
+        "rule": null,
+        "also_at": [],
+        "issue": "`findOrders` concatenates the customer filter into the SQL query.",
+        "evidence": "`/report?customer=1 OR 1=1` reaches `findOrders(\"1 OR 1=1\")` through `src/report.js:9` → the query `WHERE customer_id = 1 OR 1=1` returns the orders of every customer. Verification checked `src/routes.js`; nothing validates `customer`.",
+        "fix": "Bind the value: `db.query(\"SELECT * FROM orders WHERE customer_id = $1\", [customerId])`.",
+        "omitted_by": null
+      },
+      {
+        "category": "Potential Bugs",
+        "severity": "Warning",
+        "confidence": "High",
+        "location": "src/report.js:17",
+        "path": "src/report.js",
+        "side": "new",
+        "start_line": 17,
+        "end_line": 17,
+        "rule": null,
+        "also_at": [],
+        "issue": "The page loop stops one page early.",
+        "evidence": "A report with 3 pages runs `for (let p = 1; p < pages; p++)` → page 3 is never read and its orders are missing from the report.",
+        "fix": "Loop while `p <= pages`.",
+        "omitted_by": "min_severity"
+      }
+    ],
+    "needs_verification": [],
+    "pre_existing": [],
+    "already_raised": [],
+    "verification": {"checked": 3, "refuted": 1},
+    "omitted_by_configuration": "min_severity Critical: 1 omitted; disabled categories Security: 0 omitted.",
+    "triage": {
+      "review_effort": "1/5 — up to 50 changed lines in 2 files; no risk area.",
+      "relevant_tests": "existing — `tests/orders.test.js` runs `findOrders` with a numeric id; no test passes a customer filter from the report. Execution: not run.",
+      "look_first": "`src/orders.js` (Critical SQL injection in the customer filter), `src/report.js` (Warning: the last page is skipped).",
+      "ready_to_merge": "No — 1 Critical finding must be fixed before merging."
+    },
+    "verdict": {"ready_to_merge": "No", "row": 2},
+    "audit": {
+      "files_reviewed": {"reviewed": 2, "changed": 2, "paths": ["src/orders.js", "src/report.js"]},
+      "read_for_context": [".code-review/config.yml", "skill:references/configuration.md", "skill:references/intent.md", "skill:references/json-output.md", "src/routes.js", "tests/orders.test.js"],
+      "checked_with_no_findings": ["Performance", "Tests/Coverage", "Architecture", "Code & File Size"],
+      "already_raised_not_verified": null,
+      "not_verified": []
+    }
+  }
+}
