@@ -103,7 +103,7 @@ When SKILL.md Step 1.7 runs a dimension review, `references/dimensions.md` appli
 
 ## Example
 
-This example is fictional. It is an `uncommitted` review of a Node.js and TypeScript change that calls a payment SDK, so it applies the Node and TypeScript stack guides and the Resilience guide, `stacks/node.md`, `stacks/typescript.md` and `references/resilience.md`. The change has 7 changed files: `src/payments/charge.ts` (310 changed lines), `src/payments/refund.ts` (110), `src/reports/export.ts` (300), `docs/setup.md` (20), `package.json` (3), `package-lock.json` (850) and `src/api/client.ts` (400), 1993 changed lines in all.
+This example is fictional. It is an `uncommitted` review of a Node.js and TypeScript change that calls a payment SDK through an API client, so it applies the Node and TypeScript stack guides, the Resilience guide, the Observability guide and the API Design guide: `stacks/node.md`, `stacks/typescript.md`, `references/resilience.md`, `references/observability.md` and `references/api-design.md`. The change has 7 changed files: `src/payments/charge.ts` (310 changed lines), `src/payments/refund.ts` (110), `src/reports/export.ts` (300), `docs/setup.md` (20), `package.json` (3), `package-lock.json` (850) and `src/api/client.ts` (400), 1993 changed lines in all.
 
 - `package-lock.json` is a lockfile: it is skipped, and it is `material`, because `package.json` beside it changes `stripe`, but that change does not show which versions the lockfile resolves.
 - The first line of `src/api/client.ts` in the working tree contains `@generated`, and that line is not one the diff adds: it is skipped, `material`.
@@ -114,19 +114,19 @@ The review finishes both batches with no finding. The end of its report reads as
 
 ```markdown
 **Review effort:** 5/5 — more than 1000 changed lines in 7 files; payments.
-**Relevant tests:** not verified — the existing tests of the payment code cannot be matched to the changed `stripe` calls, because `src/api/client.ts` and the resolved versions in `package-lock.json` were not read. Execution: not run.
+**Relevant tests:** not verified — coverage for the reviewed payment changes cannot be established while the resolved dependency and generated client behavior is unread. Execution: not run.
 **Look first:** `src/payments/charge.ts` (payments risk), `src/payments/refund.ts` (same risk), `src/reports/export.ts` (the largest remaining reviewed file).
 **Ready to merge:** No — not fully reviewed (not read): `package-lock.json` (whole file). 2 more material limits are in the Audit.
 
 ## Audit
 
 **Files reviewed:** 5 of 7 changed files: `docs/setup.md`, `package.json`, `src/payments/charge.ts`, `src/payments/refund.ts`, `src/reports/export.ts`.
-**Read for context:** `skill:references/large-diffs.md`, `skill:references/resilience.md`, `skill:stacks/node.md`, `skill:stacks/typescript.md`, `src/payments/gateway.ts`.
-**Checked with no findings:** Security, Performance, Architecture, Code & File Size, Potential Bugs, Resilience, Stack-Specific.
+**Read for context:** `skill:references/api-design.md`, `skill:references/large-diffs.md`, `skill:references/observability.md`, `skill:references/resilience.md`, `skill:stacks/node.md`, `skill:stacks/typescript.md`, `src/payments/gateway.ts`.
+**Checked with no findings:** Security, Performance, Architecture, Code & File Size, Potential Bugs, Observability, API Design, Resilience, Stack-Specific.
 **Not verified:**
 - `package-lock.json` (whole file) — not read, material: skipped in a large diff as a lockfile; `package.json` beside it changes `stripe`, which `src/payments/charge.ts` calls, but the resolved versions were not read.
 - `src/api/client.ts` (whole file) — not read, material: skipped in a large diff as a generated file; its first line contains `@generated`, and `src/payments/charge.ts` calls the changed client.
-- relevant tests — tests not verified, material: the existing tests of the payment code cannot be matched to the changed `stripe` calls, because `src/api/client.ts` and the resolved versions in `package-lock.json` were not read.
+- relevant tests — tests not verified, material: coverage for the reviewed payment changes cannot be established while the resolved dependency and generated client behavior is unread.
 ```
 
 Tests/Coverage is left out of **Checked with no findings** because its relevant tests are not verified, and the tests item is the reason. Had the review stopped after batch 1, the Audit would also list `src/reports/export.ts` and `docs/setup.md` as whole-file `not read` items, `left unread in a large diff`, and the verdict would still name the first material item.
