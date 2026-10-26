@@ -2,6 +2,7 @@
 
 Usage:
     python3 evals/aggregate.py STUDY_DIR [--json OUT] [--summary OUT]
+    python3 evals/aggregate.py --rescore STUDY_DIR [--json OUT] [--summary OUT]
     python3 evals/aggregate.py --verify-identity STUDY_DIR
 
 Exit codes: 0 when the study is valid (or the identity matches), 1 otherwise.
@@ -19,11 +20,16 @@ import sys
 EVALS_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, EVALS_DIR)
 import run as eval_run  # noqa: E402
+import score  # noqa: E402
 
 RESULTS_GLOBS = ("samples/*/results.json", "controls/*/results.json", "retries/*/*/results.json")
 PROVENANCE_KEYS = ("provenance", "provenance_after")
 IDENTITY_SKIP = ("commit", "dirty")
 OBSERVATION_KEYS = ("intent_line", "spec_cited", "history_cited")
+MANIFEST = "manifest-sha256.txt"
+# A rescore recomputes every scored field from the raw reports; only these may change.
+RESCORE_ALGORITHM = "completeness-v2"
+RESCORABLE_FIELDS = ("complete", "passed", "checks.complete")
 
 
 class StudyError(Exception):
@@ -68,6 +74,66 @@ def _load_records(study_dir: str, freeze: dict, path: str) -> list[dict]:
                                                os.path.abspath(study_dir)).replace(os.sep, "/")
         records.append(record)
     return records
+
+
+def _verify_manifest(study_dir: str) -> str:
+    """Check every file of the study against its manifest, with none missing or extra; return the manifest's sha256."""
+    manifest = _read_study_file(study_dir, MANIFEST)
+    listed = {line[68:]: line[:64] for line in manifest.decode("utf-8").splitlines()}
+    present = sorted(
+        os.path.relpath(os.path.join(directory, name), study_dir).replace(os.sep, "/")
+        for directory, _dirs, names in os.walk(study_dir) for name in names
+        if name not in eval_run._SKIPPED_NAMES
+    )
+    present.remove(MANIFEST)
+    if present != sorted(listed):
+        raise StudyError("the files of the study differ from its manifest")
+    for path in present:
+        if _sha256_file(os.path.join(study_dir, path)) != listed[path]:
+            raise StudyError(f"manifest hash differs for {path}")
+    return hashlib.sha256(manifest).hexdigest()
+
+
+def _report_text(study_dir: str, record: dict) -> str:
+    if not record.get("report"):
+        return ""
+    with open(os.path.join(study_dir, record["report"]), "rb") as handle:
+        return handle.read().decode("utf-8")
+
+
+def _rescored(study_dir: str, record: dict, cases: dict, controls: dict) -> tuple[dict, list[dict]]:
+    """Return ``record`` scored again from its raw report by the current scorer, and the fields that changed.
+
+    Status, error class and exit code are measured, never rescored. Only completeness and what follows from it
+    may change: any other scored field that differs (report validity, a finding, a label) refuses the rescore.
+    """
+    stdout = _report_text(study_dir, record)
+    rescored = dict(record)
+    if "control" in record:
+        checked = eval_run.check_control(controls[record["control"]], stdout, record.get("gate_exit"))
+        checks = dict(checked["checks"], worktree_unchanged=record.get("worktree_unchanged"))
+        rescored.update(report_valid=checked["report_valid"], complete=checked["complete"], checks=checks,
+                        passed=record["status"] == "ok" and all(checks.values()))
+    else:
+        rescored["report_valid"] = score.looks_like_report(stdout)
+        if record["status"] == "ok":
+            rescored.update(eval_run.score_case(cases[record["id"]], stdout))
+
+    changes = []
+    for field in sorted(set(record) | set(rescored)):
+        old, new = record.get(field), rescored.get(field)
+        if field == "checks":
+            old, new = old or {}, new or {}
+            changes += [{"trial_id": record["trial_id"], "attempt": record["attempt"], "field": "checks." + name,
+                         "original": old.get(name), "rescored": new.get(name)}
+                        for name in sorted(set(old) | set(new)) if old.get(name) != new.get(name)]
+        elif old != new:
+            changes.append({"trial_id": record["trial_id"], "attempt": record["attempt"], "field": field,
+                            "original": old, "rescored": new})
+    refused = [change["field"] for change in changes if change["field"] not in RESCORABLE_FIELDS]
+    if refused:
+        raise StudyError(f"{record['trial_id']}: rescoring changed {', '.join(refused)}; only completeness may change")
+    return rescored, changes
 
 
 def _results_files(study_dir: str) -> list[str]:
@@ -164,15 +230,32 @@ def _controls(records: list[dict]) -> dict:
     }
 
 
-def build(study_dir: str) -> dict:
-    """Validate one study directory and return its aggregate; the result carries no timestamp."""
+def build(study_dir: str, rescore: bool = False) -> dict:
+    """Validate one study directory and return its aggregate; the result carries no timestamp.
+
+    With ``rescore``, the study must match its manifest and its own ``aggregate.json``; every trial is then
+    scored again from its raw report (see ``_rescored``), and the result names the original study, the
+    rescoring source and every changed field. The original provenance is kept as it was frozen.
+    """
     protocol_bytes = _read_study_file(study_dir, "protocol.json")
     protocol = json.loads(protocol_bytes)
     freeze = json.loads(_read_study_file(study_dir, "freeze.json"))
+    if rescore:
+        manifest_sha256 = _verify_manifest(study_dir)
+        aggregate_bytes = _read_study_file(study_dir, "aggregate.json")
+        if json.loads(aggregate_bytes) != build(study_dir):
+            raise StudyError("aggregate.json is not the aggregate of the recorded trials")
+        cases = {case["id"]: case for case in eval_run.select_cases(
+            [pair for pair in eval_run.load_pairs(eval_run.DEFAULT_CASES_DIR) if not pair["errors"]], None)}
+        controls = {entry["name"]: entry["control"] for entry in eval_run.load_controls(eval_run.DEFAULT_CONTROLS_DIR)}
+    changes = []
 
     by_id: dict[str, list[dict]] = {}
     for path in _results_files(study_dir):
         for record in _load_records(study_dir, freeze, path):
+            if rescore:
+                record, changed = _rescored(study_dir, record, cases, controls)
+                changes += changed
             by_id.setdefault(record["trial_id"], []).append(record)
 
     expected = expected_trials(protocol)
@@ -238,7 +321,7 @@ def build(study_dir: str) -> dict:
             "report_sha256": record.get("report_sha256"),
         })
 
-    return {
+    result = {
         "schema_version": 2,
         "kind": "aggregate",
         "study": protocol["study"],
@@ -255,6 +338,20 @@ def build(study_dir: str) -> dict:
         "cases": _cases(protocol, effective),
         "trial_results": trial_results,
     }
+    if rescore:
+        result["kind"] = "rescored-aggregate"
+        result["original"] = {
+            "manifest_sha256": manifest_sha256,
+            "aggregate_sha256": hashlib.sha256(aggregate_bytes).hexdigest(),
+        }
+        result["rescoring"] = {
+            "algorithm": RESCORE_ALGORITHM,
+            "scorer_sha256": eval_run.file_sha256("evals/score.py"),
+            "runner_sha256": eval_run.file_sha256("evals/run.py"),
+            "aggregate_sha256": eval_run.file_sha256("evals/aggregate.py"),
+        }
+        result["changes"] = changes
+    return result
 
 
 def _digest(provenance: dict, key: str) -> str:
@@ -275,9 +372,23 @@ def summary_markdown(result: dict) -> str:
     legacy = result["primary"]["legacy"]
     new = result["primary"]["new"]
     controls = result["controls"]
+    title, rescoring = "# Expanded eval baseline", []
+    if result["kind"] == "rescored-aggregate":
+        title += ", rescored"
+        source = result["rescoring"]
+        changed_trials = len({change["trial_id"] for change in result["changes"]})
+        rescoring = [
+            f"- Rescored without a model call from the raw reports of study {result['study']} (manifest sha256 "
+            f"{result['original']['manifest_sha256'][:12]}, original aggregate sha256 "
+            f"{result['original']['aggregate_sha256'][:12]})",
+            f"- Rescoring {source['algorithm']}: scorer {source['scorer_sha256'][:12]}; runner "
+            f"{source['runner_sha256'][:12]}; aggregator {source['aggregate_sha256'][:12]}; "
+            f"{len(result['changes'])} field change(s) in {changed_trials} trial(s)",
+        ]
     lines = [
-        "# Expanded eval baseline",
+        title,
         "",
+        *rescoring,
         f"- Study: {result['study']}; protocol sha256 {result['protocol_sha256'][:12]}",
         f"- Skill tree {_digest(freeze, 'skill_tree_sha256')}; runner {_digest(freeze, 'runner_sha256')}; "
         f"scorer {_digest(freeze, 'scorer_sha256')}; cases {_digest(freeze, 'cases_tree_sha256')}; "
@@ -343,6 +454,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("study_dir", metavar="STUDY_DIR")
     parser.add_argument("--json", default=None, metavar="OUT", help="write the aggregate as JSON")
     parser.add_argument("--summary", default=None, metavar="OUT", help="write the summary as Markdown")
+    parser.add_argument("--rescore", action="store_true",
+                        help="score every trial again from its raw report with the current scorer")
     parser.add_argument("--verify-identity", action="store_true",
                         help="compare the study's freeze.json with the current source and exit")
     args = parser.parse_args(argv)
@@ -361,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        result = build(args.study_dir)
+        result = build(args.study_dir, rescore=args.rescore)
     except StudyError as exc:
         print(f"study invalid: {exc}")
         return 1

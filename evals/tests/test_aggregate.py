@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 EVALS = os.path.dirname(HERE)
@@ -255,6 +256,83 @@ class CommittedBaselineTest(unittest.TestCase):
             return
         with open(BASELINE, encoding="utf-8") as handle:
             self.assertEqual(json.load(handle), aggregate.build(study))
+
+
+ORIGINAL_STUDY = os.path.join(EVALS, "baseline", "expanded")
+ORIGINAL_MANIFEST_SHA256 = "8804c7567dace5b2a16c0826eadf5de007120d97b0deb8a9b4fc89e12df86557"
+I1_TRIALS = ["s2/elapsed-timer-react/clean", "s3/elapsed-timer-react/clean", "s3/sqli-laravel/clean"]
+
+
+class RescoreTest(unittest.TestCase):
+    def copy_original(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, True)
+        study = os.path.join(root, "expanded")
+        shutil.copytree(ORIGINAL_STUDY, study)
+        return study
+
+    def test_rescore_of_the_original_study_changes_only_completeness(self):
+        result = aggregate.build(ORIGINAL_STUDY, rescore=True)
+        self.assertEqual(result["kind"], "rescored-aggregate")
+        self.assertEqual(result["original"]["manifest_sha256"], ORIGINAL_MANIFEST_SHA256)
+        with open(os.path.join(ORIGINAL_STUDY, "freeze.json"), encoding="utf-8") as handle:
+            self.assertEqual(result["provenance"], json.load(handle))
+        self.assertEqual(result["rescoring"]["algorithm"], "completeness-v2")
+        self.assertEqual(result["rescoring"]["scorer_sha256"], eval_run.file_sha256("evals/score.py"))
+        changes = result["changes"]
+        self.assertTrue(changes)
+        for change in changes:
+            with self.subTest(change=change):
+                self.assertIn(change["field"], aggregate.RESCORABLE_FIELDS)
+                self.assertEqual((change["original"], change["rescored"]), (True, False))
+        changed = {(change["trial_id"], change["field"]) for change in changes}
+        for trial in I1_TRIALS:
+            self.assertIn((trial, "complete"), changed)
+            self.assertIn((trial, "passed"), changed)
+
+    def test_rescore_refuses_a_study_without_a_manifest(self):
+        study = self.copy_original()
+        os.remove(os.path.join(study, "manifest-sha256.txt"))
+        with self.assertRaisesRegex(aggregate.StudyError, "missing manifest-sha256.txt"):
+            aggregate.build(study, rescore=True)
+
+    def test_rescore_refuses_a_file_changed_after_its_manifest(self):
+        study = self.copy_original()
+        with open(os.path.join(study, "env.txt"), "a", encoding="utf-8") as handle:
+            handle.write("edited after the manifest\n")
+        with self.assertRaisesRegex(aggregate.StudyError, "manifest hash differs for env.txt"):
+            aggregate.build(study, rescore=True)
+
+    def test_rescore_refuses_a_change_outside_completeness(self):
+        real = eval_run.score_case
+
+        def drifted(case, stdout):
+            fields = real(case, stdout)
+            if case["kind"] == "clean":
+                fields["false_positives"] = 7
+            return fields
+
+        with mock.patch.object(eval_run, "score_case", side_effect=drifted):
+            with self.assertRaisesRegex(aggregate.StudyError, "rescoring changed false_positives"):
+                aggregate.build(ORIGINAL_STUDY, rescore=True)
+
+    def test_cli_rescore_writes_json_and_summary(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, True)
+        json_out = os.path.join(root, "aggregate.json")
+        summary_out = os.path.join(root, "summary.md")
+        proc = subprocess.run(
+            [sys.executable, AGGREGATE, "--rescore", ORIGINAL_STUDY, "--json", json_out, "--summary", summary_out],
+            cwd=root, capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        with open(json_out, encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle), aggregate.build(ORIGINAL_STUDY, rescore=True))
+        with open(summary_out, encoding="utf-8") as handle:
+            summary = handle.read()
+        self.assertTrue(summary.startswith("# Expanded eval baseline, rescored\n"), summary)
+        self.assertIn("- Rescored without a model call from the raw reports of study expanded (manifest sha256 "
+                      + ORIGINAL_MANIFEST_SHA256[:12], summary)
 
 
 if __name__ == "__main__":

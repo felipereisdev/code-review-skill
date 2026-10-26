@@ -584,6 +584,42 @@ def _error_result(result: dict, case: dict, error: str) -> dict:
     return result
 
 
+def score_case(case: dict, stdout: str) -> dict:
+    """Score one case's report and return the scored fields of its result record."""
+    completeness = score.report_completeness(stdout)
+    fields = {
+        "complete": completeness["complete"],
+        "ready_to_merge": completeness["ready_to_merge"],
+        "observations": score.observations(stdout, case["meta"]),
+        "findings": [
+            {"heading": finding["heading"], "severity": finding["severity"],
+             "needs_verification": finding["needs_verification"],
+             "pre_existing": finding["pre_existing"],
+             "already_raised": finding["already_raised"]}
+            for finding in score.parse_findings(stdout)
+        ],
+    }
+    if case["kind"] == "bug":
+        location_path = (case["bug"].get("location") or {}).get("path")
+        scored = score.score_bug(stdout, case["bug"]["patterns"], case["bug"]["min_severity"], location_path)
+        fields["detected"] = scored["detected"]
+        fields["matched_finding"] = scored["matched_finding"]
+        fields["passed"] = bool(scored["detected"])
+    else:
+        fields["false_positives"] = score.score_clean(stdout)["false_positives"]
+        fields["passed"] = fields["false_positives"] == 0 and fields["complete"]
+    return fields
+
+
+def check_control(control: dict, stdout: str, gate_exit: int | None) -> dict:
+    """Check one control's report with the checker its ``check`` names; return that checker's result."""
+    if control["check"] == "json_gate":
+        return score.check_json_control(stdout, gate_exit, control["expect"])
+    if control["check"] == "fix_headless":
+        return score.check_fix_control(stdout, control["expect"])
+    return score.check_second_opinion_control(stdout, control["expect"])
+
+
 def evaluate(case: dict, args, out_dir: str) -> dict:
     """Run one case end to end and return its result record."""
     started = time.monotonic()
@@ -648,27 +684,7 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
         if status != "ok":
             return _error_result(result, case, error)
 
-        completeness = score.report_completeness(stdout)
-        result["complete"] = completeness["complete"]
-        result["ready_to_merge"] = completeness["ready_to_merge"]
-        result["observations"] = score.observations(stdout, case["meta"])
-        result["findings"] = [
-            {"heading": finding["heading"], "severity": finding["severity"],
-             "needs_verification": finding["needs_verification"],
-             "pre_existing": finding["pre_existing"],
-             "already_raised": finding["already_raised"]}
-            for finding in score.parse_findings(stdout)
-        ]
-        if case["kind"] == "bug":
-            location_path = (case["bug"].get("location") or {}).get("path")
-            scored = score.score_bug(stdout, case["bug"]["patterns"], case["bug"]["min_severity"], location_path)
-            result["detected"] = scored["detected"]
-            result["matched_finding"] = scored["matched_finding"]
-            result["passed"] = bool(scored["detected"])
-        else:
-            result["false_positives"] = score.score_clean(stdout)["false_positives"]
-            result["passed"] = result["false_positives"] == 0 and result["complete"]
-
+        result.update(score_case(case, stdout))
         return result
     finally:
         result["duration_s"] = round(time.monotonic() - started, 1)
@@ -742,12 +758,7 @@ def evaluate_control(control: dict, pair_record: dict, args, out_dir: str) -> di
             if check == "json_gate":
                 result["gate_exit"], result["gate_output"] = run_gate(report_path)
 
-        if check == "json_gate":
-            checked = score.check_json_control(stdout, result["gate_exit"], control["expect"])
-        elif check == "fix_headless":
-            checked = score.check_fix_control(stdout, control["expect"])
-        else:
-            checked = score.check_second_opinion_control(stdout, control["expect"])
+        checked = check_control(control, stdout, result["gate_exit"])
         checks = dict(checked["checks"], worktree_unchanged=unchanged)
 
         status, error_class, error = classify(run_result, checked["report_valid"], args.timeout)
