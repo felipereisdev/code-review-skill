@@ -339,7 +339,67 @@ class ReportShapeTest(unittest.TestCase):
         self.assertFalse(stack_mentioned("A Python project", "laravel"))
 
 
-PRE_EXISTING_REPORT = """\
+class IncompleteReportTest(unittest.TestCase):
+    INCOMPLETE = "Review incomplete or pending — no confirmed findings in the code inspected."
+    NOT_READY = "**Ready to merge:** No — not fully reviewed (not read): `src/routes.js` lines 40-90."
+    COMPACT_AUDIT = ("**Audit:** 1 of 2 changed files reviewed; 0 files read for context; no findings in none; "
+                     "not verified: `src/routes.js` lines 40-90 (not read, material).")
+
+    def test_incomplete_headline_beside_its_readiness_and_audit_is_a_report(self):
+        full = f"**Scope:** staged\n\n{self.INCOMPLETE}\n\n{self.NOT_READY}\n\n## Audit\n\n- nothing\n"
+        compact = f"{self.INCOMPLETE}\n\n{self.NOT_READY}\n\n{self.COMPACT_AUDIT}\n"
+        self.assertTrue(looks_like_report(full))
+        self.assertTrue(looks_like_report(compact))
+        self.assertEqual(score_clean(full), {"false_positives": 0})
+
+    def test_bare_incomplete_headline_is_not_a_report(self):
+        self.assertFalse(looks_like_report(self.INCOMPLETE + "\n"))
+
+    def test_incomplete_headline_with_ready_yes_is_not_a_report(self):
+        report = f"{self.INCOMPLETE}\n\n**Ready to merge:** Yes — no Critical or Warning findings.\n\n## Audit\n"
+        self.assertFalse(looks_like_report(report))
+
+    def test_incomplete_headline_needs_both_readiness_and_audit(self):
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n## Audit\n"))
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{self.NOT_READY}\n"))
+
+    def test_incomplete_headline_inside_a_fence_is_not_a_report(self):
+        fence = "`" * 3
+        report = f"Example:\n{fence}text\n{self.INCOMPLETE}\n{self.NOT_READY}\n## Audit\n{fence}\n"
+        self.assertFalse(looks_like_report(report))
+
+    def test_question_or_prose_echo_is_not_a_report(self):
+        self.assertFalse(looks_like_report(f'Should I write "{self.INCOMPLETE}" here?\n\n{self.NOT_READY}\n\n## Audit\n'))
+        self.assertFalse(looks_like_report(f"I would write {self.INCOMPLETE}\n\n{self.NOT_READY}\n\n## Audit\n"))
+
+    def test_blockquoted_template_echo_is_not_a_report(self):
+        template = (
+            "The following is a quoted template, not an issued code review:\n\n"
+            f"> {self.INCOMPLETE}\n> \n"
+            f"> {self.NOT_READY}\n> \n"
+            f"> {self.COMPACT_AUDIT}\n"
+        )
+        self.assertFalse(looks_like_report(template))
+        self.assertFalse(looks_like_report(f"> {self.INCOMPLETE}\n\n{self.NOT_READY}\n\n## Audit\n"))
+
+    def test_blockquoted_readiness_or_audit_is_not_discovery_context(self):
+        quoted_ready = f"> {self.NOT_READY}"
+        quoted_audit = f"> {self.COMPACT_AUDIT}"
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{quoted_ready}\n\n## Audit\n"))
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{self.NOT_READY}\n\n{quoted_audit}\n"))
+        self.assertFalse(looks_like_report(f"{self.INCOMPLETE}\n\n{quoted_ready}\n{quoted_audit}\n"))
+
+    def test_literal_quotes_are_not_discovery_context(self):
+        self.assertFalse(looks_like_report(f'"{self.INCOMPLETE}"\n\n{self.NOT_READY}\n\n## Audit\n'))
+        self.assertFalse(looks_like_report(f'{self.INCOMPLETE}\n\n"{self.NOT_READY}"\n\n## Audit\n'))
+        self.assertFalse(looks_like_report(f'{self.INCOMPLETE}\n\n{self.NOT_READY}\n\n"{self.COMPACT_AUDIT}"\n'))
+
+    def test_emphasis_and_indentation_still_discover(self):
+        report = f"**{self.INCOMPLETE}**\n\n  {self.NOT_READY}\n\n  {self.COMPACT_AUDIT}\n"
+        self.assertTrue(looks_like_report(report))
+
+
+PRE_EXISTING_REPORT ="""\
 ## Findings
 
 ### Potential Bugs — Warning

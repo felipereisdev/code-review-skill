@@ -1009,6 +1009,150 @@ make_copy "$work/pubnoconfiglines"
 drop_lines "$work/pubnoconfiglines/references/publishing.md" 'copy each one unchanged into the summary'
 expect_fail "a summary comment that drops the configuration lines fails" "$work/pubnoconfiglines" "references/publishing.md is missing: copy each one unchanged into the summary"
 
+make_copy "$work/triagenostep"
+replace_first "$work/triagenostep/SKILL.md" '## Step 3 — Triage, Verdict and Audit' '## Step 3 — Summary'
+expect_fail "a SKILL.md without Step 3 fails" "$work/triagenostep" "SKILL.md has no '## Step 3 — Triage, Verdict and Audit' section"
+
+make_copy "$work/triagemoved"
+move_section_to_end "$work/triagemoved/SKILL.md" '## Step 3 — Triage, Verdict and Audit'
+expect_fail "Step 3 after the output format fails" "$work/triagemoved" "'## Step 3 — Triage, Verdict and Audit' must come after Step 2 and before '## 6. What Was Done Well'"
+
+make_copy "$work/verdictcritical"
+replace_first "$work/verdictcritical/SKILL.md" '**Ready to merge:** No — <c> Critical findings must be fixed before merging.' '**Ready to merge:** With fixes — <c> Critical findings should be fixed.'
+expect_fail "a Critical finding that does not block the verdict fails" "$work/verdictcritical" "Step 3 is missing: **Ready to merge:** No — <c> Critical findings must be fixed before merging."
+
+make_copy "$work/verdictfilters"
+replace_first "$work/verdictfilters/SKILL.md" 'before the filters of `./references/configuration.md`' 'after the filters of `./references/configuration.md`'
+expect_fail "a verdict that follows the presentation filters fails" "$work/verdictfilters" "Step 3 is missing: before the filters of \`./references/configuration.md\`"
+
+make_copy "$work/testsban"
+printf -- '- Never run the tests: they execute code from the change.\n' >> "$work/testsban/SKILL.md"
+expect_fail "a new ban on running tests fails" "$work/testsban" "SKILL.md forbids running tests or claims they never run: Never run the tests"
+
+make_copy "$work/testsnotverified"
+replace_first "$work/testsnotverified/SKILL.md" '- `not verified`: you could not check which tests run the changed code' '- `missing`: you could not check which tests run the changed code'
+expect_fail "unverifiable tests reported as missing fail" "$work/testsnotverified" "Step 3 is missing: - \`not verified\`: you could not check which tests run the changed code"
+
+make_copy "$work/testsinvented"
+replace_first "$work/testsinvented/SKILL.md" 'Never say that a test passes or fails unless you ran it and saw the result' 'Say whether the tests pass'
+expect_fail "claiming a test result without running it fails" "$work/testsinvented" "Step 3 is missing: Never say that a test passes or fails unless you ran it and saw the result"
+
+make_copy "$work/materialbytag"
+replace_first "$work/materialbytag/SKILL.md" 'The tag does not decide: any limit can be either.' 'Only `not read` limits are material.'
+expect_fail "materiality decided by the tag fails" "$work/materialbytag" "Step 3 is missing: The tag does not decide: any limit can be either."
+
+make_copy "$work/materialneeds"
+replace_first "$work/materialneeds/SKILL.md" 'a finding under `## Needs human verification` never makes a material limit not material' 'a finding under `## Needs human verification` makes its limit not material'
+expect_fail "a Needs-verification finding that downgrades a material limit fails" "$work/materialneeds" "Step 3 is missing: a finding under \`## Needs human verification\` never makes a material limit not material"
+
+make_copy "$work/limitnotbug"
+replace_first "$work/limitnotbug/SKILL.md" 'A limit is never a finding' 'A limit is a Warning finding'
+expect_fail "a limit reported as a finding fails" "$work/limitnotbug" "Step 3 is missing: A limit is never a finding"
+
+make_copy "$work/raisedproof"
+replace_first "$work/raisedproof/SKILL.md" 'it neither confirms the problem nor shows that it is still present' 'it confirms the problem'
+expect_fail "an open thread taken as proof fails" "$work/raisedproof" "Step 3 is missing: it neither confirms the problem nor shows that it is still present"
+
+make_copy "$work/verdictexcluded"
+replace_first "$work/verdictexcluded/SKILL.md" '<e> changed files excluded by configuration were not reviewed.' '<e> changed files excluded by configuration are clean.'
+expect_fail "calling excluded files clean in the verdict fails" "$work/verdictexcluded" "Step 3 is missing: <e> changed files excluded by configuration were not reviewed."
+
+make_copy "$work/verdictapproves"
+replace_first "$work/verdictapproves/SKILL.md" 'It never approves, requests changes, blocks or changes the status of a pull request.' 'It approves the pull request when it says Yes.'
+expect_fail "a verdict that approves the pull request fails" "$work/verdictapproves" "Step 3 is missing: It never approves, requests changes, blocks or changes the status of a pull request."
+
+make_copy "$work/auditcap"
+replace_first "$work/auditcap/SKILL.md" 'List every path on both lines, however many there are.' 'Both lists show at most 20 paths.'
+expect_fail "an Audit that caps its path lists fails" "$work/auditcap" "Step 3 caps the Audit path lists: at most 20"
+
+make_copy "$work/auditnotlast"
+replace_first "$work/auditnotlast/SKILL.md" '`## Audit` is the last section of the report' '`## Audit` comes before the action items'
+expect_fail "an Audit that is not the last section fails" "$work/auditnotlast" "Step 3 is missing: \`## Audit\` is the last section of the report"
+
+make_copy "$work/compactnoaudit"
+drop_lines "$work/compactnoaudit/SKILL.md" '**Audit:** <n> of <m> changed files reviewed'
+expect_fail "compact mode without the audit line fails" "$work/compactnoaudit" "Step 3 is missing: **Audit:** <n> of <m> changed files reviewed;"
+
+make_copy "$work/verdictraised"
+replace_first "$work/verdictraised/SKILL.md" 'change the verdict only through row 6 of Step 3' 'do not change the verdict'
+expect_fail "already-raised Warnings that never reach the verdict fail" "$work/verdictraised" "SKILL.md still says: already-raised lines do not change the verdict"
+
+make_copy "$work/apitoolname"
+printf -- '- Validate APIs with `mcp__plugin_context7_context7__query-docs`.\n' >> "$work/apitoolname/SKILL.md"
+expect_fail "naming an MCP tool literally fails" "$work/apitoolname" "a Markdown file names an agent-specific MCP tool"
+
+make_copy "$work/apinofallback"
+replace_first "$work/apinofallback/SKILL.md" 'do not report a finding that depends on it' 'report it anyway'
+expect_fail "reporting an unvalidated API claim fails" "$work/apinofallback" "SKILL.md is missing: do not report a finding that depends on it"
+
+make_copy "$work/apiblanket"
+replace_first "$work/apiblanket/SKILL.md" 'A bug whose Evidence follows from code you read needs no documentation' 'Every finding needs documentation'
+expect_fail "requiring documentation for code-local bugs fails" "$work/apiblanket" "SKILL.md is missing: A bug whose Evidence follows from code you read needs no documentation"
+
+make_copy "$work/apialwaysminor"
+replace_first "$work/apialwaysminor/SKILL.md" 'mark it `material` when a changed behavior or a contract the change relies on depends on the claim, and `not material` otherwise' 'always mark it `not material`'
+expect_fail "an unvalidated API claim that is never material fails" "$work/apialwaysminor" "SKILL.md is missing: mark it \`material\` when a changed behavior or a contract the change relies on depends on the claim, and \`not material\` otherwise"
+
+make_copy "$work/readmeapi"
+replace_first "$work/readmeapi/README.md" 'with any documentation tool the agent has' 'with the Context7 plugin'
+expect_fail "a README that needs the Context7 plugin fails" "$work/readmeapi" "README.md is missing: with any documentation tool the agent has"
+
+make_copy "$work/apistackblanket"
+replace_first "$work/apistackblanket/SKILL.md" 'Behavior that a loaded stack or pattern file already documents' 'Only the official documentation counts'
+expect_fail "dropping stack-file guidance for stable behavior fails" "$work/apistackblanket" "SKILL.md is missing: Behavior that a loaded stack or pattern file already documents"
+
+make_copy "$work/apiunscoped"
+replace_first "$work/apiunscoped/SKILL.md" 'When a claim is version-specific or uncertain' 'When any API claim is made'
+expect_fail "suppressing every API claim instead of version-specific or uncertain ones fails" "$work/apiunscoped" "SKILL.md is missing: When a claim is version-specific or uncertain"
+
+make_copy "$work/apiinjection"
+replace_first "$work/apiinjection/SKILL.md" 'Do not infer that a value bound through the query builder' 'Report a value bound through the query builder as injectable'
+expect_fail "reporting query-builder bindings as injectable fails" "$work/apiinjection" "SKILL.md is missing: Do not infer that a value bound through the query builder"
+
+make_copy "$work/pubnoverdict"
+drop_lines "$work/pubnoverdict/references/publishing.md" '**Ready to merge:** <verdict>'
+expect_fail "a summary comment without the verdict fails" "$work/pubnoverdict" "references/publishing.md is missing: **Ready to merge:** <verdict>"
+
+make_copy "$work/pubverdictinline"
+replace_first "$work/pubverdictinline/references/publishing.md" 'never in an inline comment' 'and in every inline comment'
+expect_fail "a verdict in every inline comment fails" "$work/pubverdictinline" "references/publishing.md is missing: never in an inline comment"
+
+make_copy "$work/pubauditsecrets"
+replace_first "$work/pubauditsecrets/references/publishing.md" 'the **Secrets** rule applies to them' 'they are copied as they are'
+expect_fail "triage and audit lines outside the secrets rule fail" "$work/pubauditsecrets" "references/publishing.md is missing: the **Secrets** rule applies to them"
+
+make_copy "$work/cfgverdictfilters"
+replace_first "$work/cfgverdictfilters/references/configuration.md" 'counts the findings before these filters' 'counts the findings these filters leave'
+expect_fail "a verdict that only sees filtered findings fails" "$work/cfgverdictfilters" "references/configuration.md is missing: counts the findings before these filters"
+
+make_copy "$work/cfgexcludedlimit"
+replace_first "$work/cfgexcludedlimit/references/configuration.md" 'an exclusion is not a limit of the review' 'an exclusion is a material limit'
+expect_fail "an exclusion treated as a material limit fails" "$work/cfgexcludedlimit" "references/configuration.md is missing: an exclusion is not a limit of the review"
+
+make_copy "$work/readmenotriage"
+drop_lines "$work/readmenotriage/README.md" '**Triage, Verdict and Audit**'
+expect_fail "a README without the triage feature fails" "$work/readmenotriage" "README is missing: **Triage, Verdict and Audit**"
+
+make_copy "$work/readmeraised"
+replace_first "$work/readmeraised/README.md" 'have no severity and are not counted in the Summary table;' 'have no severity, are not counted in the Summary table and do not change the verdict;'
+expect_fail "a README that keeps open Warnings out of the verdict fails" "$work/readmeraised" "README still says: are not counted in the Summary table and do not change the verdict"
+
+make_copy "$work/readmeneverruns"
+printf -- '\nTests are listed as `not run`, which the skill never runs.\n' >> "$work/readmeneverruns/README.md"
+expect_fail "a README that says the skill never runs tests fails" "$work/readmeneverruns" "README still says: which the skill never runs"
+
+make_copy "$work/exampleverdict"
+replace_first "$work/exampleverdict/example-output.md" '**Ready to merge:** No — 2 Critical findings must be fixed before merging.' '**Ready to merge:** Yes — no Critical or Warning findings.'
+expect_fail "an example that approves a Critical report fails" "$work/exampleverdict" "example-output.md full report is missing: **Ready to merge:** No — 2 Critical findings must be fixed before merging."
+
+make_copy "$work/examplenocoverage"
+replace_first "$work/examplenocoverage/example-output.md" '## Coverage Limits' '## Limits'
+expect_fail "an example without the coverage limits fails" "$work/examplenocoverage" "example-output.md is missing: ## Coverage Limits"
+
+make_copy "$work/exampleboundary"
+replace_first "$work/exampleboundary/example-output.md" 'The report ends with the Audit above.' 'The action items are part of the report.'
+expect_fail "an example without the report boundary fails" "$work/exampleboundary" "example-output.md is missing: The report ends with the Audit above."
+
 # quote_value <text>: the POSIX single-quote form that SKILL.md Step 0 prescribes for a value inside a shell command.
 quote_value() {
   local s=${1//"'"/"'\''"}
