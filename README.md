@@ -27,6 +27,7 @@
 - **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and never writes to the pull request unless you pass `--comment`; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
 - **Publishing to the Pull Request** - `/code-review pr 123 --comment` posts each finding that sits on a line of the diff as an inline comment, in one review submitted only as a comment (never an approval), with a `suggestion` block only for a complete fix, plus one summary comment that later runs edit instead of repeating; `--dry-run` prints the exact `gh` or `glab` commands and payloads and posts nothing
 - **Dimension Review with Subagents** - When the agent can start subagents, up to four of them review the bugs, security, repository rules and tests dimensions, each with only its own checklist, while the main review keeps every other category, merges duplicate candidates, verifies them, applies the configuration filters once, and alone writes the verdict, the audit and any published comment; a subagent that fails never makes its dimension clean (`references/dimensions.md`). Without subagents, the single-pass review runs unchanged
+- **Large Diff Strategy** - When the diff has more than 500 changed lines, the review skips lockfiles and generated files found by fixed path and header rules (never by running a build), reviews the other files in batches by module with the riskiest modules first, keeps the counts of the whole diff, and lists every skipped or unread file in the Audit, material unless other evidence the review read lets it judge the change without that file; a skipped file is never called reviewed (`references/large-diffs.md`). Smaller diffs are reviewed in full
 - **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
 - **6 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>`, `range <from>..<to>` or `pr <number|url>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and the command that produced the diff
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
@@ -356,6 +357,7 @@ code-review-skill/
 │   ├── database-migrations.md
 │   ├── dimensions.md    # Dimension review with subagents (not a review category)
 │   ├── i18n.md
+│   ├── large-diffs.md   # Strategy for diffs over 500 changed lines (not a review category)
 │   ├── observability.md
 │   ├── privacy.md
 │   ├── publishing.md    # Publishing rules for --comment (not a review category)

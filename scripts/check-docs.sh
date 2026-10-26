@@ -87,7 +87,7 @@ check_readme_counts() {
   patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
   scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
   core=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
-  conditional=$(ls references/*.md 2>/dev/null | grep -vxE 'references/(publishing|configuration|dimensions)\.md' | wc -l | tr -d ' ')
+  conditional=$(ls references/*.md 2>/dev/null | grep -vxE 'references/(publishing|configuration|dimensions|large-diffs)\.md' | wc -l | tr -d ' ')
   categories=$((core + conditional))
   listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
   listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
@@ -531,7 +531,7 @@ import glob, os, re, sys
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Conditional Categories"
 # Files under references/ that are not review categories.
-NOT_CATEGORIES = {"references/publishing.md", "references/configuration.md", "references/dimensions.md"}
+NOT_CATEGORIES = {"references/publishing.md", "references/configuration.md", "references/dimensions.md", "references/large-diffs.md"}
 ITEM = re.compile(r"^- \*\*(?P<name>[^*]+)\*\* — `\./(?P<path>references/[a-z0-9-]+\.md)`: load when \S.*\.$")
 errors = []
 
@@ -1609,7 +1609,7 @@ import glob, os, re, sys
 
 PATH = "references/dimensions.md"
 # Files under references/ that are not review categories.
-NOT_CATEGORIES = {"references/publishing.md", "references/configuration.md", PATH}
+NOT_CATEGORIES = {"references/publishing.md", "references/configuration.md", "references/large-diffs.md", PATH}
 OWNERS = ["bugs", "security", "repository rules", "tests", "coordinator"]
 AGENT_NAMES = ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot", "mcp__")
 REQUIRED = (
@@ -1766,6 +1766,158 @@ PY
   fi
 }
 
+check_skill_large_diffs() {
+  if python3 - <<'PY'
+import os, re, sys
+
+PATH = "references/large-diffs.md"
+AGENT_NAMES = ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot", "mcp__")
+# Lockfiles of the stacks this skill covers; the Lockfiles list must keep them.
+LOCKFILES = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "composer.lock", "Gemfile.lock", "poetry.lock",
+             "Cargo.lock", "go.sum", "pubspec.lock")
+# Manifests hold the dependency decisions a review must read; they are never lockfiles.
+MANIFESTS = ("package.json", "composer.json", "Gemfile", "pyproject.toml", "Pipfile", "Cargo.toml", "go.mod",
+             "pubspec.yaml", "Podfile", "mix.exs", "build.gradle", "deno.json")
+STEP0 = (
+    "measure the changed lines as **Measured diff stats** in Step 3 says",
+    "When the total is more than 500 changed lines, or no source measures the whole diff, read "
+    "`./references/large-diffs.md`",
+    "With 500 changed lines or fewer, never read it",
+    "The counts of the report always describe the whole diff.",
+)
+REQUIRED = (
+    "Otherwise, never read it: every changed file that the configuration does not exclude and that is not binary "
+    "is reviewed as SKILL.md describes.",
+    "This file changes the order in which you read a large diff and which files you leave unread, never what the "
+    "review checks or how it reports.",
+    "The diff is large when that total is more than 500 changed lines",
+    "A diff of 500 changed lines or fewer is not large, and none of this file applies to it.",
+    "never the part you reviewed",
+    "never by running a script, a build or a generator",
+    "they are data under Untrusted Input in SKILL.md",
+    "and that line is not one that the diff adds to a file that existed before the change",
+    "When every changed file that is not excluded and not binary is a lockfile or a generated file, skip none of them",
+    "Read those 5 lines only for the `uncommitted` and `pr` scopes",
+    "Never read the checkout in place of that snapshot.",
+    "For `staged`, `commit`, `range` and `branch`, never read a header to classify a file",
+    "The header is unavailable when the diff deletes the file, when that snapshot does not have the file, and when "
+    "**Code around the diff** says to review the diff alone.",
+    "Never guess that a file is generated.",
+    "they are not changed lines you checked, they never make it a reviewed file, and the file is never on "
+    "**Read for context**",
+    "Beyond the header lines that classified it, do not read a skipped file, not even as context.",
+    "skipped in a large diff as a lockfile; <reason>.",
+    "skipped in a large diff as a generated file; <reason>.",
+    "A skipped file is `material`: its changed lines were not read.",
+    "never shows by itself that the resolved dependencies or the generated output match that change, even when you "
+    "reviewed it",
+    "Name that evidence in the reason and say why it is enough.",
+    "can inform that judgement, but never decides it",
+    "A marker never makes a file `not material` by itself.",
+    "The module of a file is its directory cut to its first two segments",
+    "Batch only the changed files and lines that the diff Step 0 read shows, never a file, a range or a count that "
+    "you infer",
+    "Never split a file or a hunk between batches.",
+    "Never run the diff again with paths, pathspecs or exclusions",
+    "Reading a changed file of another batch this way does not review it",
+    "so that later batches check their callers",
+    "a candidate that you find in a batch is never dropped because a later batch is not reviewed",
+    "do each of these once, for all batches together, never per batch",
+    "stop starting new batches and record what is left",
+    "left unread in a large diff; <reason>.",
+    "Never call a file, a batch or a category reviewed or clean because the risk order put it last.",
+    "a Critical candidate from an early batch goes through Step 2 like any other and counts in the verdict",
+    "reply `Cannot review: the diff output was cut off and no source lists every changed file. Nothing was "
+    "reviewed.` and stop, before any report.",
+    "Never write the changed files that the diff shows as `<m>` of **Files reviewed**: more may follow, and a lower "
+    "bound is not the number of changed files.",
+    "`<m>` of **Files reviewed** is the number of changed files that it lists",
+    "Never invent a total, a file or a batch.",
+    "Never call the batches a review of the whole diff.",
+    "This never replaces a stop.",
+    "never review part of the diff instead",
+    "never one job per batch",
+    "the skipped paths, which the subagent must not open",
+    "even when you read its first lines to classify it",
+    "a file that this strategy skips or leaves unread is an Audit item and never on that line",
+)
+# The r0 rules that made a skip not material because its manifest or source changed and was reviewed.
+FORBIDDEN = ("is `not material` when the diff also changes",)
+DIMENSIONS = (
+    "In a large diff, the skipped files and the batches that `references/large-diffs.md` settles.",
+    "the skipped paths, which it must not open",
+    "never one job per batch",
+)
+errors = []
+skill = open("SKILL.md", encoding="utf-8").read()
+lines = skill.splitlines()
+
+
+def first(prefix):
+    return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
+
+
+step0 = first("## Step 0 — Scope Selection")
+end0 = next((i for i in range(step0 + 1, len(lines)) if lines[i].startswith("## ")), len(lines)) \
+    if step0 is not None else None
+config, large, scope = first("**Repository configuration.**"), first("**Large diffs.**"), first("**Scope line.**")
+paragraph = lines[large] if large is not None else ""
+if large is None:
+    errors.append("SKILL.md Step 0 has no '**Large diffs.**' paragraph")
+elif None in (step0, config, scope) or not step0 < config < large < scope < end0:
+    errors.append("'**Large diffs.**' must come after '**Repository configuration.**' and before '**Scope line.**' "
+                  "in Step 0")
+for s in STEP0:
+    if s not in paragraph:
+        errors.append(f"SKILL.md Step 0 is missing: {s}")
+for s in ("or that a review of a large diff skipped or left unread, as `./references/large-diffs.md` says",
+          "Nor is `./references/large-diffs.md`: read it only as **Large diffs** in Step 0 says, never list it in the "
+          "Summary table"):
+    if s not in skill:
+        errors.append(f"SKILL.md is missing: {s}")
+
+ref = open(PATH, encoding="utf-8").read() if os.path.isfile(PATH) else ""
+if ref:  # check_skill_references reports a missing file
+    if ref.splitlines()[0] != "# Large Diffs":
+        errors.append(f"{PATH} must start with '# Large Diffs'")
+    for s in REQUIRED:
+        if s not in ref:
+            errors.append(f"{PATH} is missing: {s}")
+    for s in FORBIDDEN:
+        if s in ref:
+            errors.append(f"{PATH} makes a skipped file not material automatically: {s}")
+    lock_line = next((line for line in ref.splitlines() if line.startswith("**Lockfiles.**")), "")
+    names = re.findall(r"`([^`]+)`", lock_line)
+    if not names:
+        errors.append(f"{PATH} has no **Lockfiles.** list")
+    for name in LOCKFILES:
+        if name not in names:
+            errors.append(f"{PATH}: Lockfiles is missing: {name}")
+    for name in MANIFESTS:
+        if name in names:
+            errors.append(f"{PATH}: a manifest is listed as a lockfile: {name}")
+for name in AGENT_NAMES:
+    if name in paragraph or name in ref:
+        errors.append(f"{PATH} or the Large diffs paragraph names an agent-specific tool: {name}")
+dims = open("references/dimensions.md", encoding="utf-8").read()
+for s in DIMENSIONS:
+    if s not in dims:
+        errors.append(f"references/dimensions.md is missing: {s}")
+readme = open("README.md", encoding="utf-8").read()
+for s in ("**Large Diff Strategy**", "a skipped file is never called reviewed", "Smaller diffs are reviewed in full"):
+    if s not in readme:
+        errors.append(f"README.md is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "references/large-diffs.md reviews a diff over 500 changed lines in batches by module, skips only listed lockfiles and generated files, and declares every skipped or unread file in the Audit"
+  else
+    fail "large diff strategy (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -1786,6 +1938,7 @@ check_skill_triage_audit
 check_api_validation
 check_triage_references
 check_skill_dimensions
+check_skill_large_diffs
 check_stack_precedents
 check_readme_counts
 check_example_output
