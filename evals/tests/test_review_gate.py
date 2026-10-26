@@ -352,10 +352,12 @@ class RuleCitationTest(unittest.TestCase):
         return doc
 
     def test_rule_path_with_a_space_exits_0(self):
-        doc = self.spaced_rule_doc("src/Web App/AGENTS.md:L4-L5")
-        self.assertEqual(review_gate.contract_errors(doc), [])
-        self.assertEqual(run_gate_all("-", stdin=json.dumps(doc).encode()),
-                         (0, "review-gate: pass: complete review with no verified Critical finding\n", ""))
+        for rule in ("src/Web App/AGENTS.md:L4-L5", "src/Web App/AGENTS.md:L4"):
+            with self.subTest(rule=rule):
+                doc = self.spaced_rule_doc(rule)
+                self.assertEqual(review_gate.contract_errors(doc), [])
+                self.assertEqual(run_gate_all("-", stdin=json.dumps(doc).encode()),
+                                 (0, "review-gate: pass: complete review with no verified Critical finding\n", ""))
 
     def test_rule_path_without_a_space_still_exits_0(self):
         doc = self.spaced_rule_doc("src/WebApp/AGENTS.md:L4-L5")
@@ -364,8 +366,12 @@ class RuleCitationTest(unittest.TestCase):
     def test_malformed_rule_suffix_is_still_invalid(self):
         for rule in ("src/Web App/AGENTS.md:4", "src/Web App/AGENTS.md:L4-5", "src/Web App/AGENTS.md"):
             with self.subTest(rule=rule):
-                errors = review_gate.contract_errors(self.spaced_rule_doc(rule))
+                doc = self.spaced_rule_doc(rule)
+                errors = review_gate.contract_errors(doc)
                 self.assertEqual(errors, ["review.findings[0].rule must be null or path:Lstart-Lend"])
+                self.assertEqual(run_gate_all("-", stdin=json.dumps(doc).encode()),
+                                 (3, "review-gate: invalid: review.findings[0].rule must be null or path:Lstart-Lend\n",
+                                  ""))
 
 
 class CountTextTest(unittest.TestCase):
@@ -398,6 +404,29 @@ class CountTextTest(unittest.TestCase):
         code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
         self.assertEqual((code, err), (3, ""), out)
         self.assertTrue(out.startswith(self.PREFIX), out)
+
+    def test_two_excluded_files_exit_0_without_stderr(self):
+        doc = self.excluded_doc("**Excluded by configuration:** 2 changed files match ignore_paths and were not "
+                                "reviewed: `docs/setup.md`, `src/generated/client.ts`.", 3)
+        code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
+        self.assertEqual((code, err), (0, ""), out)
+
+    def test_listed_count_one_past_the_digit_limit_exits_3_without_a_traceback(self):
+        # 1 + (10**4300 - 1) = 10**4300 has 4301 digits: the sum is valid input, but writing it out is not.
+        doc = self.excluded_doc("**Excluded by configuration:** 2 changed files match ignore_paths and were not "
+                                "reviewed: `docs/setup.md`, and " + "9" * 4300 + " more.", 3)
+        code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
+        self.assertEqual((code, err), (3, ""), out)
+        self.assertTrue(out.startswith(self.PREFIX), out)
+
+    def test_equation_total_past_the_digit_limit_exits_3_without_a_traceback(self):
+        # The excluded and listed counts both hold 4300 digits and agree; the reviewed file makes the total 4301 digits.
+        more = "9" * 4299 + "8"
+        doc = self.excluded_doc("**Excluded by configuration:** " + "9" * 4300 + " changed files match ignore_paths and "
+                                "were not reviewed: `docs/setup.md`, and " + more + " more.", 3)
+        code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
+        self.assertEqual((code, err), (3, ""), out)
+        self.assertTrue(out.startswith("review-gate: invalid: review.audit.files_reviewed: 1 reviewed + "), out)
 
 
 def json_paths(value, path=()):

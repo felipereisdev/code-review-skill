@@ -237,7 +237,7 @@ def _accounting_errors(errors, review):
         listed = len(excluded) + more_count
         if excluded_count == 0 or listed != excluded_count:
             errors.append(f"review.context_lines: the **Excluded by configuration:** line counts {excluded_count} "
-                          f"files and lists {listed}")
+                          f"files and lists {_count_text(listed)}")
             return
     binary, unread = [], []
     for i, item in enumerate(audit["not_verified"]):
@@ -267,7 +267,8 @@ def _accounting_errors(errors, review):
     total = len(reviewed) + excluded_count + len(binary) + len(unread)
     if total != files["changed"]:
         errors.append(f"review.audit.files_reviewed: {len(reviewed)} reviewed + {excluded_count} excluded by "
-                      f"configuration + {len(binary)} binary + {len(unread)} not read as a whole make {total}, "
+                      f"configuration + {len(binary)} binary + {len(unread)} not read as a whole make "
+                      f"{_count_text(total)}, "
                       f"not the {files['changed']} changed files")
     in_context = [path for path in audit["read_for_context"] if path in counted]
     if in_context:
@@ -280,6 +281,14 @@ def _count(digits: str):
         return int(digits)
     except ValueError:
         return None
+
+
+def _count_text(number: int) -> str:
+    """The decimal text of a count the gate computed, or a fixed phrase when str() refuses a number this long."""
+    try:
+        return str(number)
+    except ValueError:
+        return "a count too long to write out"
 
 
 def expected_row(review: dict) -> int:
