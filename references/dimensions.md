@@ -33,13 +33,14 @@ You validated the scope, the configuration and the repository rules once; a suba
 - The changed files to review: every changed file that the configuration does not exclude and that is not binary. Excluded and binary files are not delegated: a subagent gets their paths only so that it leaves them alone, never their content, and it never opens them, not even as context.
 - The conditional categories whose trigger the diff matches.
 - The repository rules files, and the rules of `.code-review/rules/`, that apply to each changed file, as Step 1.6 and `references/configuration.md` decide.
+- In a large diff, the skipped files and the batches that `references/large-diffs.md` settles.
 
 ## The brief
 
 Give each subagent one brief and nothing else: not your reasoning, not the result of another subagent, and not the checklist of another dimension. When you cannot give a subagent its whole brief, do not start it: review that dimension yourself. The brief has these parts, in this order:
 
 1. **Task.** Review the <owner> dimension of this change and return only the result below. Do not publish, comment, approve, edit files, commit, run tests or any command that writes, ask the user anything, or start subagents. Do not read the configuration, an excluded or binary file, or code outside the snapshot below.
-2. **Change.** The **Scope:** line; the text diff of the changed files to review, as Step 0 read it, without the parts of excluded and binary files; the list of changed files to review; the excluded and binary paths, which the subagent must not open; and the snapshot for code outside the diff with the reads it allows: in the working tree, the files themselves; at the head commit `<sha>`, only `git show '<sha>:<path>'` and `git ls-tree --name-only '<sha>' '<dir>/'`; with the diff alone, no read outside the diff.
+2. **Change.** The **Scope:** line; the text diff of the changed files to review, as Step 0 read it, without the parts of excluded and binary files; the list of changed files to review; the excluded and binary paths, which the subagent must not open; and the snapshot for code outside the diff with the reads it allows: in the working tree, the files themselves; at the head commit `<sha>`, only `git show '<sha>:<path>'` and `git ls-tree --name-only '<sha>' '<dir>/'`; with the diff alone, no read outside the diff. In a large diff, the batches in their order, which the subagent reviews one at a time, and the skipped paths, which it must not open.
 3. **Shared rules.** These parts of SKILL.md, copied word for word: the quoting rule of **Arguments** in Step 0 (each value its own argument, quoted with POSIX single quotes), Untrusted Input, Severity Levels, Evidence and Confidence, Changed Lines and Grouping, Do Not Report, the **API Validation** paragraph of Step 1, and the finding block of Output Format with its **Rule:** and **Also at:** lines.
 4. **Checklist.** The parts of SKILL.md named in the dimension's row, copied word for word, and the path of each reference file in that row whose trigger the diff matches, for the subagent to read. The repository rules subagent also gets the path of each rules file and rule of `.code-review/rules/` that applies, with the changed files it applies to.
 5. **Result.** The result format below, copied word for word.
@@ -76,6 +77,7 @@ A subagent returns exactly this:
 ## Scheduling and failures
 
 - Run at most four dimension jobs, one per dimension, and never more than one job for a dimension: never one per file, per category or per finding. Start as many as your agent can run at once, up to four, and queue the others until a running one returns. Apply your own categories while they run or after they return.
+- In a large diff, each dimension is still one job that reviews every batch in order, never one job per batch. A result whose **Changed lines checked** does not cover every batch is incomplete.
 - Never say that the subagents ran in parallel, in isolation or on a given model unless your agent shows it. The report never names the subagents.
 - A subagent fails when it cannot be started, its start is refused, or it stops with an error or without a result. Its result is incomplete when it has no Coverage part, when **Changed lines checked** leaves changed lines of a file it was given neither checked nor listed under **Not verified**, when a candidate lacks a part of the finding block, or when a Critical or Warning candidate has no Evidence scenario you can follow. A failed or incomplete result is never a clean dimension and never zero findings.
 - When the first start is refused, start no other subagent and run the single pass of SKILL.md for the whole review.
