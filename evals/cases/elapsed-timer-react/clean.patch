@@ -1,0 +1,40 @@
+diff --git a/src/components/QuizHeader.test.tsx b/src/components/QuizHeader.test.tsx
+index e9774d8..5392036 100644
+--- a/src/components/QuizHeader.test.tsx
++++ b/src/components/QuizHeader.test.tsx
+@@ -7,4 +7,9 @@ describe('QuizHeader', () => {
+     render(<QuizHeader title="Capitals" />);
+     expect(screen.getByRole('heading', { name: 'Capitals' })).toBeTruthy();
+   });
++
++  it('starts the timer at zero', () => {
++    render(<QuizHeader title="Capitals" />);
++    expect(screen.getByText('Time: 0s')).toBeTruthy();
++  });
+ });
+diff --git a/src/components/QuizHeader.tsx b/src/components/QuizHeader.tsx
+index eb4fdfb..b74475a 100644
+--- a/src/components/QuizHeader.tsx
++++ b/src/components/QuizHeader.tsx
+@@ -1,11 +1,21 @@
++import { useEffect, useState } from 'react';
++
+ interface QuizHeaderProps {
+   title: string;
+ }
+ 
+ export function QuizHeader({ title }: QuizHeaderProps) {
++  const [seconds, setSeconds] = useState(0);
++
++  useEffect(() => {
++    const id = setInterval(() => setSeconds((s) => s + 1), 1000);
++    return () => clearInterval(id);
++  }, []);
++
+   return (
+     <header>
+       <h1>{title}</h1>
++      <p aria-live="off">Time: {seconds}s</p>
+     </header>
+   );
+ }

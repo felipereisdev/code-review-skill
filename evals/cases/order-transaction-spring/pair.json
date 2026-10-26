@@ -1,0 +1,14 @@
+{
+  "topic": "transaction-boundary",
+  "stack": "java-spring",
+  "description": "Adds quantity validation and extracts persist(); the bug moves @Transactional to persist, which placeOrder calls on this, the clean diff keeps it on placeOrder, which the controller calls through the Spring proxy.",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": ["self[- ]?invo|proxy|this\\.persist|internal (?:method )?call|same class|bypass", "transaction|rollback|roll(?:s|ed)? back|atomic"],
+    "location": {"path": "src/main/java/com/example/shop/OrderService.java", "side": "new"},
+    "scenario": "The controller calls placeOrder, which has no @Transactional, and placeOrder calls this.persist, a self-invocation that bypasses the transaction proxy; orders.save commits in its own repository transaction, and when stock.reserve throws OutOfStockException the order stays saved with no stock reserved."
+  },
+  "clean": {
+    "why_safe": "placeOrder keeps @Transactional and is called by the controller through the Spring proxy, so persist runs inside that transaction and OutOfStockException, a RuntimeException, rolls back the saved order."
+  }
+}
