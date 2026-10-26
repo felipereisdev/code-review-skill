@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sys
@@ -629,6 +630,26 @@ class CompletenessTest(unittest.TestCase):
         report = "```\n**Ready to merge:** Yes — x\n```\nCode review passed — no issues found.\n\n## Audit\n"
         result = report_completeness(report)
         self.assertEqual((result["ready_to_merge"], result["complete"]), (None, False))
+
+
+class CompletenessProbeCorpusTest(unittest.TestCase):
+    def test_frozen_completeness_probes(self):
+        corpus = json.loads((Path(__file__).with_name("fixtures") / "completeness_probes.json").read_text(encoding="utf-8"))
+        self.assertEqual(corpus["schema_version"], 1)
+        probes = corpus["probes"]
+        self.assertEqual(len(probes), 29)
+        self.assertEqual(len({probe["id"] for probe in probes}), 29)
+        self.assertEqual(sum(1 for probe in probes if probe["expected_complete"]), 15)
+        repo = Path(__file__).resolve().parents[2]
+        for probe in probes:
+            with self.subTest(probe=probe["id"]):
+                if "report_path" in probe:
+                    data = (repo / probe["report_path"]).read_bytes()
+                    self.assertEqual(hashlib.sha256(data).hexdigest(), probe["report_sha256"])
+                    report = data.decode("utf-8")
+                else:
+                    report = probe["report"]
+                self.assertEqual(report_completeness(report)["complete"], probe["expected_complete"], probe["reason"])
 
 
 class LocationScoringTest(unittest.TestCase):

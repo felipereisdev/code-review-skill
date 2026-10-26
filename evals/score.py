@@ -41,6 +41,10 @@ _AUDIT_LINE_RE = re.compile(r"^(?:#{1,6}\s*audit\s*#*\s*$|[\s*_]*audit:)", re.I)
 _FILE_LOCATION_RE = re.compile(r"^\W*(?:file|location)s?\W*:[\s*_]*(?P<value>.*)$", re.I)
 _LOCATION_TOKEN_RE = re.compile(r"`([^`]+)`|([^\s`:|]+)")
 _LINE_SUFFIX_RE = re.compile(r":\d+(?:-\d+)?$")
+# Explicit unfinished-review metadata (SKILL.md Step 3): the verdict reason of rows 1 and 3 or the row 2 suffix,
+# and an Audit limit marked material (``<what> — <tag>, material: …`` or the compact ``(<tag>, material)``).
+_NOT_FULLY_REVIEWED_RE = re.compile(r"\bnot fully reviewed\b", re.I)
+_MATERIAL_LIMIT_RE = re.compile(r",\s*material\b", re.I)
 
 _NORMALIZED_SEVERITY = {
     "critical": "Critical",
@@ -264,22 +268,42 @@ def _incomplete_report(lines: list[str]) -> bool:
             and any(_AUDIT_LINE_RE.match(line) for line in lines))
 
 
-def report_completeness(report: str) -> dict:
-    """Describe whether ``report`` is a finished review, not one cut off or left incomplete.
+def _audit_lines(lines: list[str]) -> list[str]:
+    """Return the Audit: the compact Audit line, or the lines from the Audit heading to the next level 1-2 heading."""
+    audit = []
+    inside = False
+    for line in lines:
+        heading = _HEADING_RE.match(line)
+        if inside and heading is not None and len(heading.group(1)) <= 2:
+            break
+        if not inside and _AUDIT_LINE_RE.match(line):
+            inside = True
+        if inside:
+            audit.append(line)
+    return audit
 
-    The verdict cannot tell an incomplete review that still lists findings (rows 1 and 3)
-    from a complete one (row 2), so those reports count as complete.
+
+def report_completeness(report: str) -> dict:
+    """Describe whether ``report`` is a finished review, not one cut off, left unfinished or contradictory.
+
+    A report is unfinished when its last Ready to merge line says ``not fully reviewed`` (verdict rows 1
+    and 3, or the row 2 suffix) or its Audit marks a limit ``material``. It contradicts itself when the
+    passed headline stands beside a Ready to merge that is not Yes. Neither is complete.
     """
     lines = _outside_fences(report)
-    readiness = [m.group(1).lower() for m in map(_READY_LINE_RE.match, lines) if m]
-    ready = _READY_VALUES[readiness[-1]] if readiness else None
+    ready_lines = [(m, line) for m, line in zip(map(_READY_LINE_RE.match, lines), lines) if m]
+    ready = _READY_VALUES[ready_lines[-1][0].group(1).lower()] if ready_lines else None
     audit = any(_AUDIT_LINE_RE.match(line) for line in lines)
     incomplete = any(INCOMPLETE_LINE.match(line) for line in lines)
+    unfinished = bool(ready_lines and _NOT_FULLY_REVIEWED_RE.search(ready_lines[-1][1])) or any(
+        _MATERIAL_LIMIT_RE.search(line) for line in _audit_lines(lines))
+    contradiction = ready != "Yes" and any(PASSED_LINE.match(line) for line in lines)
     return {
         "ready_to_merge": ready,
         "audit": audit,
         "incomplete_headline": incomplete,
-        "complete": looks_like_report(report) and ready is not None and audit and not incomplete,
+        "complete": (looks_like_report(report) and ready is not None and audit and not incomplete
+                     and not unfinished and not contradiction),
     }
 
 
