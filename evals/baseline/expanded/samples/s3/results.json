@@ -1,0 +1,1143 @@
+{
+  "schema_version": 2,
+  "kind": "pairs",
+  "generated_at": "2026-10-26T20:02:34Z",
+  "sample": "s3",
+  "attempt": 1,
+  "agent": {
+    "name": "claude",
+    "model": "claude-sonnet-5-5",
+    "command": "claude -p --safe-mode --disable-slash-commands --strict-mcp-config --no-session-persistence --permission-mode dontAsk --effort high --tools \"Read,Grep,Glob,Bash\" --allowedTools \"Read,Grep,Glob,Bash(rtk proxy git diff:*),Bash(rtk proxy git show:*),Bash(rtk proxy git status:*),Bash(rtk proxy git log:*),Bash(rtk proxy git blame:*),Bash(rtk proxy git rev-parse:*),Bash(rtk proxy git ls-tree:*),Bash(rtk proxy git ls-files:*),Bash(rtk proxy git merge-base:*),Bash(rtk proxy git rev-list:*),Bash(rtk proxy git symbolic-ref --quiet --short refs/remotes/origin/HEAD),Bash(rtk proxy git branch --show-current),Bash(rtk proxy git remote -v),Bash(rtk proxy git remote get-url:*),Bash(rtk proxy ls:*),Bash(rtk proxy test:*)\" --add-dir \"$EVAL_SKILL_DIR\" --model \"$EVAL_MODEL\" --output-format text",
+    "mcp": "unknown (custom agent command)",
+    "profile": "evals/profiles/sonnet-rtk-readonly.json"
+  },
+  "skill": {
+    "commit": "2af654d2be9c8e9a7a448b6e8e43bfb14172a9f8",
+    "skill_md_sha256": "b94e51653db6228903ce73297565f1d1c14b583f9fc10881f3b67256fcbb1c5f",
+    "dirty": false
+  },
+  "provenance": {
+    "commit": "2af654d2be9c8e9a7a448b6e8e43bfb14172a9f8",
+    "dirty": false,
+    "skill_tree_sha256": "e230ce6b116a04901d5a479aaef066b090b95da45b02e8da7a484ad03b0c9d02",
+    "runner_sha256": "9b552b320d309d41e16499d9b2d4a9d8fb9f6cf9a4875188973ba063e9045067",
+    "scorer_sha256": "fb070feccfc59ef610a4bee05dfdf216738f51e62ed60c1653dafafe2a6612ba",
+    "gate_sha256": "36764262aed42a66fb36e3863242eb95b23a6958eee5cfdd13eb115d52e6fdaa",
+    "cases_tree_sha256": "5ca0541a143fbc208aaa0dac35954755d0ae92b676ae8d9cd0d86131a774dc71",
+    "controls_tree_sha256": "edf78039f1c914d17fd7b9bd7d7cec32b4e335150fda3b024f12d1f0987b7923",
+    "profile": "evals/profiles/sonnet-rtk-readonly.json",
+    "profile_sha256": "8b9ea30aec21686af278b335e52aa503a1a8dc2b312dfcc8f5607a7bc573973f",
+    "agent_name": "claude",
+    "model": "claude-sonnet-5-5",
+    "timeout": 900,
+    "jobs": 3,
+    "agent_cmd_sha256": "97153fc182b57c2e2efa834d57a33d1f9349c8bb5fc339ac662de660d1e5bad3",
+    "prompt_template_sha256": "4b74f0b4511d71d9a463097c4de3801f6110a99890df192864a516cfca6aff26",
+    "prompt_addendum_sha256": "170564aa71f72fd0cc047938cba4e34ef52748c16e3d7b45dc131dd6d634b896"
+  },
+  "provenance_after": {
+    "commit": "2af654d2be9c8e9a7a448b6e8e43bfb14172a9f8",
+    "dirty": false,
+    "skill_tree_sha256": "e230ce6b116a04901d5a479aaef066b090b95da45b02e8da7a484ad03b0c9d02",
+    "runner_sha256": "9b552b320d309d41e16499d9b2d4a9d8fb9f6cf9a4875188973ba063e9045067",
+    "scorer_sha256": "fb070feccfc59ef610a4bee05dfdf216738f51e62ed60c1653dafafe2a6612ba",
+    "gate_sha256": "36764262aed42a66fb36e3863242eb95b23a6958eee5cfdd13eb115d52e6fdaa",
+    "cases_tree_sha256": "5ca0541a143fbc208aaa0dac35954755d0ae92b676ae8d9cd0d86131a774dc71",
+    "controls_tree_sha256": "edf78039f1c914d17fd7b9bd7d7cec32b4e335150fda3b024f12d1f0987b7923",
+    "profile": "evals/profiles/sonnet-rtk-readonly.json",
+    "profile_sha256": "8b9ea30aec21686af278b335e52aa503a1a8dc2b312dfcc8f5607a7bc573973f",
+    "agent_name": "claude",
+    "model": "claude-sonnet-5-5",
+    "timeout": 900,
+    "jobs": 3,
+    "agent_cmd_sha256": "97153fc182b57c2e2efa834d57a33d1f9349c8bb5fc339ac662de660d1e5bad3",
+    "prompt_template_sha256": "4b74f0b4511d71d9a463097c4de3801f6110a99890df192864a516cfca6aff26",
+    "prompt_addendum_sha256": "170564aa71f72fd0cc047938cba4e34ef52748c16e3d7b45dc131dd6d634b896"
+  },
+  "metrics": {
+    "bug_cases": 12,
+    "detected": 12,
+    "recall": 1.0,
+    "clean_cases": 12,
+    "false_positive_cases": 0,
+    "false_positive_findings": 0,
+    "errors": 0,
+    "complete": 24,
+    "clean_complete_no_fp": 12,
+    "worktree_changed": 0
+  },
+  "cases": [
+    {
+      "trial_id": "s3/elapsed-timer-react/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "elapsed-timer-react/bug",
+      "pair": "elapsed-timer-react",
+      "kind": "bug",
+      "topic": "stale-closure",
+      "stack": "react",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 28.3,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Warning",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/elapsed-timer-react__bug.md",
+      "report_sha256": "7713c9c191fd93e9feed32bff7196e614b489c02633126edf42bfd61c99dda1d"
+    },
+    {
+      "trial_id": "s3/elapsed-timer-react/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "elapsed-timer-react/clean",
+      "pair": "elapsed-timer-react",
+      "kind": "clean",
+      "topic": "stale-closure",
+      "stack": "react",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 49.4,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Warning",
+          "severity": "Warning",
+          "needs_verification": true,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/elapsed-timer-react__clean.md",
+      "report_sha256": "b53787bb81c2c5ef005c2fcc0c2bceb7935037aefd5129ae28bd30f68a667d7b"
+    },
+    {
+      "trial_id": "s3/invoice-owner-go/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "invoice-owner-go/bug",
+      "pair": "invoice-owner-go",
+      "kind": "bug",
+      "topic": "removed-authorization",
+      "stack": "go",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 38.1,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Security — Critical",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": true
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Security — Critical",
+          "severity": "Critical",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/invoice-owner-go__bug.md",
+      "report_sha256": "46fdaa82698b940278150ee8f00e947e43f684b33755695b12fb62a89b973496"
+    },
+    {
+      "trial_id": "s3/invoice-owner-go/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "invoice-owner-go/clean",
+      "pair": "invoice-owner-go",
+      "kind": "clean",
+      "topic": "removed-authorization",
+      "stack": "go",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 47.2,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": false
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Architecture — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/invoice-owner-go__clean.md",
+      "report_sha256": "e74494d3ae3f1779391a4bad4e07ac6d9cd0462df820edeca191d22d8bb1b467"
+    },
+    {
+      "trial_id": "s3/n-plus-one-laravel/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "n-plus-one-laravel/bug",
+      "pair": "n-plus-one-laravel",
+      "kind": "bug",
+      "topic": "n-plus-one",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 42.8,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Performance — Warning",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Performance — Warning",
+          "severity": "Warning",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/n-plus-one-laravel__bug.md",
+      "report_sha256": "42aeeb7fb06019422a012a09643db238e8f69b3cb562890170e7cefb1980e478"
+    },
+    {
+      "trial_id": "s3/n-plus-one-laravel/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "n-plus-one-laravel/clean",
+      "pair": "n-plus-one-laravel",
+      "kind": "clean",
+      "topic": "n-plus-one",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 40.3,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/n-plus-one-laravel__clean.md",
+      "report_sha256": "867a244752876d9476e218fdc466aae44e9026665371faf08acd4b4c1385dc59"
+    },
+    {
+      "trial_id": "s3/null-node/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "null-node/bug",
+      "pair": "null-node",
+      "kind": "bug",
+      "topic": "null-undefined",
+      "stack": "node",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 31.4,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Critical",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Critical",
+          "severity": "Critical",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/null-node__bug.md",
+      "report_sha256": "473a298822a9fbb2fc2b4d30ca4f4bb4220a0ab4be1a9afd2a5a5f45554737bc"
+    },
+    {
+      "trial_id": "s3/null-node/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "null-node/clean",
+      "pair": "null-node",
+      "kind": "clean",
+      "topic": "null-undefined",
+      "stack": "node",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 22.7,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/null-node__clean.md",
+      "report_sha256": "3e8ed6c6c0838abbc8327539843e87851630fa26b415d6b9b75e90c9d808aca6"
+    },
+    {
+      "trial_id": "s3/off-by-one-python/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "off-by-one-python/bug",
+      "pair": "off-by-one-python",
+      "kind": "bug",
+      "topic": "off-by-one",
+      "stack": "python",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 32.2,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Warning",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/off-by-one-python__bug.md",
+      "report_sha256": "323414d09127c886cb0ef1a6aa44fab6a53bcc13ce19ace0b57925bfbe4d804a"
+    },
+    {
+      "trial_id": "s3/off-by-one-python/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "off-by-one-python/clean",
+      "pair": "off-by-one-python",
+      "kind": "clean",
+      "topic": "off-by-one",
+      "stack": "python",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 22.0,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/off-by-one-python__clean.md",
+      "report_sha256": "0aa61a1d9b4eba4df189765f9afbed40695dff5f6221848d83db6fb4cc0d7e75"
+    },
+    {
+      "trial_id": "s3/order-transaction-spring/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "order-transaction-spring/bug",
+      "pair": "order-transaction-spring",
+      "kind": "bug",
+      "topic": "transaction-boundary",
+      "stack": "java-spring",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 52.3,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Critical",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Critical",
+          "severity": "Critical",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/order-transaction-spring__bug.md",
+      "report_sha256": "7549bfc040afafefbd390eb303125b28945ee4095f2049cee1b33d41e55b0855"
+    },
+    {
+      "trial_id": "s3/order-transaction-spring/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "order-transaction-spring/clean",
+      "pair": "order-transaction-spring",
+      "kind": "clean",
+      "topic": "transaction-boundary",
+      "stack": "java-spring",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 41.0,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/order-transaction-spring__clean.md",
+      "report_sha256": "d1e503253036ef0f668ec9db39ceddcd8908e806b296cee1257cecb3ab4f3a16"
+    },
+    {
+      "trial_id": "s3/price-units-ts/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "price-units-ts/bug",
+      "pair": "price-units-ts",
+      "kind": "bug",
+      "topic": "caller-contract",
+      "stack": "typescript",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 35.4,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Warning",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/price-units-ts__bug.md",
+      "report_sha256": "a043b9776f0e2a906d601797135111c2ecd54007c466b6aa8f9f282754c9735e"
+    },
+    {
+      "trial_id": "s3/price-units-ts/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "price-units-ts/clean",
+      "pair": "price-units-ts",
+      "kind": "clean",
+      "topic": "caller-contract",
+      "stack": "typescript",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 30.4,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/price-units-ts__clean.md",
+      "report_sha256": "e4b7f0a88af1c4914af7537426eccf897401a306bb76eb9c3d6b0cd8956c4415"
+    },
+    {
+      "trial_id": "s3/refund-window-python/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "refund-window-python/bug",
+      "pair": "refund-window-python",
+      "kind": "bug",
+      "topic": "requirement-violation",
+      "stack": "python",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 43.7,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Warning",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": true,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "01b9e05969959a00625fd8eebd82d9999eaa52c5f68928731b2f13c8d17bb48d",
+      "report": "reports/refund-window-python__bug.md",
+      "report_sha256": "c853d7a683e44d8e2729575afd0877d484e1f33ef6c78bf909d53c7b53893c18"
+    },
+    {
+      "trial_id": "s3/refund-window-python/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "refund-window-python/clean",
+      "pair": "refund-window-python",
+      "kind": "clean",
+      "topic": "requirement-violation",
+      "stack": "python",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 29.3,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": true,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "01b9e05969959a00625fd8eebd82d9999eaa52c5f68928731b2f13c8d17bb48d",
+      "report": "reports/refund-window-python__clean.md",
+      "report_sha256": "cb3e499ad5c4f4f430f232c976807b1fa6578b85d6e2dbdbc8170a3b333520d7"
+    },
+    {
+      "trial_id": "s3/sale-price-node/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "sale-price-node/bug",
+      "pair": "sale-price-node",
+      "kind": "bug",
+      "topic": "removed-validation",
+      "stack": "node",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 40.4,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Warning",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": true
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/sale-price-node__bug.md",
+      "report_sha256": "a20922d616c336a005dafba755dfbd90bf9d14041cd794c94350e36885156793"
+    },
+    {
+      "trial_id": "s3/sale-price-node/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "sale-price-node/clean",
+      "pair": "sale-price-node",
+      "kind": "clean",
+      "topic": "removed-validation",
+      "stack": "node",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 47.7,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": false
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Potential Bugs — Warning",
+          "severity": "Warning",
+          "needs_verification": true,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/sale-price-node__clean.md",
+      "report_sha256": "58229f7267260e99926b4ca92fc95b2fb46445e4b1263f304c26c7b0dee0d3e6"
+    },
+    {
+      "trial_id": "s3/sqli-laravel/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "sqli-laravel/bug",
+      "pair": "sqli-laravel",
+      "kind": "bug",
+      "topic": "sql-injection",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 45.5,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Security — Critical",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Security — Critical",
+          "severity": "Critical",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Architecture — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Privacy/Compliance — Warning",
+          "severity": "Warning",
+          "needs_verification": true,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/sqli-laravel__bug.md",
+      "report_sha256": "0386d7f3b123fac73ea456edd84217f0dc878c2d90d55255a2b61aeed86cc0ae"
+    },
+    {
+      "trial_id": "s3/sqli-laravel/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "sqli-laravel/clean",
+      "pair": "sqli-laravel",
+      "kind": "clean",
+      "topic": "sql-injection",
+      "stack": "laravel",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 48.5,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "With fixes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Privacy/Compliance — Warning",
+          "severity": "Warning",
+          "needs_verification": true,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/sqli-laravel__clean.md",
+      "report_sha256": "7dcdf0bd9d22d32de716412cf8fdeeb02a45fe27d6c9719ac67542e05a489f83"
+    },
+    {
+      "trial_id": "s3/swallowed-error-ts/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "swallowed-error-ts/bug",
+      "pair": "swallowed-error-ts",
+      "kind": "bug",
+      "topic": "swallowed-error",
+      "stack": "typescript",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 42.5,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Potential Bugs — Critical",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Potential Bugs — Critical",
+          "severity": "Critical",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Observability — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/swallowed-error-ts__bug.md",
+      "report_sha256": "f2520c38690dfccd400d535582f0f864e6a72e38be7082587bfdea8adbdec9c6"
+    },
+    {
+      "trial_id": "s3/swallowed-error-ts/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "swallowed-error-ts/clean",
+      "pair": "swallowed-error-ts",
+      "kind": "clean",
+      "topic": "swallowed-error",
+      "stack": "typescript",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 39.6,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Resilience — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/swallowed-error-ts__clean.md",
+      "report_sha256": "180b776c6cea0e818c1a9f422f558d8ef45cca099f2f9571293b008b2c193677"
+    },
+    {
+      "trial_id": "s3/xss-react/bug",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "xss-react/bug",
+      "pair": "xss-react",
+      "kind": "bug",
+      "topic": "xss-false-alarm",
+      "stack": "react",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 45.4,
+      "passed": true,
+      "detected": true,
+      "matched_finding": "Security — Critical",
+      "false_positives": null,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "No",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [
+        {
+          "heading": "Security — Critical",
+          "severity": "Critical",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        },
+        {
+          "heading": "Tests/Coverage — Suggestion",
+          "severity": "Suggestion",
+          "needs_verification": false,
+          "pre_existing": false,
+          "already_raised": false
+        }
+      ],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/xss-react__bug.md",
+      "report_sha256": "4bb5bf6ac4bad955c0f3ff084bb1f3545cc1a0d1316a853237e77842ccd86e7a"
+    },
+    {
+      "trial_id": "s3/xss-react/clean",
+      "sample": "s3",
+      "attempt": 1,
+      "id": "xss-react/clean",
+      "pair": "xss-react",
+      "kind": "clean",
+      "topic": "xss-false-alarm",
+      "stack": "react",
+      "status": "ok",
+      "error": null,
+      "error_class": null,
+      "exit_code": 0,
+      "duration_s": 22.0,
+      "passed": true,
+      "detected": null,
+      "matched_finding": null,
+      "false_positives": 0,
+      "report_valid": true,
+      "complete": true,
+      "ready_to_merge": "Yes",
+      "worktree_unchanged": true,
+      "observations": {
+        "intent_line": true,
+        "spec_cited": null,
+        "history_cited": null
+      },
+      "stack_mentioned": true,
+      "findings": [],
+      "prompt_sha256": "f25bb071bed2e1d803ee9afbf0760e5ec8b69c3c6f47e76408a23da644c4e915",
+      "report": "reports/xss-react__clean.md",
+      "report_sha256": "98300936367e2d2001fc10e430b481cf44a5021d8f707b411c2725d7477056ea"
+    }
+  ]
+}
