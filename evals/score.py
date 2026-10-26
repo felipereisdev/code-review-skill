@@ -45,6 +45,8 @@ _LINE_SUFFIX_RE = re.compile(r":\d+(?:-\d+)?$")
 # and an Audit limit marked material (``<what> — <tag>, material: …`` or the compact ``(<tag>, material)``).
 _NOT_FULLY_REVIEWED_RE = re.compile(r"\bnot fully reviewed\b", re.I)
 _MATERIAL_LIMIT_RE = re.compile(r",\s*material\b", re.I)
+# The passed headline as report metadata: a blockquote marker or literal quote makes it template data, as above.
+_PASSED_HEADLINE_RE = re.compile(r"^[\s*_]*code review passed\s*[—–-]{1,2}\s*no issues found\.?[\s*_]*$", re.I)
 
 _NORMALIZED_SEVERITY = {
     "critical": "Critical",
@@ -297,7 +299,7 @@ def report_completeness(report: str) -> dict:
     incomplete = any(INCOMPLETE_LINE.match(line) for line in lines)
     unfinished = bool(ready_lines and _NOT_FULLY_REVIEWED_RE.search(ready_lines[-1][1])) or any(
         _MATERIAL_LIMIT_RE.search(line) for line in _audit_lines(lines))
-    contradiction = ready != "Yes" and any(PASSED_LINE.match(line) for line in lines)
+    contradiction = ready != "Yes" and any(_PASSED_HEADLINE_RE.match(line) for line in lines)
     return {
         "ready_to_merge": ready,
         "audit": audit,

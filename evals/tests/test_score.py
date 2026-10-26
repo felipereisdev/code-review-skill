@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-from score import looks_like_report, observations, parse_findings, report_completeness, score_bug, score_clean, stack_mentioned  # noqa: E402
+from score import PASSED_LINE, looks_like_report, observations, parse_findings, report_completeness, score_bug, score_clean, stack_mentioned  # noqa: E402
 
 SKILL_FORMAT = """\
 Some intro text.
@@ -630,6 +630,14 @@ class CompletenessTest(unittest.TestCase):
         report = "```\n**Ready to merge:** Yes — x\n```\nCode review passed — no issues found.\n\n## Audit\n"
         result = report_completeness(report)
         self.assertEqual((result["ready_to_merge"], result["complete"]), (None, False))
+
+    def test_quoted_passed_headline_beside_with_fixes_is_template_data(self):
+        headline = "Code review passed — no issues found."
+        for template in (f"> {headline}\n", f'"{headline}"\n'):
+            with self.subTest(template=template):
+                self.assertTrue(PASSED_LINE.match(template.strip()))
+                result = report_completeness(f"{COMPLETE_REPORT}\n## Notes\n\n{template}")
+                self.assertEqual((result["ready_to_merge"], result["complete"]), ("With fixes", True))
 
 
 class CompletenessProbeCorpusTest(unittest.TestCase):
