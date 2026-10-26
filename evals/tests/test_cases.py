@@ -379,6 +379,7 @@ failed charge is reported as successful.
 
 PAYMENT_CORPUS_PATH = os.path.join(TESTS_DIR, "fixtures", "payment_probes.json")
 PAYMENT_CORPUS_HEADER = "### Potential Bugs — Warning\n**File:** `src/charge.ts:15`\n"
+PAIR_PROBES_PATH = os.path.join(TESTS_DIR, "fixtures", "pair_probes.json")
 
 
 def load_payment_corpus():
@@ -465,6 +466,34 @@ class LegacyCorpusTest(unittest.TestCase):
             with self.subTest(path=path):
                 with open(os.path.join(REPO_ROOT, path), "rb") as handle:
                     self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), digest)
+
+
+class PairProbeTest(unittest.TestCase):
+    """Frozen labeled probes of the new pairs: they decide what a finding must say, before any measurement."""
+
+    def rows(self):
+        with open(PAIR_PROBES_PATH, encoding="utf-8") as probes:
+            return json.load(probes)
+
+    def test_every_pair_probe_matches_its_label(self):
+        for row in self.rows():
+            bug = load_bug(row["pair"])
+            location = (bug.get("location") or {}).get("path")
+            detected = score_bug(row["report"], bug["patterns"], bug["min_severity"], location)["detected"]
+            with self.subTest(row=row["id"]):
+                self.assertEqual(detected, row["label"] == "DETECT")
+
+    def test_every_new_pair_has_three_detect_and_three_ignore_probes(self):
+        rows = self.rows()
+        new_pairs = sorted(name for name in os.listdir(CASES_DIR)
+                           if os.path.isfile(os.path.join(CASES_DIR, name, "pair.json"))
+                           and name not in eval_run.LEGACY_PAIRS)
+        self.assertTrue(new_pairs)
+        self.assertEqual(sorted({row["pair"] for row in rows}), new_pairs)
+        for pair in new_pairs:
+            with self.subTest(pair=pair):
+                self.assertEqual(sorted(row["label"] for row in rows if row["pair"] == pair),
+                                 ["DETECT"] * 3 + ["IGNORE"] * 3)
 
 
 class BaselineBugReportTest(unittest.TestCase):

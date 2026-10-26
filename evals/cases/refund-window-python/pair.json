@@ -1,0 +1,16 @@
+{
+  "topic": "requirement-violation",
+  "stack": "python",
+  "description": "Adds is_refundable for the refund rule of policy/refund-policy.md, which the request names; the bug measures the 30-day window from created_at, the clean diff from delivered_at as the spec requires.",
+  "request": "Please review my staged changes. They implement the refund rule described in policy/refund-policy.md.",
+  "spec_path": "policy/refund-policy.md",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": ["created_at|\\bplaced\\b|\\bcreation\\b|order date", "deliver"],
+    "location": {"path": "shop/refunds.py", "side": "new"},
+    "scenario": "An order placed on 2026-03-01 and delivered on 2026-03-20 asks for a refund on 2026-04-10, 21 days after delivery: policy/refund-policy.md accepts it, but is_refundable measures 40 days from created_at and returns False."
+  },
+  "clean": {
+    "why_safe": "The window is measured from delivered_at as policy/refund-policy.md requires, <= keeps day 30 inside the window, and an undelivered order returns False before the subtraction."
+  }
+}
