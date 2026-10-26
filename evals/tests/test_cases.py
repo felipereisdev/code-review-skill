@@ -38,7 +38,8 @@ REPO_ROOT = os.path.dirname(EVALS_DIR)
 CASES_DIR = os.path.join(EVALS_DIR, "cases")
 CONTROLS_DIR = os.path.join(EVALS_DIR, "controls")
 BASELINE_DIR = os.path.join(EVALS_DIR, "baseline", "reports")
-PROTOCOL_PATH = os.path.join(EVALS_DIR, "baseline", "expanded", "protocol.json")
+PROTOCOL_PATH = os.path.join(aggregate.CURRENT_STUDY, "protocol.json")
+ORIGINAL_PROTOCOL_PATH = os.path.join(EVALS_DIR, "baseline", "expanded", "protocol.json")
 
 
 def load_bug(case):
@@ -524,6 +525,19 @@ class SuiteTest(unittest.TestCase):
         self.assertEqual((protocol["max_retries"], protocol["retryable_error_classes"]), (1, ["infrastructure"]))
         self.assertTrue(os.path.isfile(os.path.join(REPO_ROOT, protocol["profile"])))
         self.assertEqual(len(aggregate.expected_trials(protocol)), 84)
+
+    def test_current_protocol_keeps_the_original_inventory(self):
+        with open(ORIGINAL_PROTOCOL_PATH, encoding="utf-8") as f:
+            original = json.load(f)
+        with open(PROTOCOL_PATH, encoding="utf-8") as f:
+            current = json.load(f)
+        self.assertEqual(current["study"], "expanded-r2")
+        changed = ("study", "description", "scoring")
+        self.assertEqual({key: value for key, value in current.items() if key not in changed},
+                         {key: value for key, value in original.items() if key not in changed})
+        self.assertEqual(len(current["scoring"]), len(original["scoring"]))
+        self.assertEqual(current["scoring"][:1] + current["scoring"][2:], original["scoring"][:1] + original["scoring"][2:])
+        self.assertIn("not fully reviewed", current["scoring"][1])
 
 
 class BaselineBugReportTest(unittest.TestCase):

@@ -30,6 +30,8 @@ MANIFEST = "manifest-sha256.txt"
 # A rescore recomputes every scored field from the raw reports; only these may change.
 RESCORE_ALGORITHM = "completeness-v2"
 RESCORABLE_FIELDS = ("complete", "passed", "checks.complete")
+# The study whose aggregate is the canonical baseline.json.
+CURRENT_STUDY = os.path.join(EVALS_DIR, "baseline", "expanded-r2")
 
 
 class StudyError(Exception):

@@ -12,7 +12,7 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 EVALS = os.path.dirname(HERE)
 AGGREGATE = os.path.join(EVALS, "aggregate.py")
 BASELINE = os.path.join(EVALS, "baseline.json")
-BASELINE_SHA256 = "ca33dc8c7c74757a642bf2ddd584ea37a7f579f412364c00f834cb337f84918a"
+BASELINE_SHA256 = "2eebfa1916335fbbee48c47e8c92f3bd64ab1e0dca6c4dbe81f43af016ce8e76"
 
 sys.path.insert(0, EVALS)
 import aggregate  # noqa: E402
@@ -249,13 +249,22 @@ class IdentityTest(unittest.TestCase):
 
 class CommittedBaselineTest(unittest.TestCase):
     def test_committed_baseline_matches_its_study(self):
-        study = os.path.join(EVALS, "baseline", "expanded")
+        study = aggregate.CURRENT_STUDY
+        # Until the current study is recorded, baseline.json is still the original study's aggregate.
         if not os.path.exists(os.path.join(study, "freeze.json")):
             with open(BASELINE, "rb") as handle:
                 self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), BASELINE_SHA256)
             return
         with open(BASELINE, encoding="utf-8") as handle:
             self.assertEqual(json.load(handle), aggregate.build(study))
+
+
+class OriginalStudyTest(unittest.TestCase):
+    def test_original_study_keeps_its_aggregate(self):
+        with open(os.path.join(ORIGINAL_STUDY, "aggregate.json"), encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle), aggregate.build(ORIGINAL_STUDY))
+        with open(os.path.join(ORIGINAL_STUDY, "manifest-sha256.txt"), "rb") as handle:
+            self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), ORIGINAL_MANIFEST_SHA256)
 
 
 ORIGINAL_STUDY = os.path.join(EVALS, "baseline", "expanded")
