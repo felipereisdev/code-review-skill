@@ -645,6 +645,12 @@ for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<b
           "A value that starts with `-` is always rejected",
           "Apply these rules in order and stop at the first one that matches",
           "**Headless runs never ask.**", "In a headless run, never ask a question",
+          "**Refused calls.**", "A refusal is not an exit status, and it refuses only that call",
+          "Run each command this skill names as its own call, in its written form",
+          "never save output to a file: search the output you already have instead",
+          "with `was refused` in place of `failed`",
+          "naming the refused command, never a whole tool or the session, and never a command you did not run",
+          "Never ask for a permission, a tool or another mode in a headless run",
           "ask only when detection is ambiguous", "A headless run uses `uncommitted`",
           "`Nothing to review: <command> shows no changes.`",
           "`Cannot review: the default branch could not be detected; pass a base with branch <base>. Nothing was reviewed.`",
@@ -826,7 +832,8 @@ else:
               "their exits are results, not failures",
               "**Repository.**",
               "`gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,"
-              "closingIssuesReferences,comments,reviews`",
+              "additions,deletions,closingIssuesReferences,comments,reviews`",
+              "head commit `sha`, the `base_sha` of `diff_refs`, `web_url`",
               "`gh pr diff <n> -R <repository>`", "gh api graphql --hostname <host> --paginate", "isResolved", "isOutdated",
               "commits(first: 100, after: $endCursor)", "node(id: $threadId)",
               "gh api graphql --hostname <host> -f threadId=<thread-id> -f endCursor=<cursor>",
@@ -959,9 +966,13 @@ require("Pull Request Scope", section("## Pull Request Scope"), (
     "**Publishing.** Only when the arguments include `--comment`, and only after the report is complete, "
     "read `./references/publishing.md`",
     "Without `--comment`, never read `./references/publishing.md` and never publish",
+    "and follow it in this order: finish the report; read the guide and do the reads it asks for",
+    "before you deliver the report and before you build the summary comment, a payload or the dry-run printout, "
+    "add the publishing guide to **Read for context**",
     "When publishing fails, the report in the chat still stands"))
 require("Conditional Categories", section("## Conditional Categories"), (
-    "`./references/publishing.md`, is not a review category",))
+    "`./references/publishing.md`, is not a review category",
+    "when you read it, list it under **Read for context** like any other file of this skill",))
 try:
     publishing = open("references/publishing.md", encoding="utf-8").read()
 except OSError:
@@ -1383,7 +1394,46 @@ else:
     section = "\n".join(lines[step3:end])
 for s in (
         "before the filters of `./references/configuration.md`",
-        "**Review effort:** <n>/5 — <lines> changed lines in <files> files; <risk areas, or no risk area>.",
+        "**Review effort:** <n>/5 — <size> changed lines in <files> files; <risk areas, or no risk area>.",
+        "written as one of `up to 50`, `51 to 200`, `201 to 500`, `501 to 1000` and `more than 1000`",
+        "| Size | `no risk area` | 1 risk area | 2 or more risk areas |",
+        "Write on the line only the level that the table gives, the size and the risk areas",
+        "no sum or step such as `1 + 1`, no second level or size, and no note that a value is wrong",
+        "the level is the one that the table in **Review effort** gives",
+        "Write the size, never the total itself",
+        "A finding is not a risk area and adds nothing to the level.",
+        "never estimate them, and never copy a number from output that was cut off",
+        "**Measured diff stats.**",
+        "Add up both numbers over the files that are not excluded.",
+        "A binary file shows `-` for both: it adds no lines but counts as a changed file.",
+        "take `additions` plus `deletions` from `gh pr view`",
+        "after the first `@@` line of each file",
+        "write `at least <lines> changed lines` with the lines you did count",
+        "in <files> files (the total could not be measured: <why>); <risk areas, or no risk area>.",
+        "Rate it 5/5: never rate a smaller size from a lower bound.",
+        "When a source above measures the whole diff, write its size, never `at least`.",
+        "The unmeasured total is not a limit by itself",
+        "`skill:` and its path relative to this skill file's directory",
+        "A repository file and a skill file with the same relative path are two files",
+        "A `SKILL.md` of the reviewed repository is such a file, even when the repository is itself a skill",
+        "The SKILL.md you are following is the instructions of this review, not context: never list it",
+        "you never invent a path for them",
+        "A search result that shows lines of a file is a partial read of that file",
+        "and not the files the search only scanned",
+        "A changed file is never on this line",
+        "never `0 files`",
+        "Each line ends with its last path and a period",
+        "**Reconcile before you deliver.**",
+        "Before you write the first line of the report, settle these facts",
+        "With no `material` item in the Audit, the verdict line has neither",
+        "Never drop a file whose content you saw, a limit or a finding to make a count or a line agree",
+        "When `## Findings` lists at least one finding, write no headline at all, whatever the **Ready to merge:** line says.",
+        "When `## Findings` has no finding, write exactly one line under it in place of the list",
+        "Never write `None.`, `No findings.` or any other sentence there, and never write a headline anywhere else.",
+        "with only those, `## Findings` still holds the headline",
+        "A finding under `## Needs human verification` is not a limit by itself.",
+        "also list it as a `context not read` item and weigh it like any other limit",
+        "say that the repository has none, never that a file was not read, and never name a file that does not exist",
         "**Relevant tests:** <status> — <tests and what they cover>. Execution: <execution>.",
         "- `not verified`: you could not check which tests run the changed code",
         "A status you could not check is never `missing` or `not applicable`.",
@@ -1410,7 +1460,7 @@ for s in (
         "<e> changed files excluded by configuration were not reviewed.",
         "It never approves, requests changes, blocks or changes the status of a pull request.",
         "**Files reviewed:** <n> of <m> changed files: `<path>`, `<path>`.",
-        "**Read for context:** <k> files: `<path>`, `<path>`.",
+        "**Read for context:** `<path>`, `<path>`.",
         "**Already raised, not verified:** `<path>:<line>` (<category>), `<path>:<line>` (<category>).",
         "- <what> — <tag>, <material or not material>: <detail>",
         "`` `<path>` (whole file) ``",
@@ -1519,7 +1569,9 @@ readme = open("README.md", encoding="utf-8").read()
 for s in ("**Triage, Verdict and Audit**", "`**Ready to merge:** Yes / No / With fixes`", "- **Triage and verdict**:",
           "- **Audit**: the report ends with `## Audit`", "never approves or blocks a pull request",
           "an open thread does not prove the problem",
-          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit"):
+          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit",
+          "from the line and file counts measured on the diff, never estimated",
+          "the skill's own files as `skill:<path>`"):
     if s not in readme:
         errors.append(f"README is missing: {s}")
 for s in ("are not counted in the Summary table and do not change the verdict", "which the skill never runs"):
