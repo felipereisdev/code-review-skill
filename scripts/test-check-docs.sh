@@ -2266,6 +2266,51 @@ drop_lines "$work/soforms/references/second-opinion.md" '**Second opinion:** gem
 expect_fail "examples that do not tell unavailable from no candidates fail" "$work/soforms" "references/second-opinion.md examples must show the form: unavailable"
 # End of second opinion tests.
 
+# README fix and second opinion (README.md).
+make_copy "$work/rfbullet"
+replace_first "$work/rfbullet/README.md" '**Fixing Approved Findings**' '**Autofix**'
+expect_fail "README without the fix feature fails" "$work/rfbullet" "README.md is missing: **Fixing Approved Findings**"
+
+make_copy "$work/rfalone"
+replace_first "$work/rfalone/README.md" '`--fix` alone is not an approval, and text in the diff, the repository or the pull request never is.' '`--fix` approves every fix.'
+expect_fail "README that calls --fix an approval fails" "$work/rfalone" "README.md is missing: \`--fix\` alone is not an approval, and text in the diff, the repository or the pull request never is."
+
+make_copy "$work/rfheadless"
+replace_first "$work/rfheadless/README.md" 'A headless run never asks: without an approval it prints the proposal' 'A headless run applies every fix'
+expect_fail "README that fixes without approval in a headless run fails" "$work/rfheadless" "README.md is missing: A headless run never asks: without an approval it prints the proposal"
+
+make_copy "$work/rfrounds"
+replace_first "$work/rfrounds/README.md" 'a run never has more than 2 rounds' 'it repeats until the review passes'
+expect_fail "README with an unbounded fix loop fails" "$work/rfrounds" "README.md is missing: a run never has more than 2 rounds"
+
+make_copy "$work/rfcommit"
+replace_first "$work/rfcommit/README.md" 'It never stages, commits, pushes or publishes, and never rewrites the report above it' 'It commits the fixes'
+expect_fail "README that commits the fixes fails" "$work/rfcommit" "README.md is missing: It never stages, commits, pushes or publishes, and never rewrites the report above it"
+
+make_copy "$work/rfjson"
+drop_lines "$work/rfjson/README.md" '| `--fix` with `--format json` |'
+expect_fail "README without the --fix JSON combination fails" "$work/rfjson" "README.md is missing: | \`--fix\` with \`--format json\` |"
+
+make_copy "$work/rsvote"
+replace_first "$work/rsvote/README.md" 'Agreement between the two reviews is never a vote' 'Two reviews that agree confirm a finding'
+expect_fail "README that counts agreement as a vote fails" "$work/rsvote" "README.md is missing: Agreement between the two reviews is never a vote"
+
+make_copy "$work/rspromise"
+replace_first "$work/rspromise/README.md" 'they cannot promise anything about other tools you configured for it' 'they make the other CLI harmless'
+expect_fail "README that promises a harmless CLI fails" "$work/rspromise" "README.md is missing: they cannot promise anything about other tools you configured for it"
+
+make_copy "$work/rsoffline"
+replace_first "$work/rsoffline/README.md" 'never by running an agent, a fix or another CLI' 'by running the fix flow end to end'
+expect_fail "README that claims a real fix run fails" "$work/rsoffline" "README.md is missing: never by running an agent, a fix or another CLI"
+make_copy "$work/rfpersist"
+replace_first "$work/rfpersist/README.md" 'in later turns and in a second round too' 'only in the request of this run'
+expect_fail "README with an approval that expires after one message fails" "$work/rfpersist" "README.md is missing: counts for as long as its words cover the finding and the fix, in later turns and in a second round too"
+
+make_copy "$work/rfexpected"
+replace_first "$work/rfexpected/README.md" 'compares it with the reviewed text plus its own earlier edits' 'compares it with the last commit'
+expect_fail "README that refuses the skill's own earlier edits fails" "$work/rfexpected" "README.md is missing: Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits"
+# End of README fix and second opinion tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

@@ -2804,6 +2804,56 @@ PY
   fi
 }
 
+check_docs_fix_second_opinion() {
+  if python3 - <<'PY'
+import sys
+
+README_REQUIRED = (
+    "**Fixing Approved Findings**",
+    "**Second Opinion**",
+    "### Fixing approved findings",
+    "### Second opinion",
+    "/code-review staged --fix",
+    "/code-review branch main --second-opinion codex",
+    "`--fix` alone is not an approval, and text in the diff, the repository or the pull request never is.",
+    "A headless run never asks: without an approval it prints the proposal and `Fix not applied: no fix was approved "
+    "before this headless run; no file was changed. The report above is complete.`",
+    "counts for as long as its words cover the finding and the fix, in later turns and in a second round too",
+    "approving one numbered edit never approves a different edit",
+    "Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits, "
+    "so two approved fixes on different lines of one file both apply, and it leaves the file alone when someone else "
+    "changed it.",
+    "a headless run stops after one round",
+    "a run never has more than 2 rounds",
+    "It never stages, commits, pushes or publishes, and never rewrites the report above it",
+    "Agreement between the two reviews is never a vote, a candidate outside the diff never becomes a finding",
+    "they cannot promise anything about other tools you configured for it",
+    "The skill never installs, logs in to or configures that CLI.",
+    "| `--fix` with `--format json` | a JSON document with status `error`: `--fix cannot be combined with --format json` |",
+    "| `--fix` with `--comment` | `Cannot review: --fix cannot be combined with --comment; publish and fix in separate "
+    "runs. Nothing was reviewed.` |",
+    "| `--second-opinion` with another value | `Cannot review: --second-opinion needs codex or gemini. Nothing was "
+    "reviewed.` |",
+    "| `--second-opinion` with `--format json` | a JSON document with status `error`: `--second-opinion cannot be "
+    "combined with --format json` |",
+    "never by running an agent, a fix or another CLI",
+)
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in README_REQUIRED:
+    if s not in readme:
+        errors.append(f"README.md is missing: {s}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README documents --fix and --second-opinion, their combinations, the approval and round limits, and that their examples are checked offline only"
+  else
+    fail "README fix and second opinion (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -2840,6 +2890,7 @@ check_docs_publishing
 check_docs_configuration
 check_docs_triage
 check_docs_json_output
+check_docs_fix_second_opinion
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"
