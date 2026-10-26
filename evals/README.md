@@ -138,6 +138,7 @@ The deterministic checks prove the contracts of the scripts and the text of the 
 - Controls under a read-only profile cannot show write restraint.
 - Fixtures and fake agents are controlled. They show what the scripts do with an output, never what a real agent does.
 - The pairs are checked as patches and text. No repository test compiles, boots or runs the code of a pair: the Go, TypeScript, React (Vitest) and Spring pairs are not built or tested, and the Spring component fixture has no full application boot or database. The Python and Node pairs are not executed by the tests either.
+- Repository identity is stable only in part. History overlays are committed with fixed dates, so their commits and the `git blame` context they give are stable. The final `base` commit (and the single commit of a legacy pair) uses the build time, so the full HEAD hash of the temporary repository can vary between repeats and is not part of a case's identity. The per-trial `worktree_state` fingerprint hashes that HEAD, so it must not be compared across samples as an identity.
 
 ## Add a pair
 
