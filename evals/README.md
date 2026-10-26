@@ -93,7 +93,7 @@ Three expanded records are kept, and none replaces another:
 - **Rescored original**, `baseline/expanded-rescored/`: the same 84 raw reports scored again by the corrected scorer, with no model call (`--rescore`, see **Run**). The rescore first checks every file of the original study against its manifest and the study's `aggregate.json` against its records. It keeps the original provenance, and it records the hashes of the original manifest and aggregate, the hashes of the scorer, runner and aggregator that rescored it, and every field it changed under `changes`. Only completeness and what follows from it may change (`complete`, `passed`, and the `complete` check of a control); any other difference stops the rescore. Its `elapsed-timer-react` reports still review the fixture without the cleanup.
 - **Corrected study**, `baseline/expanded-r2/`: a new complete study of the same 84 trials under its own frozen protocol, with the corrected scorer and the corrected `elapsed-timer-react` fixture, collected after the source was frozen. It reruns every trial, not a selection.
 
-`baseline.json` is still the aggregate of the original study, `baseline/expanded/`, until the corrected study is recorded.
+`baseline.json` is the aggregate of the corrected study, `baseline/expanded-r2/`, recomputable with `python3 evals/aggregate.py evals/baseline/expanded-r2`.
 
 `baseline/initial-2026-10-23.json`, `baseline/summary.md` and `baseline/reports/` are the initial run of 2026-10-23: 6 pairs, 1 sample, the model alias `sonnet`, and the skill `ae62bbea`. They are kept unedited and are not causally comparable with the expanded study: the alias was not resolved to a model, and the runner, the prompt and the profile differ.
 
