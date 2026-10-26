@@ -2,5 +2,11 @@
   "topic": "demo",
   "stack": "python",
   "description": "Runner test fixture; not part of the suite.",
-  "bug": {"min_severity": "Critical", "patterns": ["sql injection", "app\\.py"]}
+  "bug": {
+    "min_severity": "Critical",
+    "patterns": ["sql injection", "app\\.py"],
+    "location": {"path": "app.py", "side": "new"},
+    "scenario": "The planted BUG line marks the change that runner tests treat as the bug."
+  },
+  "clean": {"why_safe": "The clean diff plants nothing."}
 }
