@@ -28,13 +28,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from score import score_bug  # noqa: E402
 import run as eval_run  # noqa: E402
+import aggregate  # noqa: E402
 
 
 TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 EVALS_DIR = os.path.dirname(TESTS_DIR)
 REPO_ROOT = os.path.dirname(EVALS_DIR)
 CASES_DIR = os.path.join(EVALS_DIR, "cases")
+CONTROLS_DIR = os.path.join(EVALS_DIR, "controls")
 BASELINE_DIR = os.path.join(EVALS_DIR, "baseline", "reports")
+PROTOCOL_PATH = os.path.join(EVALS_DIR, "baseline", "expanded", "protocol.json")
 
 
 def load_bug(case):
@@ -494,6 +497,32 @@ class PairProbeTest(unittest.TestCase):
             with self.subTest(pair=pair):
                 self.assertEqual(sorted(row["label"] for row in rows if row["pair"] == pair),
                                  ["DETECT"] * 3 + ["IGNORE"] * 3)
+
+
+class SuiteTest(unittest.TestCase):
+    def pair_names(self):
+        return sorted(name for name in os.listdir(CASES_DIR) if os.path.isfile(os.path.join(CASES_DIR, name, "pair.json")))
+
+    def test_new_pairs_span_at_least_four_stacks(self):
+        new = [name for name in self.pair_names() if name not in eval_run.LEGACY_PAIRS]
+        self.assertEqual(len(new), 6)
+        stacks = set()
+        for name in new:
+            with open(os.path.join(CASES_DIR, name, "pair.json"), encoding="utf-8") as f:
+                stacks.add(json.load(f)["stack"])
+        self.assertGreaterEqual(len(stacks), 4)
+
+    def test_protocol_matches_the_suite(self):
+        with open(PROTOCOL_PATH, encoding="utf-8") as f:
+            protocol = json.load(f)
+        self.assertEqual(protocol["pairs"], self.pair_names())
+        self.assertEqual(protocol["legacy_pairs"], sorted(eval_run.LEGACY_PAIRS))
+        self.assertEqual(protocol["controls"], sorted(n[:-5] for n in os.listdir(CONTROLS_DIR) if n.endswith(".json")))
+        self.assertEqual(protocol["samples"], ["s1", "s2", "s3"])
+        self.assertEqual(protocol["planned_trials"], {"primary": 72, "controls": 12, "total": 84})
+        self.assertEqual((protocol["max_retries"], protocol["retryable_error_classes"]), (1, ["infrastructure"]))
+        self.assertTrue(os.path.isfile(os.path.join(REPO_ROOT, protocol["profile"])))
+        self.assertEqual(len(aggregate.expected_trials(protocol)), 84)
 
 
 class BaselineBugReportTest(unittest.TestCase):

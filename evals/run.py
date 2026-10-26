@@ -25,8 +25,12 @@ import score  # noqa: E402
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DEFAULT_CASES_DIR = os.path.join(REPO_ROOT, "evals", "cases")
 DEFAULT_CONTROLS_DIR = os.path.join(REPO_ROOT, "evals", "controls")
-REQUIRED_TOPICS = ("null-undefined", "sql-injection", "off-by-one", "swallowed-error", "n-plus-one", "xss-false-alarm")
-MIN_PAIRS = 6
+REQUIRED_TOPICS = (
+    "null-undefined", "sql-injection", "off-by-one", "swallowed-error", "n-plus-one", "xss-false-alarm",
+    "requirement-violation", "removed-authorization", "removed-validation", "caller-contract",
+    "stale-closure", "transaction-boundary",
+)
+MIN_PAIRS = 12
 GIT_IDENTITY = ["-c", "user.name=code-review-eval", "-c", "user.email=eval@example.invalid"]
 LEGACY_PAIRS = ("n-plus-one-laravel", "null-node", "off-by-one-python", "sqli-laravel", "swallowed-error-ts", "xss-react")
 # tree_sha256 of the six pairs as the initial baseline measured them (also the GATE2 cases-tree hash).

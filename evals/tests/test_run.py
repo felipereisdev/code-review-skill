@@ -37,7 +37,7 @@ class ValidateTest(unittest.TestCase):
     def test_coverage_required_without_filter(self):
         r = run("--validate", "--cases-dir", FIXTURES)
         self.assertEqual(r.returncode, 1)
-        self.assertIn("need at least 6 pairs", r.stdout)
+        self.assertIn("need at least 12 pairs", r.stdout)
 
     def test_broken_patch_is_rejected(self):
         tmp = tempfile.mkdtemp()
