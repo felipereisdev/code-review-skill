@@ -1,6 +1,6 @@
 diff --git a/shop/refunds.py b/shop/refunds.py
 new file mode 100644
-index 0000000..52b4517
+index 0000000..868e2d3
 --- /dev/null
 +++ b/shop/refunds.py
 @@ -0,0 +1,12 @@
@@ -12,7 +12,7 @@ index 0000000..52b4517
 +
 +
 +def is_refundable(order: Order, now: datetime) -> bool:
-+    """Return True when the order can still be refunded (docs/refund-policy.md)."""
++    """Return True when the order can still be refunded (policy/refund-policy.md)."""
 +    if order.delivered_at is None:
 +        return False
 +    return now - order.created_at <= REFUND_WINDOW
