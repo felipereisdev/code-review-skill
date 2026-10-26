@@ -131,7 +131,7 @@ check_readme_counts() {
   else
     fail "git grep failed (run the script inside a git checkout)"
   fi
-  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh evals/run.py evals/score.py evals/make-patch.sh .github/workflows/ci.yml; do
+  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh scripts/review_gate.py evals/run.py evals/score.py evals/make-patch.sh .github/workflows/ci.yml; do
     grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
   done
   if [ -z "$missing" ]; then
@@ -1394,7 +1394,6 @@ else:
     end = next((i for i in range(step3 + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     section = "\n".join(lines[step3:end])
 for s in (
-        "before the filters of `./references/configuration.md`",
         "**Review effort:** <n>/5 — <size> changed lines in <files> files; <risk areas, or no risk area>.",
         "written as one of `up to 50`, `51 to 200`, `201 to 500`, `501 to 1000` and `more than 1000`",
         "| Size | `no risk area` | 1 risk area | 2 or more risk areas |",
@@ -1476,6 +1475,8 @@ for s in (
         "change the verdict only through row 6 of Step 3"):
     if s not in text:
         errors.append(f"Step 3 is missing: {s}")
+if "before the filters of `./references/configuration.md`" not in section:
+    errors.append("Step 3 is missing: before the filters of `./references/configuration.md`")
 for s in ("Never run the tests", "never runs tests", "Not run by this review"):
     if s in text:
         errors.append(f"SKILL.md forbids running tests or claims they never run: {s}")
@@ -2379,6 +2380,64 @@ PY
   fi
 }
 
+check_docs_json_output() {
+  if python3 - <<'PY'
+import os, re, subprocess, sys
+
+README_REQUIRED = (
+    "**JSON Output and Merge Gate**",
+    "### JSON output and the merge gate",
+    "/code-review branch main --format json --fail-on critical",
+    "A finding that a `.code-review/config.yml` filter hides from the Markdown report stays in the document with "
+    "`omitted_by` set",
+    "A Critical finding under Needs human verification is not verified and does not fail the gate",
+    "| `--fail-on critical` without `--format json` | `Cannot review: --fail-on needs --format json. Nothing was "
+    "reviewed.` |",
+    "nothing is read for publishing and nothing is published",
+    "The skill's text cannot change the exit status of your agent's CLI",
+    "the skill itself never needs it",
+    "| 3 | invalid input:",
+    "it cannot check that the review read what the document says, or that its evidence and judgments are right.",
+    "which are examples of the contract, not the output of an agent",
+    "This repository's CI runs only the offline fixtures, never an agent",
+    "it reads an empty, cut-off or wrapped reply as invalid, never as zero findings",
+)
+# A local example line of the README: the command, then the exit status it documents.
+RUN_RE = re.compile(r"^(printf '' \| )?python3 scripts/review_gate\.py (\S+)\s+# exit (\d)$")
+errors = []
+readme = open("README.md", encoding="utf-8").read()
+for s in README_REQUIRED:
+    if s not in readme:
+        errors.append(f"README.md is missing: {s}")
+seen = set()
+for line in readme.splitlines():
+    m = RUN_RE.match(line)
+    if m is None:
+        continue
+    empty, arg, documented = m.group(1), m.group(2), int(m.group(3))
+    if not empty and not os.path.isfile(arg):
+        errors.append(f"README.md runs the gate on a missing file: {arg}")
+        continue
+    proc = subprocess.run([sys.executable, "scripts/review_gate.py", arg], input=b"",
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    seen.add(proc.returncode)
+    if proc.returncode != documented:
+        errors.append(f"README.md says the gate exits {documented} for {line.split('#')[0].strip()}, "
+                      f"it exits {proc.returncode}")
+for status in (0, 1, 2, 3):
+    if status not in seen:
+        errors.append(f"README.md has no local gate example that exits {status}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "README documents --format json and --fail-on critical, the gate's exit statuses and transport limits, and its local gate examples exit as documented"
+  else
+    fail "README JSON output and merge gate (see messages above)"
+  fi
+}
+
 # --- run checks ---
 check_license
 check_frontmatter
@@ -2412,6 +2471,7 @@ check_docs_pr_scope
 check_docs_publishing
 check_docs_configuration
 check_docs_triage
+check_docs_json_output
 
 if [ "$failures" -gt 0 ]; then
   printf '%d check(s) failed\n' "$failures"

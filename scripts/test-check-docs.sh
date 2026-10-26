@@ -2024,6 +2024,36 @@ replace_first "$work/jsaccount/references/json-output.md" '"changed": 2,' '"chan
 expect_fail "an example with an unaccounted changed file fails" "$work/jsaccount" "references/json-output.md example 1: review.audit.files_reviewed: 2 reviewed + 0 excluded by configuration + 0 binary + 0 not read as a whole make 2, not the 3 changed files"
 # End of JSON output tests.
 
+# README JSON output and merge gate (README.md and scripts/review_gate.py).
+make_copy "$work/jrexit"
+replace_first "$work/jrexit/README.md" 'fixtures/json/critical.json     # exit 1' 'fixtures/json/critical.json     # exit 0'
+expect_fail "a README gate example with the wrong exit status fails" "$work/jrexit" "README.md says the gate exits 0 for python3 scripts/review_gate.py evals/tests/fixtures/json/critical.json, it exits 1"
+
+make_copy "$work/jrmissing"
+replace_first "$work/jrmissing/README.md" 'fixtures/json/pass.json' 'fixtures/json/passed.json'
+expect_fail "a README gate example on a missing file fails" "$work/jrmissing" "README.md runs the gate on a missing file: evals/tests/fixtures/json/passed.json"
+
+make_copy "$work/jrinvalid"
+drop_lines "$work/jrinvalid/README.md" "printf '' | python3 scripts/review_gate.py -"
+expect_fail "README without a local invalid-input example fails" "$work/jrinvalid" "README.md has no local gate example that exits 3"
+
+make_copy "$work/jrcli"
+replace_first "$work/jrcli/README.md" "The skill's text cannot change the exit status of your agent's CLI" "The gate sets the exit status of your agent's CLI"
+expect_fail "claiming that the skill sets the agent's exit status fails" "$work/jrcli" "README.md is missing: The skill's text cannot change the exit status of your agent's CLI"
+
+make_copy "$work/jrzero"
+replace_first "$work/jrzero/README.md" 'as invalid, never as zero findings' 'as zero findings'
+expect_fail "reading a wrapped reply as zero findings fails" "$work/jrzero" "README.md is missing: it reads an empty, cut-off or wrapped reply as invalid, never as zero findings"
+
+make_copy "$work/jrci"
+replace_first "$work/jrci/README.md" "This repository's CI runs only the offline fixtures, never an agent" "This repository's CI runs the agent"
+expect_fail "claiming an agent run in CI fails" "$work/jrci" "README.md is missing: This repository's CI runs only the offline fixtures, never an agent"
+
+make_copy "$work/jrstructure"
+drop_lines "$work/jrstructure/README.md" '── review_gate.py'
+expect_fail "README Project Structure without the gate script fails" "$work/jrstructure" "README Project Structure is missing: scripts/review_gate.py"
+# End of README JSON output tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
