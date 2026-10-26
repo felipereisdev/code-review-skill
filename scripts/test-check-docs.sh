@@ -645,7 +645,8 @@ replace_first "$work/scopenocommand/example-output.md" '**Scope:** pr 123 (gh pr
 expect_fail "a Scope line without its command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<command>)'"
 
 make_copy "$work/latescope"
-replace_first "$work/latescope/example-output.md" $'**Scope:** pr 123 (gh pr diff 123)\n\n### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** pr 123 (gh pr diff 123)\n'
+replace_first "$work/latescope/example-output.md" $'**Scope:** pr 123 (gh pr diff 123)\n\n' ''
+replace_first "$work/latescope/example-output.md" $'### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** pr 123 (gh pr diff 123)\n'
 expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
 
 make_copy "$work/shelltext"
