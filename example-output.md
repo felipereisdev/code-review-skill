@@ -4,13 +4,24 @@ This is an example of the code review output format. The actual review will vary
 
 ## Scenario
 
-Reviewing pull request #123 on GitHub (`https://github.com/acme/shop-api/pull/123`), which adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The pull request also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch. The pull request already has two review threads: an open one on `src/routes/auth.routes.ts:8` saying that `POST /auth/login` has no rate limit, and a resolved one on `src/services/auth.service.ts:45` asking to remove the hard-coded JWT secret. The review was started with `/code-review pr 123`.
+Reviewing pull request #123 on GitHub (`https://github.com/acme/shop-api/pull/123`), which adds user authentication with JWT to a Node.js/Express API. The repository has an `AGENTS.md` at its root and another in `src/services/`, whose lines 4-5 say that services log through `logger` from `src/lib/logger.ts` and never call `console.*`. The pull request also edits `src/app.ts` to mount the new auth routes; the `/health` handler at the top of that file is older than the branch. The pull request already has two review threads: an open one on `src/routes/auth.routes.ts:8` saying that `POST /auth/login` has no rate limit, and a resolved one on `src/services/auth.service.ts:45` asking to remove the hard-coded JWT secret. Its description says that it adds registration, login, token refresh and logout, closes #98 and follows the security design in SEC-42, a ticket on another tracker for which the agent has no tool; it names SEC-42 only as background, and no changed behavior depends on what SEC-42 says. Issue #98 states four requirements: login returns an access token and a refresh token for valid credentials, logout revokes the refresh token, a refresh token works only once, and five failed logins in a row lock the account. The diff has more than 500 changed lines and no lockfile or generated file, so the review follows the large diff strategy and reviews all 6 changed files in batches. The review was started with `/code-review pr 123`.
 
 ---
 
 ## Code Review Report
 
 **Scope:** pr 123 (gh pr diff 123)
+
+## Intent
+
+**Intent:** Add registration, login, token refresh and logout with JWT to the API (title, description, #98).
+**Requirements:** 2 met, 1 not met, 1 not judged.
+- Met — login returns an access token and a refresh token for valid credentials (#98): `src/controllers/auth.controller.ts:15-40` returns both tokens from `POST /auth/login`.
+- Met — logout revokes the refresh token (#98): `src/controllers/auth.controller.ts:96-110` deletes the stored refresh token.
+- Not met — a refresh token works only once (#98): the Critical finding at `src/services/auth.service.ts:89-97` lets two concurrent requests use the same refresh token.
+- Not judged — five failed logins in a row lock the account (#98): `src/services/auth.service.ts:131-133` counts the failures, but whether parallel attempts lose a count depends on the gateway configuration, which is not in the repository.
+**Scope creep:** compared only with the description and #98: `src/controllers/auth.controller.ts:300-487` (password reset and email verification, which neither asks for).
+**Sources not read:** SEC-42 (no read-only tool for its tracker).
 
 ### What Was Done Well
 
@@ -183,7 +194,7 @@ The Medium-confidence finding under Needs human verification is not counted in t
 ## Audit
 
 **Files reviewed:** 6 of 6 changed files: `src/app.ts`, `src/controllers/auth.controller.ts`, `src/middleware/auth.middleware.ts`, `src/routes/auth.routes.ts`, `src/services/auth.service.ts`, `tests/auth.test.ts`.
-**Read for context:** `AGENTS.md`, `package.json`, `skill:references/api-design.md`, `skill:references/concurrency.md`, `skill:references/observability.md`, `skill:stacks/node.md`, `skill:stacks/typescript.md`, `src/controllers/user.controller.ts`, `src/lib/logger.ts`, `src/services/AGENTS.md`.
+**Read for context:** `AGENTS.md`, `package.json`, `skill:references/api-design.md`, `skill:references/concurrency.md`, `skill:references/intent.md`, `skill:references/large-diffs.md`, `skill:references/observability.md`, `skill:stacks/node.md`, `skill:stacks/typescript.md`, `src/controllers/user.controller.ts`, `src/lib/logger.ts`, `src/services/AGENTS.md`.
 **Checked with no findings:** API Design, Architecture Patterns, Stack-Specific.
 **Already raised, not verified:** `src/routes/auth.routes.ts:8` (Security).
 **Not verified:**
@@ -221,6 +232,15 @@ The same review when the user asks for `/code-review pr 123 compact`:
 
 **Scope:** pr 123 (gh pr diff 123)
 
+**Intent:** Add registration, login, token refresh and logout with JWT to the API (title, description, #98).
+**Requirements:** 2 met, 1 not met, 1 not judged.
+- Met — login returns an access token and a refresh token for valid credentials (#98): `src/controllers/auth.controller.ts:15-40` returns both tokens from `POST /auth/login`.
+- Met — logout revokes the refresh token (#98): `src/controllers/auth.controller.ts:96-110` deletes the stored refresh token.
+- Not met — a refresh token works only once (#98): the Critical finding at `src/services/auth.service.ts:89-97` lets two concurrent requests use the same refresh token.
+- Not judged — five failed logins in a row lock the account (#98): `src/services/auth.service.ts:131-133` counts the failures, but whether parallel attempts lose a count depends on the gateway configuration, which is not in the repository.
+**Scope creep:** compared only with the description and #98: `src/controllers/auth.controller.ts:300-487` (password reset and email verification, which neither asks for).
+**Sources not read:** SEC-42 (no read-only tool for its tracker).
+
 - src/services/auth.service.ts:45-46: Critical: the JWT secret falls back to 'dev-secret', so anyone can forge tokens → fail at startup when JWT_SECRET is unset
 - src/services/auth.service.ts:89-97: Critical: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction
 - src/controllers/auth.controller.ts:23-27: Warning: different login errors reveal which emails are registered → return one message for both cases
@@ -248,7 +268,7 @@ The same review when the user asks for `/code-review pr 123 compact`:
 **Relevant tests:** changed — `tests/auth.test.ts` covers login and token generation; no test covers token refresh. Execution: not run.
 **Look first:** `src/services/auth.service.ts` (the JWT secret fallback and the refresh-token race, both Critical), `src/controllers/auth.controller.ts` (login answers reveal which emails are registered), `src/middleware/auth.middleware.ts` (every protected route depends on it).
 **Ready to merge:** No — 2 Critical findings must be fixed before merging. Not fully reviewed: see the Audit.
-**Audit:** 6 of 6 changed files reviewed; 10 files read for context; no findings in API Design, Architecture Patterns, Stack-Specific; already raised, not verified: 1 Warning candidate; not verified: `jsonwebtoken` version-specific migration recommendations (API not validated, not material), gateway configuration (context not read, material).
+**Audit:** 6 of 6 changed files reviewed; 12 files read for context; no findings in API Design, Architecture Patterns, Stack-Specific; already raised, not verified: 1 Warning candidate; not verified: `jsonwebtoken` version-specific migration recommendations (API not validated, not material), gateway configuration (context not read, material).
 
 ---
 
@@ -344,7 +364,7 @@ Right after the verification line, the report counts what the filters left out: 
 
 ## Publishing Dry Run
 
-The same review when the user asks for `/code-review pr 123 --comment --dry-run`: after the report, the skill prints what `--comment` would post and posts nothing. The pull request has no summary comment from an earlier run, so the summary comment would be created. The review payload below shows one of its 8 inline comments. The summary comment ends with the triage lines and the one-line audit; no inline comment carries them. With `--comment` the skill also read the publishing guide, so this run's **Read for context** line adds `skill:references/publishing.md` after `skill:references/observability.md`, and its audit counts 11 files read for context.
+The same review when the user asks for `/code-review pr 123 --comment --dry-run`: after the report, the skill prints what `--comment` would post and posts nothing. The pull request has no summary comment from an earlier run, so the summary comment would be created. The review payload below shows one of its 8 inline comments. The summary comment ends with the triage lines and the one-line audit; no inline comment carries them. With `--comment` the skill also read the publishing guide, so this run's **Read for context** line adds `skill:references/publishing.md` after `skill:references/observability.md`, and its audit counts 13 files read for context.
 
 ## Dry run — nothing was published
 
@@ -380,7 +400,7 @@ gh api --hostname github.com --method POST repos/acme/shop-api/issues/123/commen
 
 ```json
 {
-  "body": "<!-- code-review-skill:summary -->\n## Code review\n\n**Scope:** pr 123 (gh pr diff 123) at `9c1e4b7`\n**Findings:** 2 Critical, 1 Warning, 5 Suggestion. Inline comments: 8.\n\n- src/services/auth.service.ts:45-46: Critical: the JWT secret falls back to `[REDACTED]`, so anyone can forge tokens → fail at startup when JWT_SECRET is unset (inline)\n- src/services/auth.service.ts:89-97: Critical: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction (inline)\n- src/controllers/auth.controller.ts:23-27: Warning: different login errors reveal which emails are registered → return one message for both cases (inline)\n- src/services/auth.service.ts:67-69: Suggestion: token generation loads every user column, including the password hash → select only id and email (inline)\n- tests/auth.test.ts:34-41: Suggestion: the test mocks jwt.sign and never checks claims or expiry → verify the real token (inline)\n- src/middleware/auth.middleware.ts:18-74: Suggestion: the 57-line middleware mixes extraction, verification and lookup → extract helpers (inline)\n- src/controllers/auth.controller.ts:1-487: Suggestion: one 487-line controller handles six flows → split it into one controller per flow (inline)\n- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error, which the services rules forbid → use the structured logger (also at src/services/auth.service.ts:124) (Rule: src/services/AGENTS.md:L4-L5) (inline)\n\n**Needs human verification**\n\n- src/services/auth.service.ts:131-133: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment\n\n**Verification:** 5 Critical/Warning candidates checked, 1 refuted.\n\n**Review effort:** 5/5 — 501 to 1000 changed lines in 6 files; authentication and concurrency.\n**Relevant tests:** changed — `tests/auth.test.ts` covers login and token generation; no test covers token refresh. Execution: not run.\n**Look first:** `src/services/auth.service.ts` (the JWT secret fallback and the refresh-token race, both Critical), `src/controllers/auth.controller.ts` (login answers reveal which emails are registered), `src/middleware/auth.middleware.ts` (every protected route depends on it).\n**Ready to merge:** No — 2 Critical findings must be fixed before merging. Not fully reviewed: see the Audit.\n**Audit:** 6 of 6 changed files reviewed; 11 files read for context; no findings in API Design, Architecture Patterns, Stack-Specific; already raised, not verified: 1 Warning candidate; not verified: `jsonwebtoken` version-specific migration recommendations (API not validated, not material), gateway configuration (context not read, material)."
+  "body": "<!-- code-review-skill:summary -->\n## Code review\n\n**Scope:** pr 123 (gh pr diff 123) at `9c1e4b7`\n**Findings:** 2 Critical, 1 Warning, 5 Suggestion. Inline comments: 8.\n\n- src/services/auth.service.ts:45-46: Critical: the JWT secret falls back to `[REDACTED]`, so anyone can forge tokens → fail at startup when JWT_SECRET is unset (inline)\n- src/services/auth.service.ts:89-97: Critical: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction (inline)\n- src/controllers/auth.controller.ts:23-27: Warning: different login errors reveal which emails are registered → return one message for both cases (inline)\n- src/services/auth.service.ts:67-69: Suggestion: token generation loads every user column, including the password hash → select only id and email (inline)\n- tests/auth.test.ts:34-41: Suggestion: the test mocks jwt.sign and never checks claims or expiry → verify the real token (inline)\n- src/middleware/auth.middleware.ts:18-74: Suggestion: the 57-line middleware mixes extraction, verification and lookup → extract helpers (inline)\n- src/controllers/auth.controller.ts:1-487: Suggestion: one 487-line controller handles six flows → split it into one controller per flow (inline)\n- src/services/auth.service.ts:112: Suggestion: auth failures go to console.error, which the services rules forbid → use the structured logger (also at src/services/auth.service.ts:124) (Rule: src/services/AGENTS.md:L4-L5) (inline)\n\n**Needs human verification**\n\n- src/services/auth.service.ts:131-133: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment\n\n**Verification:** 5 Critical/Warning candidates checked, 1 refuted.\n\n**Review effort:** 5/5 — 501 to 1000 changed lines in 6 files; authentication and concurrency.\n**Relevant tests:** changed — `tests/auth.test.ts` covers login and token generation; no test covers token refresh. Execution: not run.\n**Look first:** `src/services/auth.service.ts` (the JWT secret fallback and the refresh-token race, both Critical), `src/controllers/auth.controller.ts` (login answers reveal which emails are registered), `src/middleware/auth.middleware.ts` (every protected route depends on it).\n**Ready to merge:** No — 2 Critical findings must be fixed before merging. Not fully reviewed: see the Audit.\n**Audit:** 6 of 6 changed files reviewed; 13 files read for context; no findings in API Design, Architecture Patterns, Stack-Specific; already raised, not verified: 1 Warning candidate; not verified: `jsonwebtoken` version-specific migration recommendations (API not validated, not material), gateway configuration (context not read, material)."
 }
 ```
 

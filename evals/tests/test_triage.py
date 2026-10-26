@@ -1558,7 +1558,7 @@ class ExampleOutputTests(Base):
                             "`skill:references/observability.md`, `skill:references/publishing.md`, ")
         self.assertEqual(check_report(full), [])
         compact = compact_audit_line(parse_audit(full))
-        self.assertIn("; 11 files read for context;", compact)
+        self.assertIn("; 13 files read for context;", compact)
         intro = EXAMPLE[EXAMPLE.index("## Publishing Dry Run"):EXAMPLE.index("## Dry run — nothing was published")]
         self.assertIn("`skill:references/publishing.md`", intro)
         dry = EXAMPLE[EXAMPLE.index("## Dry run — nothing was published"):]
