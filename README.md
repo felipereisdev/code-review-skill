@@ -425,7 +425,8 @@ code-review-skill/
 │   ├── privacy.md
 │   ├── publishing.md    # Publishing rules for --comment (not a review category)
 │   ├── removed-code-history.md # Git history of removed validation, permission checks and error handling (not a review category)
-│   └── resilience.md
+│   ├── resilience.md
+│   └── second-opinion.md # Second opinion from another reviewer CLI for --second-opinion (not a review category)
 └── stacks/              # Technology-specific rules
     ├── angular.md
     ├── docker.md
