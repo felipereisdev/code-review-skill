@@ -10,7 +10,23 @@ if git diff --cached | grep -q 'BUG'; then
 **Fix:** Use a parameterized query.
 
 ## Summary
+
+**Ready to merge:** No — 1 Critical finding must be fixed before merging.
+
+## Audit
+
+**Files reviewed:** 1 of 1 changed files: `app.py`.
 EOF
 else
-  printf 'Code review passed — no issues found.\n'
+  cat <<'EOF'
+## Findings
+
+Code review passed — no issues found.
+
+**Ready to merge:** Yes — no finding.
+
+## Audit
+
+**Files reviewed:** 1 of 1 changed files: `app.py`.
+EOF
 fi

@@ -31,6 +31,14 @@ LEGACY_PAIRS = ("n-plus-one-laravel", "null-node", "off-by-one-python", "sqli-la
 # tree_sha256 of the six pairs as the initial baseline measured them (also the GATE2 cases-tree hash).
 LEGACY_CASES_SHA256 = "a1a47fb084020e9a56e0be52a2e668e05945f894ad4da136a7ad8dfd9f055706"
 _SKIPPED_NAMES = {"__pycache__", ".DS_Store"}
+GATE_SCRIPT = os.path.join(REPO_ROOT, "scripts", "review_gate.py")
+RUNTIME_ROOTS = ("SKILL.md", "stacks", "patterns", "references")
+PROFILE_KEYS = ("name", "agent_name", "model", "agent_cmd", "prompt_addendum", "timeout", "jobs")
+INFRA_RE = re.compile(
+    r"concurrency limit reached|rate[ _-]?limit|overloaded|api error: ?(?:429|5\d\d)|econnreset|etimedout"
+    r"|socket hang up|network error",
+    re.I,
+)
 
 
 def files_under(*roots: str) -> list[str]:
@@ -57,6 +65,19 @@ def tree_sha256(paths: list[str]) -> str:
         with open(os.path.join(REPO_ROOT, path), "rb") as handle:
             lines.append("%s  %s\n" % (hashlib.sha256(handle.read()).hexdigest(), path))
     return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()
+
+
+def sha256_text(text: str) -> str:
+    """sha256 of ``text`` encoded as UTF-8."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def file_sha256(rel_path: str) -> str:
+    """sha256 of the bytes of the repo-relative file ``rel_path``."""
+    with open(os.path.join(REPO_ROOT, rel_path), "rb") as handle:
+        return hashlib.sha256(handle.read()).hexdigest()
+
+
 DEFAULT_AGENT_CMD = (
     'claude -p --safe-mode --disable-slash-commands --strict-mcp-config '
     '--no-session-persistence --permission-mode dontAsk '
@@ -392,8 +413,8 @@ def validate(pairs: list[dict], filtered: bool) -> int:
     return 1
 
 
-def run_agent(cmd: str, repo: str, prompt: str, env: dict, timeout: int) -> tuple[str, str | None, str]:
-    """Run the agent command in ``repo`` and classify its output."""
+def invoke_agent(cmd: str, repo: str, prompt: str, env: dict, timeout: int) -> dict:
+    """Run the agent command in ``repo`` with ``prompt`` on stdin; return its raw outcome."""
     proc = subprocess.Popen(
         ["bash", "-c", cmd],
         cwd=repo,
@@ -412,19 +433,45 @@ def run_agent(cmd: str, repo: str, prompt: str, env: dict, timeout: int) -> tupl
         except ProcessLookupError:
             pass
         stdout, stderr = proc.communicate()
-        return "error", f"timeout after {timeout}s", stdout
+        return {"exit_code": None, "stdout": stdout, "stderr": stderr, "timed_out": True}
 
-    if proc.returncode != 0:
-        error = f"agent exited with {proc.returncode}"
+    return {"exit_code": proc.returncode, "stdout": stdout, "stderr": stderr, "timed_out": False}
+
+
+def classify(run_result: dict, report_valid: bool, timeout: int) -> tuple[str, str | None, str | None]:
+    """Return (status, error_class, error) for one agent run; infrastructure failures are told apart."""
+    if run_result["timed_out"]:
+        return "error", "timeout", f"timeout after {timeout}s"
+
+    stdout, stderr = run_result["stdout"], run_result["stderr"]
+    infra = len(stdout) < 2000 and INFRA_RE.search(stdout + "\n" + stderr) is not None
+    if run_result["exit_code"] != 0:
+        error = f"agent exited with {run_result['exit_code']}"
         tail = stderr.strip()
         if tail:
             error += ": " + tail[-300:]
-        return "error", error, stdout
+        return "error", "infrastructure" if not report_valid and infra else "agent_exit", error
 
-    if not score.looks_like_report(stdout):
-        return "error", "report not in the skill's Output Format", stdout
+    if not report_valid:
+        return "error", "infrastructure" if infra else "format", "report not in the skill's Output Format"
 
-    return "ok", None, stdout
+    return "ok", None, None
+
+
+def worktree_state(repo: str) -> str:
+    """Hash HEAD, the status, the staged diff and the unstaged diff of ``repo``, to detect an agent that writes."""
+    digest = hashlib.sha256()
+    for args in (["rev-parse", "HEAD"], ["status", "--porcelain=v1", "-uall", "--ignored"],
+                 ["diff", "--cached", "--binary"], ["diff", "--binary"]):
+        result = subprocess.run(["git", *args], cwd=repo, capture_output=True)
+        digest.update(" ".join(args).encode("utf-8") + b"\0" + str(result.returncode).encode("utf-8") + b"\0")
+        digest.update(result.stdout)
+    return digest.hexdigest()
+
+
+def trial_id(args, case_id: str) -> str:
+    """Name one trial: the case id, prefixed by the sample label when there is one."""
+    return f"{args.sample}/{case_id}" if args.sample else case_id
 
 
 def _error_result(result: dict, case: dict, error: str) -> dict:
@@ -444,6 +491,9 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
     repo = None
     prompt_path = None
     result = {
+        "trial_id": trial_id(args, case["id"]),
+        "sample": args.sample,
+        "attempt": args.attempt,
         "id": case["id"],
         "pair": case["pair"],
         "kind": case["kind"],
@@ -451,23 +501,34 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
         "stack": case["stack"],
         "status": "error",
         "error": None,
+        "error_class": None,
+        "exit_code": None,
         "duration_s": 0.0,
         "passed": False,
         "detected": None,
         "matched_finding": None,
         "false_positives": None,
+        "report_valid": False,
+        "complete": False,
+        "ready_to_merge": None,
+        "worktree_unchanged": None,
+        "observations": None,
         "stack_mentioned": False,
         "findings": [],
+        "prompt_sha256": None,
         "report": None,
+        "report_sha256": None,
     }
 
     try:
         try:
             repo = prepare_repo(case["dir"], case["patch"], case.get("history"))
         except RuntimeError as exc:
+            result["error_class"] = "setup"
             return _error_result(result, case, f"setup failed: {str(exc).strip()}")
 
-        prompt = render_prompt(PAIR_ARGUMENTS, case.get("request"))
+        prompt = render_prompt(PAIR_ARGUMENTS, case.get("request"), args.prompt_addendum)
+        result["prompt_sha256"] = sha256_text(prompt)
         handle, prompt_path = tempfile.mkstemp(prefix="cr-eval-prompt-", text=True)
         with os.fdopen(handle, "w", encoding="utf-8") as prompt_file:
             prompt_file.write(prompt)
@@ -479,21 +540,33 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
             EVAL_MODEL=args.model,
             EVAL_CASE_ID=case["id"],
         )
-        status, error, stdout = run_agent(args.agent_cmd, repo, prompt, env, args.timeout)
+        before = worktree_state(repo)
+        run_result = invoke_agent(args.agent_cmd, repo, prompt, env, args.timeout)
+        result["worktree_unchanged"] = worktree_state(repo) == before
+        result["exit_code"] = run_result["exit_code"]
 
+        stdout = run_result["stdout"]
         if stdout:
             report_path = os.path.join(out_dir, "reports", f"{case['pair']}__{case['kind']}.md")
-            with open(report_path, "w", encoding="utf-8") as report_file:
-                report_file.write(stdout)
-            result["report"] = os.path.relpath(report_path, REPO_ROOT)
+            with open(report_path, "wb") as report_file:
+                report_file.write(stdout.encode("utf-8"))
+            result["report"] = os.path.relpath(report_path, out_dir).replace(os.sep, "/")
+            result["report_sha256"] = sha256_text(stdout)
 
+        result["report_valid"] = score.looks_like_report(stdout)
+        status, error_class, error = classify(run_result, result["report_valid"], args.timeout)
         result["status"] = status
         result["error"] = error
+        result["error_class"] = error_class
         result["stack_mentioned"] = score.stack_mentioned(stdout, case["stack"])
 
         if status != "ok":
             return _error_result(result, case, error)
 
+        completeness = score.report_completeness(stdout)
+        result["complete"] = completeness["complete"]
+        result["ready_to_merge"] = completeness["ready_to_merge"]
+        result["observations"] = score.observations(stdout, case["meta"])
         result["findings"] = [
             {"heading": finding["heading"], "severity": finding["severity"],
              "needs_verification": finding["needs_verification"],
@@ -502,13 +575,14 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
             for finding in score.parse_findings(stdout)
         ]
         if case["kind"] == "bug":
-            scored = score.score_bug(stdout, case["bug"]["patterns"], case["bug"]["min_severity"])
+            location_path = (case["bug"].get("location") or {}).get("path")
+            scored = score.score_bug(stdout, case["bug"]["patterns"], case["bug"]["min_severity"], location_path)
             result["detected"] = scored["detected"]
             result["matched_finding"] = scored["matched_finding"]
             result["passed"] = bool(scored["detected"])
         else:
             result["false_positives"] = score.score_clean(stdout)["false_positives"]
-            result["passed"] = result["false_positives"] == 0
+            result["passed"] = result["false_positives"] == 0 and result["complete"]
 
         return result
     finally:
@@ -548,6 +622,48 @@ def _skill_metadata() -> dict:
     return {"commit": commit, "skill_md_sha256": digest, "dirty": dirty}
 
 
+def provenance(args) -> dict:
+    """Hash everything that defines one study: skill, runner, scorer, gate, cases, profile, prompt and agent."""
+    try:
+        commit = subprocess.run(
+            ["git", "-C", REPO_ROOT, "rev-parse", "HEAD"], capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = "unknown"
+
+    try:
+        dirty = bool(subprocess.run(
+            ["git", "-C", REPO_ROOT, "status", "--porcelain", "--",
+             "SKILL.md", "stacks", "patterns", "references", "evals", "scripts"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip())
+    except (OSError, subprocess.CalledProcessError):
+        dirty = False
+
+    profile = None
+    if args.profile is not None:
+        profile = os.path.relpath(args.profile, REPO_ROOT).replace(os.sep, "/")
+    addendum = args.prompt_addendum
+    return {
+        "commit": commit,
+        "dirty": dirty,
+        "skill_tree_sha256": tree_sha256(files_under(*RUNTIME_ROOTS)),
+        "runner_sha256": file_sha256("evals/run.py"),
+        "scorer_sha256": file_sha256("evals/score.py"),
+        "gate_sha256": file_sha256(os.path.relpath(GATE_SCRIPT, REPO_ROOT).replace(os.sep, "/")),
+        "cases_tree_sha256": tree_sha256(files_under(os.path.relpath(args.cases_dir, REPO_ROOT))),
+        "profile": profile,
+        "profile_sha256": file_sha256(profile) if profile is not None else None,
+        "agent_name": args.agent_name,
+        "model": args.model,
+        "timeout": args.timeout,
+        "jobs": args.jobs,
+        "agent_cmd_sha256": sha256_text(args.agent_cmd),
+        "prompt_template_sha256": sha256_text(PROMPT_TEMPLATE),
+        "prompt_addendum_sha256": sha256_text(addendum) if addendum else None,
+    }
+
+
 def _metrics(results: list[dict]) -> dict:
     bug_results = [result for result in results if result["kind"] == "bug"]
     clean_results = [result for result in results if result["kind"] == "clean"]
@@ -564,6 +680,9 @@ def _metrics(results: list[dict]) -> dict:
         "false_positive_cases": len(false_positive_results),
         "false_positive_findings": sum(result["false_positives"] for result in false_positive_results),
         "errors": sum(1 for result in results if result["status"] == "error"),
+        "complete": sum(1 for result in results if result["complete"] is True),
+        "clean_complete_no_fp": sum(1 for result in clean_results if result["passed"] is True),
+        "worktree_changed": sum(1 for result in results if result["worktree_unchanged"] is False),
     }
 
 
@@ -587,6 +706,8 @@ def _summary(result: dict, *, mcp: str) -> str:
         f"{metrics['false_positive_findings']} Critical/Warning finding(s) "
         f"in {metrics['false_positive_cases']}/{metrics['clean_cases']} clean case(s)",
         f"- Errors: {metrics['errors']}",
+        f"- Complete reports: {metrics['complete']}/{len(result['cases'])}",
+        f"- Worktree changes: {metrics['worktree_changed']}",
         "",
         "| Case | Kind | Stack | Status | Result | Details |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -599,27 +720,91 @@ def _summary(result: dict, *, mcp: str) -> str:
             details = f"detected: {case['matched_finding']}" if case["detected"] else "not detected"
         else:
             details = f"{case['false_positives']} Critical/Warning finding(s)"
+            if not case["complete"]:
+                details += "; incomplete report"
         passed = "PASS" if case["passed"] else "FAIL"
         lines.append(f"| {case['id']} | {case['kind']} | {case['stack']} | {case['status']} | {passed} | {details} |")
 
     return "\n".join(lines) + "\n"
 
 
-def main(argv: list[str] | None = None) -> int:
+def _positive_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def load_profile(parser: argparse.ArgumentParser, path: str) -> dict:
+    """Return the frozen agent profile at ``path``; exit through ``parser`` when it is not a valid profile."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            profile = json.load(handle)
+    except (OSError, ValueError) as exc:
+        parser.error(f"profile {path}: {exc}")
+
+    if not isinstance(profile, dict) or sorted(profile) != sorted(PROFILE_KEYS):
+        parser.error(f"profile {path}: must be a JSON object with exactly the keys {', '.join(PROFILE_KEYS)}")
+    for key in ("name", "agent_name", "model", "agent_cmd"):
+        if not _text(profile[key]):
+            parser.error(f"profile {path}: {key} must be a non-empty string")
+    if not isinstance(profile["prompt_addendum"], str):
+        parser.error(f"profile {path}: prompt_addendum must be a string")
+    for key in ("timeout", "jobs"):
+        if not _positive_int(profile[key]):
+            parser.error(f"profile {path}: {key} must be a positive integer")
+    return profile
+
+
+def resolve_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse the command line and resolve the agent settings, from a frozen profile or from the defaults."""
     parser = argparse.ArgumentParser(description="Run the code review skill evals.")
     parser.add_argument("--validate", action="store_true", help="validate the pair folders and exit")
     parser.add_argument("--cases", default=None, metavar="GLOB", help="only run cases matching GLOB")
     parser.add_argument("--cases-dir", default=DEFAULT_CASES_DIR, metavar="DIR")
     parser.add_argument("--out-dir", default=None, metavar="DIR")
     parser.add_argument("--json", default=None, metavar="PATH")
-    parser.add_argument("--jobs", type=int, default=1, metavar="N")
-    parser.add_argument("--timeout", type=int, default=900, metavar="SECONDS")
-    parser.add_argument("--agent-cmd", default=os.environ.get("EVAL_AGENT_CMD") or DEFAULT_AGENT_CMD, metavar="CMD")
-    parser.add_argument("--agent-name", default=os.environ.get("EVAL_AGENT_NAME") or "claude", metavar="NAME")
-    parser.add_argument("--model", default=os.environ.get("EVAL_MODEL") or "sonnet", metavar="MODEL")
+    parser.add_argument("--jobs", type=int, default=None, metavar="N")
+    parser.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
+    parser.add_argument("--agent-cmd", default=None, metavar="CMD")
+    parser.add_argument("--agent-name", default=None, metavar="NAME")
+    parser.add_argument("--model", default=None, metavar="MODEL")
+    parser.add_argument("--profile", default=None, metavar="PATH", help="frozen agent profile JSON")
+    parser.add_argument("--sample", default=None, metavar="LABEL", help="name this run's sample")
+    parser.add_argument("--attempt", type=int, default=1, metavar="N")
+    parser.add_argument("--provenance", action="store_true", help="print the provenance hashes and exit")
     args = parser.parse_args(argv)
 
+    if args.profile is not None:
+        given = [flag for flag, value in (
+            ("--agent-cmd", args.agent_cmd), ("--agent-name", args.agent_name), ("--model", args.model),
+            ("--timeout", args.timeout), ("--jobs", args.jobs),
+        ) if value is not None]
+        if given:
+            parser.error("--profile fixes " + ", ".join(given) + "; do not pass them too")
+        profile = load_profile(parser, args.profile)
+        args.agent_cmd = profile["agent_cmd"]
+        args.agent_name = profile["agent_name"]
+        args.model = profile["model"]
+        args.timeout = profile["timeout"]
+        args.jobs = profile["jobs"]
+        args.prompt_addendum = profile["prompt_addendum"]
+        args.profile = os.path.abspath(args.profile)
+    else:
+        args.agent_cmd = args.agent_cmd or os.environ.get("EVAL_AGENT_CMD") or DEFAULT_AGENT_CMD
+        args.agent_name = args.agent_name or os.environ.get("EVAL_AGENT_NAME") or "claude"
+        args.model = args.model or os.environ.get("EVAL_MODEL") or "sonnet"
+        args.timeout = args.timeout if args.timeout is not None else 900
+        args.jobs = args.jobs if args.jobs is not None else 1
+        args.prompt_addendum = ""
+
     args.cases_dir = os.path.abspath(args.cases_dir)
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = resolve_args(argv)
+    if args.provenance:
+        print(json.dumps(provenance(args), indent=2))
+        return 0
+
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     args.out_dir = os.path.abspath(args.out_dir) if args.out_dir else os.path.join(
         REPO_ROOT, "evals", "results", stamp
@@ -650,6 +835,7 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(reports_dir)
     os.makedirs(reports_dir, exist_ok=True)
 
+    prov = provenance(args)
     by_id = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = [pool.submit(evaluate, case, args, args.out_dir) for case in cases]
@@ -660,14 +846,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{case_result['id']}: {case_result['status']} {verdict} "
                   f"({case_result['duration_s']}s)", file=sys.stderr)
 
+    prov_after = provenance(args)
     results = [by_id[case["id"]] for case in cases]
     mcp = ("disabled; API-validation step skipped"
            if args.agent_cmd == DEFAULT_AGENT_CMD else "unknown (custom agent command)")
     data = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "kind": "pairs",
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "agent": {"name": args.agent_name, "model": args.model, "command": args.agent_cmd, "mcp": mcp},
+        "sample": args.sample,
+        "attempt": args.attempt,
+        "agent": {"name": args.agent_name, "model": args.model, "command": args.agent_cmd, "mcp": mcp,
+                  "profile": prov["profile"]},
         "skill": _skill_metadata(),
+        "provenance": prov,
+        "provenance_after": prov_after,
         "metrics": _metrics(results),
         "cases": results,
     }

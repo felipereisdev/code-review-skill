@@ -99,17 +99,25 @@ class RunTest(unittest.TestCase):
         r = self.run_demo("bash " + FAKE_AGENT)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         data = self.results()
-        self.assertEqual(data["schema_version"], 1)
+        self.assertEqual(data["schema_version"], 2)
+        self.assertEqual(data["kind"], "pairs")
         self.assertEqual(data["metrics"], {"bug_cases": 1, "detected": 1, "recall": 1.0, "clean_cases": 1,
-                                           "false_positive_cases": 0, "false_positive_findings": 0, "errors": 0})
+                                           "false_positive_cases": 0, "false_positive_findings": 0, "errors": 0,
+                                           "complete": 2, "clean_complete_no_fp": 1, "worktree_changed": 0})
         self.assertEqual([c["id"] for c in data["cases"]], ["demo/bug", "demo/clean"])
         bug, clean = data["cases"]
+        self.assertEqual((bug["trial_id"], bug["exit_code"], bug["error_class"]), ("demo/bug", 0, None))
+        self.assertEqual((bug["report_valid"], bug["complete"], bug["worktree_unchanged"]), (True, True, True))
         self.assertTrue(bug["passed"])
         self.assertEqual(bug["matched_finding"], "Security — Critical")
         self.assertEqual(bug["findings"], [{"heading": "Security — Critical", "severity": "Critical",
                                             "needs_verification": False, "pre_existing": False,
                                             "already_raised": False}])
         self.assertEqual(clean["false_positives"], 0)
+        self.assertIs(clean["passed"], True)
+        self.assertEqual(bug["report"], "reports/demo__bug.md")
+        with open(os.path.join(self.out, bug["report"]), "rb") as f:
+            self.assertEqual(bug["report_sha256"], hashlib.sha256(f.read()).hexdigest())
         self.assertTrue(os.path.isfile(os.path.join(self.out, "reports", "demo__bug.md")))
         with open(os.path.join(self.out, "summary.md"), encoding="utf-8") as f:
             summary = f.read()
@@ -133,6 +141,7 @@ class RunTest(unittest.TestCase):
         case = self.results()["cases"][0]
         self.assertEqual(case["status"], "error")
         self.assertIn("exited with 3", case["error"])
+        self.assertEqual(case["error_class"], "agent_exit")
         self.assertFalse(case["passed"])
 
     def test_report_without_output_format_is_an_error(self):
@@ -140,6 +149,7 @@ class RunTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         data = self.results()
         self.assertEqual(data["cases"][1]["status"], "error")
+        self.assertEqual(data["cases"][1]["error_class"], "format")
         self.assertFalse(data["cases"][1]["passed"])
         self.assertEqual(data["metrics"]["errors"], 2)
 
@@ -171,6 +181,7 @@ class RunTest(unittest.TestCase):
         bug, clean = self.results()["cases"]
         self.assertEqual((bug["id"], bug["status"], bug["passed"]), ("demo/bug", "error", False))
         self.assertTrue(bug["error"].startswith("setup failed:"), bug["error"])
+        self.assertEqual(bug["error_class"], "setup")
         self.assertIs(bug["detected"], False)
         self.assertIs(clean["detected"], None)
         self.assertIs(clean["false_positives"], None)
@@ -190,6 +201,84 @@ class RunTest(unittest.TestCase):
         r = self.run_demo("sleep 30 & wait", "--timeout", "1")
         self.assertEqual(r.returncode, 1)
         self.assertIn("timeout", self.results()["cases"][0]["error"])
+
+    def write_profile(self, **overrides):
+        profile = {"name": "test", "agent_name": "fake", "model": "m-1",
+                   "agent_cmd": "cat; echo; bash " + FAKE_AGENT, "prompt_addendum": "ADDENDUM LINE",
+                   "timeout": 60, "jobs": 1}
+        profile.update(overrides)
+        path = os.path.join(self.out, "profile.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(profile, f)
+        return path
+
+    def test_incomplete_clean_review_is_not_a_pass(self):
+        r = self.run_demo("cat > /dev/null; printf '## Findings\\n\\nReview incomplete or pending — no confirmed "
+                          "findings in the code inspected.\\n\\n**Ready to merge:** No — no changed file was "
+                          "reviewed.\\n\\n## Audit\\n'")
+        clean = self.results()["cases"][1]
+        self.assertEqual((clean["status"], clean["false_positives"], clean["complete"], clean["passed"]),
+                         ("ok", 0, False, False), r.stdout + r.stderr)
+
+    def test_agent_that_writes_is_recorded(self):
+        self.run_demo("cat > /dev/null; echo x >> app.py; bash " + FAKE_AGENT + " < /dev/null")
+        data = self.results()
+        self.assertEqual([c["worktree_unchanged"] for c in data["cases"]], [False, False])
+        self.assertEqual(data["metrics"]["worktree_changed"], 2)
+
+    def test_infrastructure_failure_is_classified(self):
+        self.run_demo("cat > /dev/null; echo 'API Error: 529 overloaded' >&2; exit 1")
+        case = self.results()["cases"][0]
+        self.assertEqual((case["status"], case["error_class"], case["exit_code"]), ("error", "infrastructure", 1))
+
+    def test_provenance_prints_hashes_without_running(self):
+        r = run("--provenance", "--cases-dir", FIXTURES)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads(r.stdout)
+        with open(RUN, "rb") as f:
+            self.assertEqual(data["runner_sha256"], hashlib.sha256(f.read()).hexdigest())
+        for key in ("commit", "dirty", "skill_tree_sha256", "scorer_sha256", "gate_sha256", "cases_tree_sha256",
+                    "agent_cmd_sha256", "prompt_template_sha256"):
+            self.assertIn(key, data)
+        self.assertEqual((data["profile"], data["profile_sha256"], data["prompt_addendum_sha256"]), (None, None, None))
+        self.assertEqual(data["model"], "sonnet")
+
+    def test_profile_fixes_agent_model_and_addendum(self):
+        path = self.write_profile()
+        r = run("--cases-dir", FIXTURES, "--cases", "demo/*", "--out-dir", self.out, "--profile", path)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = self.results()
+        self.assertEqual((data["agent"]["model"], data["agent"]["name"]), ("m-1", "fake"))
+        with open(path, "rb") as f:
+            self.assertEqual(data["provenance"]["profile_sha256"], hashlib.sha256(f.read()).hexdigest())
+        self.assertEqual(data["provenance"]["prompt_addendum_sha256"], hashlib.sha256(b"ADDENDUM LINE").hexdigest())
+        with open(os.path.join(self.out, "reports", "demo__bug.md"), encoding="utf-8") as f:
+            self.assertIn("\nADDENDUM LINE\n", f.read())
+        self.assertTrue(data["cases"][0]["detected"])
+
+    def test_profile_rejects_explicit_agent_settings(self):
+        r = run("--cases-dir", FIXTURES, "--cases", "demo/*", "--out-dir", self.out,
+                "--profile", self.write_profile(), "--model", "x")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("--profile fixes --model", r.stderr)
+
+    def test_invalid_profile_is_rejected(self):
+        path = self.write_profile()
+        with open(path, encoding="utf-8") as f:
+            profile = json.load(f)
+        del profile["jobs"]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(profile, f)
+        r = run("--provenance", "--profile", path)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("profile", r.stderr)
+
+    def test_sample_and_attempt_name_the_trial(self):
+        self.run_demo("bash " + FAKE_AGENT, "--sample", "s2", "--attempt", "2")
+        data = self.results()
+        self.assertEqual((data["sample"], data["attempt"]), ("s2", 2))
+        self.assertEqual([c["trial_id"] for c in data["cases"]], ["s2/demo/bug", "s2/demo/clean"])
+        self.assertEqual(data["provenance"], data["provenance_after"])
 
 
 LEGACY_PROMPT = """\
