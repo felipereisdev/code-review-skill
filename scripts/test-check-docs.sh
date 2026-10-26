@@ -758,7 +758,7 @@ expect_fail "letting a comment drop a finding fails" "$work/commentdrop" "Pull R
 
 make_copy "$work/prnorepoview"
 replace_first "$work/prnorepoview/SKILL.md" '`gh pr view <n> -R <repository> --json' '`gh pr view <n> --json'
-expect_fail "a gh pr view that does not name the repository fails" "$work/prnorepoview" "Pull Request Scope is missing: \`gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,closingIssuesReferences,comments,reviews\`"
+expect_fail "a gh pr view that does not name the repository fails" "$work/prnorepoview" "Pull Request Scope is missing: \`gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,additions,deletions,closingIssuesReferences,comments,reviews\`"
 
 make_copy "$work/prnorepodiff"
 replace_first "$work/prnorepodiff/SKILL.md" '`gh pr diff <n> -R <repository>`' '`gh pr diff <n>`'
@@ -1008,6 +1008,118 @@ expect_fail "an example without the omitted-findings line fails" "$work/examplen
 make_copy "$work/pubnoconfiglines"
 drop_lines "$work/pubnoconfiglines/references/publishing.md" 'copy each one unchanged into the summary'
 expect_fail "a summary comment that drops the configuration lines fails" "$work/pubnoconfiglines" "references/publishing.md is missing: copy each one unchanged into the summary"
+
+make_copy "$work/effortestimate"
+replace_first "$work/effortestimate/SKILL.md" 'never estimate them, and never copy a number from output that was cut off' 'estimate them when the diff is long'
+expect_fail "an effort count that may be estimated fails" "$work/effortestimate" "Step 3 is missing: never estimate them, and never copy a number from output that was cut off"
+
+make_copy "$work/effortnumstat"
+replace_first "$work/effortnumstat/SKILL.md" 'Add up both numbers over the files that are not excluded.' 'Estimate the total from the hunks.'
+expect_fail "a numstat total that is not added up fails" "$work/effortnumstat" "Step 3 is missing: Add up both numbers over the files that are not excluded."
+
+make_copy "$work/effortbinary"
+replace_first "$work/effortbinary/SKILL.md" 'A binary file shows `-` for both: it adds no lines but counts as a changed file.' 'Skip binary files.'
+expect_fail "a binary file that is not counted as a changed file fails" "$work/effortbinary" "Step 3 is missing: A binary file shows \`-\` for both: it adds no lines but counts as a changed file."
+
+make_copy "$work/effortgithub"
+replace_first "$work/effortgithub/SKILL.md" 'take `additions` plus `deletions` from `gh pr view`' 'estimate from `gh pr diff`'
+expect_fail "a pr count that is not read from gh pr view fails" "$work/effortgithub" "Step 3 is missing: take \`additions\` plus \`deletions\` from \`gh pr view\`"
+
+make_copy "$work/effortheaders"
+replace_first "$work/effortheaders/SKILL.md" 'after the first `@@` line of each file' 'anywhere in the diff'
+expect_fail "a printed-diff count that counts header lines fails" "$work/effortheaders" "Step 3 is missing: after the first \`@@\` line of each file"
+
+make_copy "$work/effortatleast"
+replace_first "$work/effortatleast/SKILL.md" 'write `at least <lines> changed lines` with the lines you did count' 'write the lines you did count'
+expect_fail "an at least count without its lower-bound form fails" "$work/effortatleast" "Step 3 is missing: write \`at least <lines> changed lines\` with the lines you did count"
+
+make_copy "$work/prglabbase"
+replace_first "$work/prglabbase/SKILL.md" 'the `base_sha` of `diff_refs`, `web_url`' '`web_url`'
+expect_fail "a GitLab view that does not name the base commit fails" "$work/prglabbase" "Pull Request Scope is missing: head commit \`sha\`, the \`base_sha\` of \`diff_refs\`, \`web_url\`"
+
+make_copy "$work/ctxskillroot"
+replace_first "$work/ctxskillroot/SKILL.md" "\`skill:\` and its path relative to this skill file's directory" "its path relative to this skill file's directory"
+expect_fail "a skill file without its skill: identity fails" "$work/ctxskillroot" "Step 3 is missing: \`skill:\` and its path relative to this skill file's directory"
+
+make_copy "$work/ctxsamesuffix"
+replace_first "$work/ctxsamesuffix/SKILL.md" 'A repository file and a skill file with the same relative path are two files' 'A repository file and a skill file with the same relative path are one file'
+expect_fail "a repository file and a skill file with one path merged fails" "$work/ctxsamesuffix" "Step 3 is missing: A repository file and a skill file with the same relative path are two files"
+
+make_copy "$work/ctxskillmd"
+replace_first "$work/ctxskillmd/SKILL.md" 'The SKILL.md you are following is the instructions of this review, not context: never list it' 'The SKILL.md you are following is context: list it'
+expect_fail "listing the active workflow SKILL.md as context fails" "$work/ctxskillmd" "Step 3 is missing: The SKILL.md you are following is the instructions of this review, not context: never list it"
+
+make_copy "$work/ctxreposkill"
+replace_first "$work/ctxreposkill/SKILL.md" 'A `SKILL.md` of the reviewed repository is such a file, even when the repository is itself a skill' 'A `SKILL.md` of the reviewed repository is never listed'
+expect_fail "a reviewed repository SKILL.md that is never listed fails" "$work/ctxreposkill" "Step 3 is missing: A \`SKILL.md\` of the reviewed repository is such a file, even when the repository is itself a skill"
+
+make_copy "$work/ctxsearchpartial"
+replace_first "$work/ctxsearchpartial/SKILL.md" 'is a partial read of that file' 'reads no file'
+expect_fail "a search that shows lines but reads no file fails" "$work/ctxsearchpartial" "Step 3 is missing: A search result that shows lines of a file is a partial read of that file"
+
+make_copy "$work/ctxsearchscanned"
+replace_first "$work/ctxsearchscanned/SKILL.md" 'and not the files the search only scanned' 'and every file the search scanned'
+expect_fail "a search that lists every scanned file fails" "$work/ctxsearchscanned" "Step 3 is missing: and not the files the search only scanned"
+
+make_copy "$work/effortlowerfive"
+replace_first "$work/effortlowerfive/SKILL.md" 'Rate it 5/5: never rate a smaller size from a lower bound.' 'Rate it from the lines you counted.'
+expect_fail "an at least count rated below 5/5 fails" "$work/effortlowerfive" "Step 3 is missing: Rate it 5/5: never rate a smaller size from a lower bound."
+
+make_copy "$work/effortexact"
+replace_first "$work/effortexact/SKILL.md" ' When a source above measures the whole diff, write its exact total, never `at least`.' ''
+expect_fail "a measured total that may still be written as at least fails" "$work/effortexact" "Step 3 is missing: When a source above measures the whole diff, write its exact total, never \`at least\`."
+
+make_copy "$work/effortwhy"
+replace_first "$work/effortwhy/SKILL.md" ' (the total could not be measured: <why>)' ''
+expect_fail "an at least count without its reason fails" "$work/effortwhy" "Step 3 is missing: in <files> files (the total could not be measured: <why>); <risk areas, or no risk area>."
+
+make_copy "$work/effortnotlimit"
+replace_first "$work/effortnotlimit/SKILL.md" 'The unmeasured total is not a limit by itself' 'The unmeasured total is a material limit'
+expect_fail "an unmeasured total treated as a material limit fails" "$work/effortnotlimit" "Step 3 is missing: The unmeasured total is not a limit by itself"
+
+make_copy "$work/ctxinvented"
+replace_first "$work/ctxinvented/SKILL.md" 'you never invent a path for them' 'you name the file they came from'
+expect_fail "invented paths for opaque instructions fail" "$work/ctxinvented" "Step 3 is missing: you never invent a path for them"
+
+make_copy "$work/ctxchanged"
+replace_first "$work/ctxchanged/SKILL.md" 'A changed file is never on this line' 'A changed file you open again is also on this line'
+expect_fail "a changed file listed as context fails" "$work/ctxchanged" "Step 3 is missing: A changed file is never on this line"
+
+make_copy "$work/ctxzero"
+replace_first "$work/ctxzero/SKILL.md" ', never `0 files`' ''
+expect_fail "an empty context line that may read 0 files fails" "$work/ctxzero" "Step 3 is missing: never \`0 files\`"
+
+make_copy "$work/ctxprose"
+replace_first "$work/ctxprose/SKILL.md" 'Each line ends with its last path and a period' 'Each line can end with a note'
+expect_fail "an Audit line that may carry a note fails" "$work/ctxprose" "Step 3 is missing: Each line ends with its last path and a period"
+
+make_copy "$work/reconcilegone"
+drop_lines "$work/reconcilegone/SKILL.md" '**Reconcile before you deliver.**'
+expect_fail "removing the reconcile step fails" "$work/reconcilegone" "Step 3 is missing: **Reconcile before you deliver.**"
+
+make_copy "$work/reconcileorder"
+replace_first "$work/reconcileorder/SKILL.md" 'Before you write the first line of the report, settle these facts' 'After you write the report, look at these facts'
+expect_fail "settling the facts after the report fails" "$work/reconcileorder" "Step 3 is missing: Before you write the first line of the report, settle these facts"
+
+make_copy "$work/reconcilematerial"
+replace_first "$work/reconcilematerial/SKILL.md" 'With no `material` item in the Audit, the verdict line has neither' 'The verdict line may add'
+expect_fail "a verdict line without material limits that may add a note fails" "$work/reconcilematerial" "Step 3 is missing: With no \`material\` item in the Audit, the verdict line has neither"
+
+make_copy "$work/reconciledrop"
+replace_first "$work/reconciledrop/SKILL.md" 'Never drop a file you opened, a limit or a finding to make a count or a line agree' 'Drop what does not fit'
+expect_fail "dropping a file to make a count agree fails" "$work/reconciledrop" "Step 3 is missing: Never drop a file you opened, a limit or a finding to make a count or a line agree"
+
+make_copy "$work/headlinefindings"
+replace_first "$work/headlinefindings/SKILL.md" 'write no headline at all, whatever the **Ready to merge:** line says' 'write the headline that the **Ready to merge:** line selects'
+expect_fail "a headline beside a listed finding fails" "$work/headlinefindings" "Step 3 is missing: When \`## Findings\` lists at least one finding, write no headline at all, whatever the **Ready to merge:** line says."
+
+make_copy "$work/readmeeffort"
+replace_first "$work/readmeeffort/README.md" ' (from the line and file counts measured on the diff, never estimated)' ''
+expect_fail "a README that does not say the effort is measured fails" "$work/readmeeffort" "README is missing: from the line and file counts measured on the diff, never estimated"
+
+make_copy "$work/readmeskillctx"
+replace_first "$work/readmeskillctx/README.md" ", the skill's own files as \`skill:<path>\`" ''
+expect_fail "a README that does not name skill identities fails" "$work/readmeskillctx" "README is missing: the skill's own files as \`skill:<path>\`"
 
 make_copy "$work/triagenostep"
 replace_first "$work/triagenostep/SKILL.md" '## Step 3 — Triage, Verdict and Audit' '## Step 3 — Summary'

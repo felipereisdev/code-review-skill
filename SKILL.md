@@ -97,7 +97,7 @@ These probes, like the `auth status` probes under **Platform for a number**, ans
 
 GitHub, with `<n>` the number and `<repository>` as above:
 
-- `gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,closingIssuesReferences,comments,reviews` reads the title, description, author, base and head branches, head commit, linked issues, conversation comments and review summaries.
+- `gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,additions,deletions,closingIssuesReferences,comments,reviews` reads the title, description, author, base and head branches, head commit, the added and removed line counts of the whole diff, linked issues, conversation comments and review summaries.
 - `gh pr diff <n> -R <repository>` prints the diff to review.
 - This GraphQL query reads every commit of the pull request, following `endCursor` through all pages. Take `<host>`, `<owner>` and `<repo>` from `<repository>`, and `<number>` from `<n>`:
 
@@ -162,7 +162,7 @@ query($threadId: ID!, $endCursor: String) {
 
 GitLab, with `<iid>` the number and `<repository>` the project URL, which is the URL up to `/-/`; add `-R <repository>` to every `glab mr` and `glab issue` command:
 
-- `glab mr view <iid> -R <repository> --output json` reads the `title`, `description`, `author`, `source_branch`, `target_branch`, head commit `sha`, `web_url` and `project_id`.
+- `glab mr view <iid> -R <repository> --output json` reads the `title`, `description`, `author`, `source_branch`, `target_branch`, head commit `sha`, the `base_sha` of `diff_refs`, `web_url` and `project_id`.
 - `glab mr diff <iid> -R <repository> --raw` prints the diff to review.
 - `glab api --hostname <host> --paginate projects/<project_id>/merge_requests/<iid>/commits` reads every commit, following the pages.
 - `glab api --hostname <host> --paginate projects/<project_id>/merge_requests/<iid>/discussions` reads the threads. Each note has `body`, `author.username`, `resolvable` and `resolved`; a note on a line also has `position.new_path`, `position.new_line`, `position.old_line` and `position.head_sha`.
@@ -545,7 +545,13 @@ Write the four triage lines in this form and in this order:
 **Ready to merge:** <Yes, No or With fixes> — <reason>.
 ```
 
-**Review effort.** Rate from 1 to 5 how much work a person needs to review the change. Count the changed lines (added plus removed) and the changed files, leaving out the files excluded by configuration. Start from the size: up to 50 changed lines is 1, up to 200 is 2, up to 500 is 3, up to 1000 is 4, and more is 5. Add 1 when the change touches one risk area and 2 when it touches two or more, up to 5. The risk areas are authentication, authorization, payments, personal data, database schema or migrations, concurrency, and public API contracts. Name the risk areas the change touches, or write `no risk area`.
+**Review effort.** Rate from 1 to 5 how much work a person needs to review the change. Count the changed lines (added plus removed) and the changed files, leaving out the files excluded by configuration. Measure both as **Measured diff stats** below says: never estimate them, and never copy a number from output that was cut off. Start from the size: up to 50 changed lines is 1, up to 200 is 2, up to 500 is 3, up to 1000 is 4, and more is 5. Add 1 when the change touches one risk area and 2 when it touches two or more, up to 5. The risk areas are authentication, authorization, payments, personal data, database schema or migrations, concurrency, and public API contracts. Name the risk areas the change touches, or write `no risk area`.
+
+**Measured diff stats.** Take both counts from the diff that Step 0 selected:
+
+- For `uncommitted`, `staged`, `branch`, `commit` and `range`, run the scope's diff command again with `--numstat`, quoted as Step 0 says: `git diff --numstat HEAD`, `git diff --numstat --cached`, `git diff --numstat <base>...HEAD`, `git show --numstat --format= <sha>` or `git diff --numstat <from>..<to>`; before the first commit, both `git diff --numstat --cached` and `git diff --numstat`. Each output line gives the added lines, the removed lines and the path of one changed file. Add up both numbers over the files that are not excluded. A binary file shows `-` for both: it adds no lines but counts as a changed file. For `uncommitted`, each untracked text file also adds its number of lines.
+- For `pr` on GitHub, take `additions` plus `deletions` from `gh pr view`. On GitLab, when `git rev-parse --verify --quiet` accepts both the `base_sha` of `diff_refs` and the head commit `sha`, each with `^{commit}` as in Step 0, run `git diff --numstat '<base_sha>' '<sha>'` and add up as above. Otherwise count, in the printed diff, the lines that start with `+` or `-` after the first `@@` line of each file, which leaves out its `---` and `+++` header lines. When configuration excludes files, subtract each excluded file's added and removed lines, counted the same way in its part of the printed diff.
+- Only when no source above measures the whole selected diff, for example because part of the printed diff was cut off and nothing else counts it, write `at least <lines> changed lines` with the lines you did count, and after the file count say why: `**Review effort:** 5/5 — at least <lines> changed lines in <files> files (the total could not be measured: <why>); <risk areas, or no risk area>.` Rate it 5/5: never rate a smaller size from a lower bound. When a source above measures the whole diff, write its exact total, never `at least`. The unmeasured total is not a limit by itself: changed lines you could not read are `not read` items, weighed by **Limits** like any other.
 
 **Relevant tests.** Pick one status:
 
@@ -607,8 +613,16 @@ Never say that a test passes or fails unless you ran it and saw the result, and 
 ```
 
 - **Files reviewed**: `<m>` is the number of changed files in the diff, and `<n>` the number you reviewed: not excluded by configuration, not binary and not left unread as a whole. A file you read only in part counts as reviewed, and its unread lines are a `not read` item. List every reviewed path in alphabetical order; with `<n>` 0, end the line after `changed files`. The reviewed files, the files excluded by configuration, the binary files and the files not read at all add up to `<m>`.
-- **Read for context**: every file outside the diff that you opened, in alphabetical order, after their number, or `none`. Reading a file for context never makes its unchanged lines reviewable: findings still cite only changed lines (see Changed Lines and Grouping).
-- List every path on both lines, however many there are. Only compact mode and the summary comment shorten the Audit, to one line.
+- **Read for context**: every file outside the diff whose content you saw for this review, with any tool, in whole or in part, after their number; with none, write `**Read for context:** none.`, never `0 files`. List each file once, however often you opened it, under one identity, and sort the identities alphabetically as written:
+  - A file of the reviewed repository, including its rules files and the files in `.code-review/`: its path from the repository root, also when you read it with `git show`. A `SKILL.md` of the reviewed repository is such a file, even when the repository is itself a skill: reviewed when it changed, otherwise listed here by its repository path when you read it.
+  - A file of this skill that you opened as guidance, such as a stack, pattern or reference file: `skill:` and its path relative to this skill file's directory, written `` `skill:<path>` ``. A repository file and a skill file with the same relative path are two files, listed under their two identities.
+  - The SKILL.md you are following is the instructions of this review, not context: never list it, under `skill:<path>` or any other identity, and never take it for a repository file with the same name.
+  - Any other file outside the repository: its absolute path.
+  - Instructions that reached you without a file you opened, such as text your agent loaded for you, are not listed, and you never invent a path for them.
+  - A directory listing or a search that shows only file names reads no file. A search result that shows lines of a file is a partial read of that file: list each file outside the diff whose lines it showed, and not the files the search only scanned.
+  - A changed file is never on this line, even when you open it again, read its old version or see its lines in a search result: it is one changed file, counted once under **Files reviewed** or among the excluded, binary or unread files, and its changed lines you did not read stay `not read` items.
+  - Reading a file for context never makes its unchanged lines reviewable: findings still cite only changed lines (see Changed Lines and Grouping).
+- List every path on both lines, however many there are. Each line ends with its last path and a period: no note, annotation or sentence after it. Only compact mode and the summary comment shorten the Audit, to one line.
 - **Checked with no findings**: the categories of the Summary table that you applied (not N/A) and that have no finding under `## Findings` or `## Needs human verification` before the filters and no Warning candidate already raised, in the table's order, or `none`. Leave out Tests/Coverage when the relevant tests are `not verified`. A category on this line had no finding in what you reviewed; it says nothing about the limits under **Not verified**.
 - **Already raised, not verified**: only in a `pr` review, and always there. List each Warning candidate that an open thread already raised, at the place of its line under `## Already raised in the PR (not repeated)`, with its category, or write `none`. They are candidates pending verification, not findings, and they stay out of the Summary table and the verification line.
 - **Not verified**: one item per limit (see **Limits**), or `**Not verified:** nothing.` when there is none. Each item has one tag:
@@ -618,6 +632,23 @@ Never say that a test passes or fails unless you ran it and saw the result, and 
   - `API not validated`: an API or version claim you could not check (see **API Validation** in Step 1).
   - `tests not verified`: the relevant tests could not be checked; `<what>` is `relevant tests`.
 - Never claim coverage you did not have: unread lines, files excluded by configuration, binary files, API behavior you did not validate and tests you did not run are never called reviewed, clean or passing.
+
+**Reconcile before you deliver.** The report is written from the top, but its headline and its verdict depend on facts that Step 2 and this step settle at the end.
+
+1. Before you write the first line of the report, settle these facts: the findings under `## Findings` and under `## Needs human verification`, the Warning candidates already raised, the reviewed changed files, the files read for context, the measured diff stats, each limit with its weight, and the verdict row.
+2. Write the report from those facts, then check it before you deliver it:
+   - **Headline**: when `## Findings` lists a finding, the report has no headline, whatever the **Ready to merge:** line says; otherwise the headline is the one that line selects (see Output Format).
+   - **Counts**: `<n>` on **Files reviewed** and `<k>` on **Read for context** equal the number of paths written on their lines, no path is written twice, and no changed file is on **Read for context**. The compact **Audit:** line and the summary comment repeat the same numbers.
+   - **Effort**: the changed lines and files on **Review effort** are the measured diff stats, exact whenever a source measured the whole diff; `at least` only when none did, with its reason and level 5/5.
+   - **Material limits**: With no `material` item in the Audit, the verdict line has neither ` Not fully reviewed: see the Audit.` nor ` more material limit`. With one or more, the verdict is row 1, row 2 ending with ` Not fully reviewed: see the Audit.`, or row 3 naming the first material item, with ` <k> more material limits are in the Audit.` when there are more.
+3. When a check fails, correct the report so that it states the facts. Never drop a file you opened, a limit or a finding to make a count or a line agree, and never deliver two lines that contradict each other with a note that one of them is wrong.
+
+Each of these was wrong in a real report:
+
+- The incomplete headline above a listed `Potential Bugs — Warning` finding, followed by a note that the headline is wrong. Right: no headline; the finding and `**Ready to merge:** With fixes — 1 Warning finding should be fixed; none blocks the merge.` say it.
+- `**Read for context:** 3 files:` followed by two paths, or a changed file listed again as context. Right: one entry per file outside the diff that was opened, and their number.
+- `**Ready to merge:** No — 2 Critical findings must be fixed before merging.` while the Audit lists a `context not read, material` item. Right: the same line ending with ` Not fully reviewed: see the Audit.`
+- `668 changed lines` for a pull request whose diff adds 670 lines and removes 41. Right: `711 changed lines`. The same effort level does not make a wrong count right.
 
 ---
 
@@ -686,7 +717,7 @@ Right after the Summary table, write one verification line with the counts from 
 
 Write the line even when both counts are 0. Do not list refuted findings unless the user asks for them.
 
-If there are no High-confidence findings, write the **Scope:** line, then state the headline that the **Ready to merge:** line of Step 3 selects: **"Code review passed — no issues found."** only when that line is **Yes**; otherwise **"Review incomplete or pending — no confirmed findings in the code inspected."** Never write the passed sentence for **No** or **With fixes**, and never write either sentence beside a listed finding. Then list any Medium-confidence findings under `## Needs human verification`, any `## Pre-existing issues (not counted)` lines and any `## Already raised in the PR (not repeated)` lines, then write the verification line, the triage lines of Step 3 and `## Audit`.
+Choose the headline only after the `## Findings` list is final (see **Reconcile before you deliver** in Step 3). When `## Findings` lists at least one finding, write no headline at all, whatever the **Ready to merge:** line says. If there are no High-confidence findings, write the **Scope:** line, then state the headline that the **Ready to merge:** line of Step 3 selects: **"Code review passed — no issues found."** only when that line is **Yes**; otherwise **"Review incomplete or pending — no confirmed findings in the code inspected."** Never write the passed sentence for **No** or **With fixes**, and never write either sentence beside a listed finding. Then list any Medium-confidence findings under `## Needs human verification`, any `## Pre-existing issues (not counted)` lines and any `## Already raised in the PR (not repeated)` lines, then write the verification line, the triage lines of Step 3 and `## Audit`.
 
 ### Compact mode
 

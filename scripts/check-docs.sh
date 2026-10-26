@@ -826,7 +826,8 @@ else:
               "their exits are results, not failures",
               "**Repository.**",
               "`gh pr view <n> -R <repository> --json number,url,title,body,author,baseRefName,headRefName,headRefOid,"
-              "closingIssuesReferences,comments,reviews`",
+              "additions,deletions,closingIssuesReferences,comments,reviews`",
+              "head commit `sha`, the `base_sha` of `diff_refs`, `web_url`",
               "`gh pr diff <n> -R <repository>`", "gh api graphql --hostname <host> --paginate", "isResolved", "isOutdated",
               "commits(first: 100, after: $endCursor)", "node(id: $threadId)",
               "gh api graphql --hostname <host> -f threadId=<thread-id> -f endCursor=<cursor>",
@@ -1384,6 +1385,32 @@ else:
 for s in (
         "before the filters of `./references/configuration.md`",
         "**Review effort:** <n>/5 — <lines> changed lines in <files> files; <risk areas, or no risk area>.",
+        "never estimate them, and never copy a number from output that was cut off",
+        "**Measured diff stats.**",
+        "Add up both numbers over the files that are not excluded.",
+        "A binary file shows `-` for both: it adds no lines but counts as a changed file.",
+        "take `additions` plus `deletions` from `gh pr view`",
+        "after the first `@@` line of each file",
+        "write `at least <lines> changed lines` with the lines you did count",
+        "in <files> files (the total could not be measured: <why>); <risk areas, or no risk area>.",
+        "Rate it 5/5: never rate a smaller size from a lower bound.",
+        "When a source above measures the whole diff, write its exact total, never `at least`.",
+        "The unmeasured total is not a limit by itself",
+        "`skill:` and its path relative to this skill file's directory",
+        "A repository file and a skill file with the same relative path are two files",
+        "A `SKILL.md` of the reviewed repository is such a file, even when the repository is itself a skill",
+        "The SKILL.md you are following is the instructions of this review, not context: never list it",
+        "you never invent a path for them",
+        "A search result that shows lines of a file is a partial read of that file",
+        "and not the files the search only scanned",
+        "A changed file is never on this line",
+        "never `0 files`",
+        "Each line ends with its last path and a period",
+        "**Reconcile before you deliver.**",
+        "Before you write the first line of the report, settle these facts",
+        "With no `material` item in the Audit, the verdict line has neither",
+        "Never drop a file you opened, a limit or a finding to make a count or a line agree",
+        "When `## Findings` lists at least one finding, write no headline at all, whatever the **Ready to merge:** line says.",
         "**Relevant tests:** <status> — <tests and what they cover>. Execution: <execution>.",
         "- `not verified`: you could not check which tests run the changed code",
         "A status you could not check is never `missing` or `not applicable`.",
@@ -1519,7 +1546,9 @@ readme = open("README.md", encoding="utf-8").read()
 for s in ("**Triage, Verdict and Audit**", "`**Ready to merge:** Yes / No / With fixes`", "- **Triage and verdict**:",
           "- **Audit**: the report ends with `## Audit`", "never approves or blocks a pull request",
           "an open thread does not prove the problem",
-          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit"):
+          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit",
+          "from the line and file counts measured on the diff, never estimated",
+          "the skill's own files as `skill:<path>`"):
     if s not in readme:
         errors.append(f"README is missing: {s}")
 for s in ("are not counted in the Summary table and do not change the verdict", "which the skill never runs"):
