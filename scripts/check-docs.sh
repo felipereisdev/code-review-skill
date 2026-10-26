@@ -131,7 +131,7 @@ check_readme_counts() {
   else
     fail "git grep failed (run the script inside a git checkout)"
   fi
-  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh scripts/review_gate.py evals/run.py evals/score.py evals/make-patch.sh .github/workflows/ci.yml; do
+  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh scripts/review_gate.py evals/run.py evals/score.py evals/aggregate.py evals/make-patch.sh .github/workflows/ci.yml; do
     grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
   done
   if [ -z "$missing" ]; then

@@ -18,20 +18,28 @@ Wave 6 replaces probe archaeology with the frozen acceptance corpus: 100 rows
 variants do not expand it.
 """
 
+import hashlib
 import json
 import os
+import shutil
 import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from score import score_bug  # noqa: E402
+import run as eval_run  # noqa: E402
+import aggregate  # noqa: E402
 
 
 TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 EVALS_DIR = os.path.dirname(TESTS_DIR)
+REPO_ROOT = os.path.dirname(EVALS_DIR)
 CASES_DIR = os.path.join(EVALS_DIR, "cases")
+CONTROLS_DIR = os.path.join(EVALS_DIR, "controls")
 BASELINE_DIR = os.path.join(EVALS_DIR, "baseline", "reports")
+PROTOCOL_PATH = os.path.join(aggregate.CURRENT_STUDY, "protocol.json")
+ORIGINAL_PROTOCOL_PATH = os.path.join(EVALS_DIR, "baseline", "expanded", "protocol.json")
 
 
 def load_bug(case):
@@ -376,6 +384,7 @@ failed charge is reported as successful.
 
 PAYMENT_CORPUS_PATH = os.path.join(TESTS_DIR, "fixtures", "payment_probes.json")
 PAYMENT_CORPUS_HEADER = "### Potential Bugs — Warning\n**File:** `src/charge.ts:15`\n"
+PAIR_PROBES_PATH = os.path.join(TESTS_DIR, "fixtures", "pair_probes.json")
 
 
 def load_payment_corpus():
@@ -431,14 +440,111 @@ every render; memoize it for long comment bodies.
                          {"detected": False, "matched_finding": None})
 
 
+INITIAL_BASELINE_SHA256 = {
+    "evals/baseline/initial-2026-10-23.json": "ca33dc8c7c74757a642bf2ddd584ea37a7f579f412364c00f834cb337f84918a",
+    "evals/baseline/summary.md": "c22408cfdf1f73f06b406e3774c23ad69d50f0021c146a234b0606f03e6f47fb",
+    "evals/baseline/reports/n-plus-one-laravel__bug.md": "038db865a107747db8d1200e7edb222904a8f68adf6eb884b837470cdc46d8c8",
+    "evals/baseline/reports/n-plus-one-laravel__clean.md": "43e21e460846accfcd0ffe5bd1952e8605dd5066ff17dfd4a768ffd5d21edd56",
+    "evals/baseline/reports/null-node__bug.md": "dbc966d855568cfac3f95e0ec7b9dd4f776ec90a51d65c94553956a4fc4c14e6",
+    "evals/baseline/reports/null-node__clean.md": "6f33c0e3b215cc940ddec6e9daf4bd1beee5b767491278f7ec2293eae517ecef",
+    "evals/baseline/reports/off-by-one-python__bug.md": "6c9eb6b0a5617ab0d5990eadac83fc4f25f7db27b6431328d24d8c1e0869741b",
+    "evals/baseline/reports/off-by-one-python__clean.md": "1d5174e52b09ec9a381d585e4b513caa966017c86315d5ad21c0a341c6fb6490",
+    "evals/baseline/reports/sqli-laravel__bug.md": "8c8cbea15efb773cfd3ba9785b5cdfe530f7f4101acea1cd2ec7ec7efd4de402",
+    "evals/baseline/reports/sqli-laravel__clean.md": "5e47190e97ac2dd0bcdb7280acfeb93fe37177ba01f4a38ca2589c4a987c8ce9",
+    "evals/baseline/reports/swallowed-error-ts__bug.md": "476f1f4db34181e2bd7975482aa46b0dea5932797516d9cdbb754a4fc5483e84",
+    "evals/baseline/reports/swallowed-error-ts__clean.md": "f2465e4b03f0d64a962ec5c8ffc6afab217c7fd54b579df7bf6b4a28682ee3fe",
+    "evals/baseline/reports/xss-react__bug.md": "412a7722f0acf77edaaebee345b9b1ad5b9a07ca350f049624803a5977ee6845",
+    "evals/baseline/reports/xss-react__clean.md": "029a2ed8f53a9ac6de40cb3983297106578258e03d63d797b653251fb0a6b8a3",
+}
+
+
+class LegacyCorpusTest(unittest.TestCase):
+    """The six pairs and the run of 2026-10-23 are historical evidence: their bytes never change."""
+
+    def test_legacy_cases_are_byte_identical(self):
+        paths = eval_run.files_under(*("evals/cases/" + name for name in eval_run.LEGACY_PAIRS))
+        self.assertEqual(len(paths), 46)
+        self.assertEqual(eval_run.tree_sha256(paths), eval_run.LEGACY_CASES_SHA256)
+
+    def test_initial_baseline_evidence_is_byte_identical(self):
+        for path, digest in INITIAL_BASELINE_SHA256.items():
+            with self.subTest(path=path):
+                with open(os.path.join(REPO_ROOT, path), "rb") as handle:
+                    self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), digest)
+
+
+class PairProbeTest(unittest.TestCase):
+    """Frozen labeled probes of the new pairs: they decide what a finding must say, before any measurement."""
+
+    def rows(self):
+        with open(PAIR_PROBES_PATH, encoding="utf-8") as probes:
+            return json.load(probes)
+
+    def test_every_pair_probe_matches_its_label(self):
+        for row in self.rows():
+            bug = load_bug(row["pair"])
+            location = (bug.get("location") or {}).get("path")
+            detected = score_bug(row["report"], bug["patterns"], bug["min_severity"], location)["detected"]
+            with self.subTest(row=row["id"]):
+                self.assertEqual(detected, row["label"] == "DETECT")
+
+    def test_every_new_pair_has_three_detect_and_three_ignore_probes(self):
+        rows = self.rows()
+        new_pairs = sorted(name for name in os.listdir(CASES_DIR)
+                           if os.path.isfile(os.path.join(CASES_DIR, name, "pair.json"))
+                           and name not in eval_run.LEGACY_PAIRS)
+        self.assertTrue(new_pairs)
+        self.assertEqual(sorted({row["pair"] for row in rows}), new_pairs)
+        for pair in new_pairs:
+            with self.subTest(pair=pair):
+                self.assertEqual(sorted(row["label"] for row in rows if row["pair"] == pair),
+                                 ["DETECT"] * 3 + ["IGNORE"] * 3)
+
+
+class SuiteTest(unittest.TestCase):
+    def pair_names(self):
+        return sorted(name for name in os.listdir(CASES_DIR) if os.path.isfile(os.path.join(CASES_DIR, name, "pair.json")))
+
+    def test_new_pairs_span_at_least_four_stacks(self):
+        new = [name for name in self.pair_names() if name not in eval_run.LEGACY_PAIRS]
+        self.assertEqual(len(new), 6)
+        stacks = set()
+        for name in new:
+            with open(os.path.join(CASES_DIR, name, "pair.json"), encoding="utf-8") as f:
+                stacks.add(json.load(f)["stack"])
+        self.assertGreaterEqual(len(stacks), 4)
+
+    def test_protocol_matches_the_suite(self):
+        with open(PROTOCOL_PATH, encoding="utf-8") as f:
+            protocol = json.load(f)
+        self.assertEqual(protocol["pairs"], self.pair_names())
+        self.assertEqual(protocol["legacy_pairs"], sorted(eval_run.LEGACY_PAIRS))
+        self.assertEqual(protocol["controls"], sorted(n[:-5] for n in os.listdir(CONTROLS_DIR) if n.endswith(".json")))
+        self.assertEqual(protocol["samples"], ["s1", "s2", "s3"])
+        self.assertEqual(protocol["planned_trials"], {"primary": 72, "controls": 12, "total": 84})
+        self.assertEqual((protocol["max_retries"], protocol["retryable_error_classes"]), (1, ["infrastructure"]))
+        self.assertTrue(os.path.isfile(os.path.join(REPO_ROOT, protocol["profile"])))
+        self.assertEqual(len(aggregate.expected_trials(protocol)), 84)
+
+    def test_current_protocol_keeps_the_original_inventory(self):
+        with open(ORIGINAL_PROTOCOL_PATH, encoding="utf-8") as f:
+            original = json.load(f)
+        with open(PROTOCOL_PATH, encoding="utf-8") as f:
+            current = json.load(f)
+        self.assertEqual(current["study"], "expanded-r2")
+        changed = ("study", "description", "scoring")
+        self.assertEqual({key: value for key, value in current.items() if key not in changed},
+                         {key: value for key, value in original.items() if key not in changed})
+        self.assertEqual(len(current["scoring"]), len(original["scoring"]))
+        self.assertEqual(current["scoring"][:1] + current["scoring"][2:], original["scoring"][:1] + original["scoring"][2:])
+        self.assertIn("not fully reviewed", current["scoring"][1])
+
+
 class BaselineBugReportTest(unittest.TestCase):
     """Tightening the expectations must keep the measured detections."""
 
     def test_every_baseline_bug_report_still_matches_its_expectation(self):
-        cases = sorted(
-            name for name in os.listdir(CASES_DIR)
-            if os.path.isfile(os.path.join(CASES_DIR, name, "pair.json"))
-        )
+        cases = list(eval_run.LEGACY_PAIRS)
         self.assertTrue(cases)
 
         for case in cases:
@@ -451,6 +557,43 @@ class BaselineBugReportTest(unittest.TestCase):
                 bug = load_bug(case)
                 self.assertTrue(score_bug(report, bug["patterns"], bug["min_severity"])["detected"],
                                 "baseline bug report no longer detected: " + case)
+
+
+class ElapsedTimerFixtureTest(unittest.TestCase):
+    """Both after-trees of elapsed-timer-react clean up between tests; only the state update differs."""
+
+    UPDATES = {
+        "bug": "setInterval(() => setSeconds(seconds + 1), 1000);",
+        "clean": "setInterval(() => setSeconds((s) => s + 1), 1000);",
+    }
+
+    def after_tree(self, kind):
+        pair_dir = os.path.join(CASES_DIR, "elapsed-timer-react")
+        repo = eval_run.prepare_repo(pair_dir, os.path.join(pair_dir, kind + ".patch"))
+        self.addCleanup(shutil.rmtree, repo, True)
+        files = {}
+        for name in ("QuizHeader.test.tsx", "QuizHeader.tsx"):
+            with open(os.path.join(repo, "src", "components", name), encoding="utf-8") as handle:
+                files[name] = handle.read()
+        return files
+
+    def test_both_after_trees_clean_up_between_tests(self):
+        with open(os.path.join(CASES_DIR, "elapsed-timer-react", "base", "vitest.config.ts"), encoding="utf-8") as handle:
+            self.assertNotIn("globals", handle.read())
+        for kind, update in self.UPDATES.items():
+            with self.subTest(kind=kind):
+                files = self.after_tree(kind)
+                test = files["QuizHeader.test.tsx"]
+                self.assertIn("import { cleanup, render, screen } from '@testing-library/react';", test)
+                self.assertIn("import { afterEach, describe, expect, it } from 'vitest';", test)
+                self.assertIn("afterEach(() => {\n  cleanup();\n});", test)
+                self.assertLess(test.index("afterEach("), test.index("describe("))
+                self.assertEqual(test.count("render(<QuizHeader"), 2)
+                self.assertIn("expect(screen.getByText('Time: 0s')).toBeTruthy();", test)
+                component = files["QuizHeader.tsx"]
+                self.assertIn(update, component)
+                self.assertNotIn(self.UPDATES["clean" if kind == "bug" else "bug"], component)
+                self.assertIn("return () => clearInterval(id);\n  }, []);", component)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,14 @@
+{
+  "topic": "caller-contract",
+  "stack": "typescript",
+  "description": "Adds a price label for the product page; the bug changes getPrice from cents to dollars, which the unchanged checkout still charges as cents, the clean diff converts to dollars only inside the label.",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": ["\\bcents?\\b|\\bdollars?\\b|/\\s*100|\\b100x\\b|hundred", "checkout|\\bcharge|amountCents|gateway|caller"],
+    "location": {"path": "src/pricing.ts", "side": "new"},
+    "scenario": "checkout(gateway, 'mug', 2) in the unchanged src/checkout.ts multiplies getPrice('mug'), now 12.5 dollars, by 2 and passes 25 to gateway.charge(amountCents), so the customer is charged 25 cents instead of $25.00."
+  },
+  "clean": {
+    "why_safe": "getPrice still returns cents, so checkout charges 2500 for two mugs; only priceLabel divides by 100 for display."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "fix-demo",
+  "description": "Runner test fixture for the headless fix control; not part of the suite.",
+  "case": "demo/bug",
+  "arguments": "staged --fix",
+  "check": "fix_headless",
+  "expect": {"stop_line": "Fix not applied: no fix was approved before this headless run; no file was changed. The report above is complete."}
+}

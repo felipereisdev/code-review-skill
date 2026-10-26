@@ -1,0 +1,37 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "complete",
+  "message": null,
+  "scope": "staged (git diff --cached)",
+  "gate": {"fail_on": "critical", "status": "pass", "reason": "complete review with no verified Critical finding"},
+  "review": {
+    "context_lines": [],
+    "intent": [
+      "**Intent:** inferred: ship gift orders to the gift recipient's name and address instead of the buyer's, and return no label when the recipient is unknown (diff).",
+      "**Requirements:** none stated.",
+      "**Scope creep:** not judged: no source states a requirement.",
+      "**Sources not read:** none."
+    ],
+    "findings": [],
+    "needs_verification": [],
+    "pre_existing": [],
+    "already_raised": [],
+    "verification": {"checked": 0, "refuted": 0},
+    "omitted_by_configuration": null,
+    "triage": {
+      "review_effort": "1/5 — up to 50 changed lines in 2 files; no risk area.",
+      "relevant_tests": "changed — `test/labels.test.js` adds 'ships gifts to the recipient' (order with `giftRecipientId: 2` gives the label of 'Alan Turing') and 'returns null for an unknown gift recipient' (`giftRecipientId: 99` gives `null`); the existing tests cover the unknown buyer and the buyer's own label. No test covers an order with a falsy `giftRecipientId` such as `null`. Execution: not run.",
+      "look_first": "`src/labels.js` (the recipient lookup and its `null` guard replace the buyer's address in the label), `test/labels.test.js` (new tests for the gift recipient and the unknown recipient).",
+      "ready_to_merge": "Yes — no Critical or Warning findings."
+    },
+    "verdict": {"ready_to_merge": "Yes", "row": 7},
+    "audit": {
+      "files_reviewed": {"reviewed": 2, "changed": 2, "paths": ["src/labels.js", "test/labels.test.js"]},
+      "read_for_context": ["package.json", "skill:references/intent.md", "skill:references/json-output.md", "skill:stacks/node.md"],
+      "checked_with_no_findings": ["Security", "Performance", "Tests/Coverage", "Architecture", "Code & File Size", "Potential Bugs", "Stack-Specific"],
+      "already_raised_not_verified": null,
+      "not_verified": []
+    }
+  }
+}

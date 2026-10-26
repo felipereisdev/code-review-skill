@@ -437,12 +437,15 @@ code-review-skill/
 │   └── test-check-docs.sh  # Negative tests for check-docs.sh
 ├── evals/               # Review-quality evals (planted-bug vs. clean diff pairs)
 │   ├── README.md        # How to run the evals
-│   ├── run.py           # Runner: temp repo per case, headless agent, scoring
+│   ├── run.py           # Runner: temp repo per case, headless agent, scoring, controls, provenance
 │   ├── score.py         # Report parser and scorer
+│   ├── aggregate.py     # Checks a measured study and computes its baseline metrics
 │   ├── make-patch.sh    # Builds a case patch from base/ and an edited copy
-│   ├── baseline.json    # Baseline metrics of the skill before review-behavior changes
-│   ├── baseline/        # Baseline summary.md and raw reports
+│   ├── baseline.json    # Current baseline: the aggregate of baseline/expanded-r2/
+│   ├── baseline/        # Initial run of 2026-10-23, the original, rescored and corrected expanded studies (protocol, hashes, raw reports)
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
+│   ├── controls/        # Behavior controls: JSON gate, headless --fix, unavailable second opinion
+│   ├── profiles/        # Frozen agent profiles for measured studies
 │   └── tests/           # Offline tests for the runner, the scorer, the --comment dry-run payloads, the triage verdict and the --format json gate
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md

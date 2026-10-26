@@ -1,0 +1,47 @@
+diff --git a/internal/invoices/handler.go b/internal/invoices/handler.go
+index f29b4db..aae31b5 100644
+--- a/internal/invoices/handler.go
++++ b/internal/invoices/handler.go
+@@ -11,19 +11,16 @@ type Handler struct {
+ 	Store *Store
+ }
+ 
+-// Download serves GET /invoices/{id} as a PDF.
++// Download serves GET /invoices/{id} as a PDF attachment.
+ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
+ 	user := auth.UserFrom(r.Context())
+ 	id := strings.TrimPrefix(r.URL.Path, "/invoices/")
+-	inv, err := h.Store.Find(r.Context(), id)
++	inv, err := h.Store.FindForOwner(r.Context(), id, user.ID)
+ 	if err != nil {
+ 		http.NotFound(w, r)
+ 		return
+ 	}
+-	if inv.OwnerID != user.ID {
+-		http.Error(w, "forbidden", http.StatusForbidden)
+-		return
+-	}
+ 	w.Header().Set("Content-Type", "application/pdf")
++	w.Header().Set("Content-Disposition", `attachment; filename="invoice-`+inv.ID+`.pdf"`)
+ 	w.Write(inv.PDF)
+ }
+diff --git a/internal/invoices/store.go b/internal/invoices/store.go
+index df60be3..2f98bee 100644
+--- a/internal/invoices/store.go
++++ b/internal/invoices/store.go
+@@ -26,3 +26,15 @@ func (s *Store) Find(ctx context.Context, id string) (*Invoice, error) {
+ 	}
+ 	return &inv, nil
+ }
++
++// FindForOwner loads one invoice by id only when ownerID owns it.
++func (s *Store) FindForOwner(ctx context.Context, id, ownerID string) (*Invoice, error) {
++	var inv Invoice
++	err := s.DB.QueryRowContext(ctx,
++		"SELECT id, owner_id, pdf FROM invoices WHERE id = $1 AND owner_id = $2", id, ownerID,
++	).Scan(&inv.ID, &inv.OwnerID, &inv.PDF)
++	if err != nil {
++		return nil, err
++	}
++	return &inv, nil
++}

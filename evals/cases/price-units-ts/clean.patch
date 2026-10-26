@@ -1,0 +1,26 @@
+diff --git a/src/price-label.test.ts b/src/price-label.test.ts
+new file mode 100644
+index 0000000..78a81bc
+--- /dev/null
++++ b/src/price-label.test.ts
+@@ -0,0 +1,8 @@
++import { describe, expect, it } from 'vitest';
++import { priceLabel } from './price-label';
++
++describe('priceLabel', () => {
++  it('formats the unit price in dollars', () => {
++    expect(priceLabel('mug')).toBe('$12.50');
++  });
++});
+diff --git a/src/price-label.ts b/src/price-label.ts
+new file mode 100644
+index 0000000..50743db
+--- /dev/null
++++ b/src/price-label.ts
+@@ -0,0 +1,6 @@
++import { getPrice } from './pricing';
++
++/** Formats the unit price of `sku` for the product page, such as "$12.50". */
++export function priceLabel(sku: string): string {
++  return `$${(getPrice(sku) / 100).toFixed(2)}`;
++}

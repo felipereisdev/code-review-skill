@@ -1,0 +1,8 @@
+{
+  "name": "second-opinion-unavailable",
+  "description": "F16: with --second-opinion codex on a host profile that allows no codex call, the review completes and reports the second opinion as unavailable.",
+  "case": "off-by-one-python/bug",
+  "arguments": "staged --second-opinion codex",
+  "check": "second_opinion_unavailable",
+  "expect": {"cli": "codex"}
+}

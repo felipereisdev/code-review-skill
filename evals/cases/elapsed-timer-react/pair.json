@@ -1,0 +1,14 @@
+{
+  "topic": "stale-closure",
+  "stack": "react",
+  "description": "Adds an elapsed-time counter to the quiz header; the bug increments from the seconds value captured by an effect that runs once, the clean diff uses a functional update with the same empty dependency list.",
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": ["stale|closure|captur|dependenc|\\bdeps\\b|first render|initial (?:value|render)|functional update", "seconds|setSeconds|timer|interval"],
+    "location": {"path": "src/components/QuizHeader.tsx", "side": "new"},
+    "scenario": "After mount the interval callback closes over seconds = 0 from the first render, because the effect runs once with []; every tick calls setSeconds(0 + 1), so the header shows Time: 1s forever."
+  },
+  "clean": {
+    "why_safe": "setSeconds((s) => s + 1) reads the current state on every tick, so the effect needs no dependency and the interval set up once counts correctly; it is cleared on unmount."
+  }
+}

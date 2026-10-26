@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "id": "actual-s2-elapsed-timer-clean-not-fully-reviewed",
+      "report_path": "evals/baseline/expanded/samples/s2/reports/elapsed-timer-react__clean.md",
+      "report_sha256": "270848ff4e675ed087167df255b8b5683c5170602c3ed0ea442ae7f6f3ab5ca3",
+      "expected_complete": false,
+      "reason": "Verdict row 3 'No — not fully reviewed (API not validated)' and an Audit item marked material: the review states it is unfinished; a Suggestion only removed the incomplete headline."
+    },
+    {
+      "id": "actual-s3-elapsed-timer-clean-not-fully-reviewed",
+      "report_path": "evals/baseline/expanded/samples/s3/reports/elapsed-timer-react__clean.md",
+      "report_sha256": "b53787bb81c2c5ef005c2fcc0c2bceb7935037aefd5129ae28bd30f68a667d7b",
+      "expected_complete": false,
+      "reason": "Same explicit unfinished metadata as s2 (row 3 verdict and a material Audit item), with a Suggestion and a Needs-human-verification Warning."
+    },
+    {
+      "id": "actual-s3-sqli-clean-passed-headline-with-fixes",
+      "report_path": "evals/baseline/expanded/samples/s3/reports/sqli-laravel__clean.md",
+      "report_sha256": "7dcdf0bd9d22d32de716412cf8fdeeb02a45fe27d6c9719ac67542e05a489f83",
+      "expected_complete": false,
+      "reason": "The passed headline is written beside 'Ready to merge: With fixes'; SKILL.md allows the passed headline only with Yes, so the report contradicts itself and is not a complete clean review."
+    },
+    {
+      "id": "actual-s2-sqli-clean-pending-headline",
+      "report_path": "evals/baseline/expanded/samples/s2/reports/sqli-laravel__clean.md",
+      "report_sha256": "60632d4247130ade5d9da52526ded98eb9a9075ee170ba86b3ff8f2e49f2c433",
+      "expected_complete": false,
+      "reason": "The incomplete or pending headline is present: not complete under the existing frozen rule, unchanged."
+    },
+    {
+      "id": "actual-s1-null-node-clean-valid-yes",
+      "report_path": "evals/baseline/expanded/samples/s1/reports/null-node__clean.md",
+      "report_sha256": "8867444634d3fcfb54a6742e5cf1a50f8e837087046e98e41e6ff8ecc3f6b608",
+      "expected_complete": true,
+      "reason": "Passed headline, 'Ready to merge: Yes', an Audit and 'Not verified: nothing': a valid complete Yes."
+    },
+    {
+      "id": "actual-s1-invoice-owner-clean-yes-with-suggestion",
+      "report_path": "evals/baseline/expanded/samples/s1/reports/invoice-owner-go__clean.md",
+      "report_sha256": "ea50312dc1c25bf787160a13a35628e568f6a797ab0cb7e08caa05739f7d0e07",
+      "expected_complete": true,
+      "reason": "A Suggestion under Findings and no headline, Yes verdict, Audit with nothing unverified: complete."
+    },
+    {
+      "id": "actual-s1-null-node-bug-critical-no",
+      "report_path": "evals/baseline/expanded/samples/s1/reports/null-node__bug.md",
+      "report_sha256": "8f69ad30cc43c2708ceefe4d4bfaec94010780236feb948a722f0e1a54ad32ba",
+      "expected_complete": true,
+      "reason": "Row 2 'No — 1 Critical finding must be fixed' without the not-fully-reviewed suffix: a finished review whose No comes from a finding, not from a limit; completeness is not Ready to merge Yes."
+    },
+    {
+      "id": "actual-s1-off-by-one-bug-with-fixes-warning",
+      "report_path": "evals/baseline/expanded/samples/s1/reports/off-by-one-python__bug.md",
+      "report_sha256": "ab762725a63974dfa5c4bcea87ba1fa28ab9f7559e133ca34ba0f617037c9da9",
+      "expected_complete": true,
+      "reason": "Row 4 With fixes from a Warning finding, Audit with nothing unverified: complete."
+    },
+    {
+      "id": "actual-s1-swallowed-error-clean-with-fixes-needs-verification",
+      "report_path": "evals/baseline/expanded/samples/s1/reports/swallowed-error-ts__clean.md",
+      "report_sha256": "3a2c6f626aa31e8786622c8ad986bda37e9308cdf8941fe590ad1b1dad059a15",
+      "expected_complete": true,
+      "reason": "A Suggestion under Findings, a Medium Warning under Needs human verification, row 5 With fixes and a 'not material' Audit item: complete; the excluded finding is not an FP and not unfinished metadata."
+    },
+    {
+      "id": "actual-s1-fix-headless-control-critical-no",
+      "report_path": "evals/baseline/expanded/controls/s1/reports/control__fix-headless.md",
+      "report_sha256": "ef5225a79b5b3ef6f0ea52457386574bee344167827f37a94e10a7467ce40bf9",
+      "expected_complete": true,
+      "reason": "Complete row 2 report followed by '## Fix proposal' and the stop line after the Audit: still complete."
+    },
+    {
+      "id": "critical-no-complete",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Potential Bugs — Critical\n\n**Location:** `src/cart.js:12`\n**Issue:** `item.price` is read from an undefined item.\n**Evidence:** An empty cart passes `undefined` → `undefined.price` throws a TypeError.\n**Confidence:** High\n**Fix:** Return 0 for an empty cart.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — 1 Critical finding must be fixed before merging.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": true,
+      "reason": "Row 2 without a material limit is a complete review."
+    },
+    {
+      "id": "critical-no-not-fully-reviewed-suffix",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Potential Bugs — Critical\n\n**Location:** `src/cart.js:12`\n**Issue:** `item.price` is read from an undefined item.\n**Evidence:** An empty cart passes `undefined` → `undefined.price` throws a TypeError.\n**Confidence:** High\n**Fix:** Return 0 for an empty cart.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — 1 Critical finding must be fixed before merging. Not fully reviewed: see the Audit.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:**\n- `src/cart.js` lines 40-90 — not read, material: the diff output was cut off.\n",
+      "expected_complete": false,
+      "reason": "Row 2 with the ' Not fully reviewed: see the Audit.' suffix and a material Audit item is unfinished."
+    },
+    {
+      "id": "with-fixes-warning-complete",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Potential Bugs — Warning\n\n**Location:** `src/cart.js:12`\n**Issue:** The discount is applied after tax.\n**Evidence:** A cart of 100 with tax 10 and discount 10% totals 99, not 100.\n**Confidence:** High\n**Fix:** Apply the discount before tax.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** With fixes — 1 Warning finding should be fixed; none blocks the merge.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:**\n- callers of `total` — context not read, not material: the repository has no caller, and the changed behavior itself was fully judged.\n",
+      "expected_complete": true,
+      "reason": "Row 4 with only a 'not material' limit: complete; 'not material' is not unfinished metadata."
+    },
+    {
+      "id": "with-fixes-needs-verification-with-suggestion",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Tests/Coverage — Suggestion\n\n**Location:** `test/cart.test.js:20`\n**Issue:** No test covers an empty cart.\n**Fix:** Add one.\n\n## Needs human verification\n\n### Resilience — Warning\n\n**Location:** `src/cart.js:30`\n**Issue:** The retry may double-charge.\n**Evidence:** A timeout after the charge is retried.\n**Confidence:** Medium\n**Fix:** Pass an idempotency key.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** With fixes — a person must check 1 finding under Needs human verification before merging.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": true,
+      "reason": "Row 5 with a Suggestion listed (so no headline): complete; With fixes is not unfinished."
+    },
+    {
+      "id": "yes-passed-headline-not-material-limit",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n**Code review passed — no issues found.**\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:**\n- callers of `total` — context not read, not material: the repository has no caller, and the changed behavior itself was fully judged.\n",
+      "expected_complete": true,
+      "reason": "Passed headline beside Yes and a 'not material' limit: a valid complete Yes."
+    },
+    {
+      "id": "row1-not-fully-reviewed-pending",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n**Review incomplete or pending — no confirmed findings in the code inspected.**\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — not fully reviewed: no changed file was reviewed.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": false,
+      "reason": "Row 1 with the incomplete headline: unfinished (already incomplete before the fix)."
+    },
+    {
+      "id": "row3-not-fully-reviewed-with-suggestion",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Tests/Coverage — Suggestion\n\n**Location:** `test/cart.test.js:20`\n**Issue:** No test covers an empty cart.\n**Fix:** Add one.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — not fully reviewed (not read): `src/cart.js` lines 40-90.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:**\n- `src/cart.js` lines 40-90 — not read, material: the diff output was cut off.\n",
+      "expected_complete": false,
+      "reason": "Row 3 with a Suggestion listed (no headline): explicit unfinished metadata decides, not the headline."
+    },
+    {
+      "id": "passed-headline-beside-no",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n**Code review passed — no issues found.**\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — not fully reviewed: no changed file was reviewed.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": false,
+      "reason": "Passed headline beside a No verdict: contradictory success headline and unfinished verdict."
+    },
+    {
+      "id": "passed-headline-beside-with-fixes-needs-verification",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n**Code review passed — no issues found.**\n\n## Needs human verification\n\n### Resilience — Warning\n\n**Location:** `src/cart.js:30`\n**Issue:** The retry may double-charge.\n**Evidence:** A timeout after the charge is retried.\n**Confidence:** Medium\n**Fix:** Pass an idempotency key.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** With fixes — a person must check 1 finding under Needs human verification before merging.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": false,
+      "reason": "The synthetic form of the s3 sqli report: passed headline beside With fixes is a contradiction."
+    },
+    {
+      "id": "yes-verdict-with-material-audit-item",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n**Code review passed — no issues found.**\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:**\n- `src/cart.js` lines 40-90 — not read, material: the diff output was cut off.\n",
+      "expected_complete": false,
+      "reason": "The Audit marks a limit material, so a changed behavior was not judged: unfinished despite Yes."
+    },
+    {
+      "id": "fenced-unfinished-example-in-complete-report",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Tests/Coverage — Suggestion\n\n**Location:** `test/cart.test.js:20`\n**Issue:** No test covers an empty cart.\n**Fix:** Add one.\n\n## Notes\n\n```\n**Ready to merge:** No — not fully reviewed (not read): x.\n**Code review passed — no issues found.**\n- x — not read, material: y.\n```\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": true,
+      "reason": "Unfinished and contradictory lines inside a code fence are example data, never report metadata."
+    },
+    {
+      "id": "fenced-yes-example-in-unfinished-report",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Tests/Coverage — Suggestion\n\n**Location:** `test/cart.test.js:20`\n**Issue:** No test covers an empty cart.\n**Fix:** Add one.\n\n## Notes\n\n```\n**Ready to merge:** Yes — no Critical or Warning findings.\n```\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — not fully reviewed (not read): `src/cart.js` lines 40-90.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:**\n- `src/cart.js` lines 40-90 — not read, material: the diff output was cut off.\n",
+      "expected_complete": false,
+      "reason": "A fenced Yes example does not hide the real unfinished verdict outside the fence."
+    },
+    {
+      "id": "blockquoted-template-in-complete-report",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Tests/Coverage — Suggestion\n\n**Location:** `test/cart.test.js:20`\n**Issue:** No test covers an empty cart.\n**Fix:** Add one.\n\n## Notes\n\n> **Ready to merge:** No — not fully reviewed (not read): x.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": true,
+      "reason": "A blockquoted template line is data, not the report's Ready to merge line."
+    },
+    {
+      "id": "material-word-outside-audit",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Potential Bugs — Warning\n\n**Location:** `src/cart.js:12`\n**Issue:** The discount is applied after tax.\n**Evidence:** A cart of 100 with tax 10 and discount 10% totals 99, not 100, material to every invoice.\n**Confidence:** High\n**Fix:** Apply the discount before tax.\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** With fixes — 1 Warning finding should be fixed; none blocks the merge.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": true,
+      "reason": "The word 'material' in a finding's Evidence is not an Audit limit."
+    },
+    {
+      "id": "not-fully-reviewed-in-summary-prose",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n### Tests/Coverage — Suggestion\n\n**Location:** `test/cart.test.js:20`\n**Issue:** No test covers an empty cart.\n**Fix:** Add one.\n\n## Summary\n\nOne changed file; the earlier draft of this module was not fully reviewed by its author.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n\n## Audit\n\n**Files reviewed:** 1 of 1 changed files: `src/cart.js`.\n**Read for context:** none.\n**Checked with no findings:** Security, Performance.\n**Not verified:** nothing.\n",
+      "expected_complete": true,
+      "reason": "Only the Ready to merge line carries the verdict reason; Summary prose is not metadata."
+    },
+    {
+      "id": "compact-with-fixes-complete",
+      "report": "**Scope:** staged changes.\n\n- src/cart.js:12: Warning: discount applied after tax → apply it before tax\n\n**Verification:** 1 Critical/Warning candidate checked, 0 refuted.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** With fixes — 1 Warning finding should be fixed; none blocks the merge.\n**Audit:** 1 of 1 changed files reviewed; 0 files read for context; no findings in Security; not verified: callers of `total` (context not read, not material).\n",
+      "expected_complete": true,
+      "reason": "Supported compact form: compact finding, triage lines and one Audit line with a not-material item."
+    },
+    {
+      "id": "compact-not-fully-reviewed-material",
+      "report": "**Scope:** staged changes.\n\n- test/cart.test.js:20: Suggestion: no empty-cart test → add one\n\n**Verification:** 0 Critical/Warning candidates checked, 0 refuted.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** No — not fully reviewed (API not validated): `pg` query options.\n**Audit:** 1 of 1 changed files reviewed; 0 files read for context; no findings in Security; not verified: `pg` query options (API not validated, material).\n",
+      "expected_complete": false,
+      "reason": "Compact form with a row 3 verdict and a material Audit item is unfinished."
+    },
+    {
+      "id": "compact-yes-with-material-audit",
+      "report": "**Scope:** staged changes.\n\nCode review passed — no issues found.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n**Audit:** 1 of 1 changed files reviewed; 0 files read for context; no findings in Security; not verified: `pg` query options (API not validated, material).\n",
+      "expected_complete": false,
+      "reason": "Compact Audit line marks a limit material while the verdict says Yes: unfinished."
+    },
+    {
+      "id": "cut-before-audit",
+      "report": "## Intent\n\n**Intent:** Fix the cart total (inferred from the diff).\n\n## Findings\n\n**Code review passed — no issues found.**\n\n## Summary\n\nOne changed file.\n\n**Review effort:** 1/5 — up to 50 changed lines in 1 file; no risk area.\n**Relevant tests:** existing — `test/cart.test.js` covers the total. Execution: not run.\n**Look first:** `src/cart.js` (the changed total).\n**Ready to merge:** Yes — no Critical or Warning findings.\n",
+      "expected_complete": false,
+      "reason": "No Audit: cut off, never complete (existing rule)."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "study": "expanded-r2",
+  "description": "Corrected expanded quality baseline: the same 12 bug/clean pairs, 4 behavior controls, 3 samples and frozen read-only profile as study expanded, with the corrected completeness scorer and the elapsed-timer-react tests isolated by an explicit cleanup; a new complete study collected after the source is frozen.",
+  "profile": "evals/profiles/sonnet-rtk-readonly.json",
+  "samples": ["s1", "s2", "s3"],
+  "pairs": ["elapsed-timer-react", "invoice-owner-go", "n-plus-one-laravel", "null-node", "off-by-one-python", "order-transaction-spring", "price-units-ts", "refund-window-python", "sale-price-node", "sqli-laravel", "swallowed-error-ts", "xss-react"],
+  "legacy_pairs": ["n-plus-one-laravel", "null-node", "off-by-one-python", "sqli-laravel", "swallowed-error-ts", "xss-react"],
+  "controls": ["fix-headless", "json-clean", "json-critical", "second-opinion-unavailable"],
+  "planned_trials": {"primary": 72, "controls": 12, "total": 84},
+  "max_retries": 1,
+  "retryable_error_classes": ["infrastructure"],
+  "commands": {
+    "freeze": "python3 evals/run.py --provenance --profile evals/profiles/sonnet-rtk-readonly.json > {study}/freeze.json",
+    "primary": "python3 evals/run.py --profile evals/profiles/sonnet-rtk-readonly.json --sample {sample} --out-dir {study}/samples/{sample}",
+    "controls": "python3 evals/run.py --controls --profile evals/profiles/sonnet-rtk-readonly.json --sample {sample} --out-dir {study}/controls/{sample}",
+    "retry": "python3 evals/run.py [--controls] --profile evals/profiles/sonnet-rtk-readonly.json --sample {sample} --attempt 2 --cases '{case}' --out-dir {study}/retries/{sample}/{slug}",
+    "aggregate": "python3 evals/aggregate.py {study} --json {study}/aggregate.json --summary {study}/summary.md",
+    "identity": "python3 evals/aggregate.py --verify-identity {study}"
+  },
+  "scoring": [
+    "Recall: bug trials whose report has one main-list finding at min_severity or higher that matches every pattern and, for a pair with bug.location, names bug.location.path; errors count as not detected.",
+    "Clean success: a complete report with no Critical or Warning main-list finding; an empty, cut-off, incomplete or error output is never a clean success. A report is not complete when its last Ready to merge line says not fully reviewed, its Audit marks a limit material, or the passed headline stands beside a Ready to merge that is not Yes.",
+    "False positives: Critical or Warning main-list findings in clean trials whose status is ok.",
+    "Needs human verification, pre-existing and already-raised findings never count, as before.",
+    "Controls pass only when every check of the control passes, including an unchanged worktree.",
+    "Exit code, status, error class, report validity, completeness, detection or false positives, gate exit and worktree state are separate fields of every trial."
+  ],
+  "error_policy": [
+    "Only error_class infrastructure is retryable, at most once per trial, with --attempt 2; every attempt is kept and the aggregator rejects any other retry.",
+    "Setup, timeout, agent_exit and format errors, refusals and unfavorable results are measured outcomes and are never retried.",
+    "A setup error or a report with both 'Cannot review:' and 'was refused' in sample s1 pauses collection for diagnosis, with every attempt kept; only command or environment evidence of a harness or profile defect leads to a source repair and a new complete study, otherwise the outcomes stay measured and the same study resumes.",
+    "A scorer-only defect is fixed with tests and rescored on the same raw outputs; a runtime, command, profile or prompt change needs a new complete study, with the old data kept.",
+    "An infrastructure classification alone is not retry permission: actual CLI/transport evidence must establish infrastructure failure; stdout model prose or ambiguous stdout-only matches are retained without retry and reported."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "complete",
+  "message": null,
+  "scope": "staged (git diff --cached)",
+  "gate": {"fail_on": "critical", "status": "fail", "reason": "1 verified Critical finding"},
+  "review": {
+    "context_lines": [],
+    "intent": [
+      "**Intent:** inferred: make the user search endpoint match the email as well as the name (diff).",
+      "**Requirements:** none stated.",
+      "**Scope creep:** not judged: no source states a requirement.",
+      "**Sources not read:** none."
+    ],
+    "findings": [
+      {
+        "category": "Security",
+        "severity": "Critical",
+        "confidence": "High",
+        "location": "app/Http/Controllers/UserSearchController.php:18-21",
+        "path": "app/Http/Controllers/UserSearchController.php",
+        "side": "new",
+        "start_line": 18,
+        "end_line": 21,
+        "rule": null,
+        "also_at": [],
+        "issue": "The search term is interpolated straight into a raw SQL string passed to `DB::select()`, which opens an SQL injection. The previous Eloquent query bound the value.",
+        "evidence": "An authenticated user calls `GET /api/users/search?q=x' UNION SELECT id,password,email FROM users -- ` (about 45 characters, under the `max:100` rule) → `$term` is placed inside the `LIKE '%...%'` literal, so the quote closes the string, the `UNION` appends the rows of another query and `--` comments out the rest, `ORDER BY` and `LIMIT` included. The JSON response then returns the `password` hashes (the default Laravel `users.password` column) in the `name` field, and the same path reaches any other table. Even a plain `q=' OR '1'='1` makes both `LIKE` clauses true. Verification checked the validation rules in the controller, which only require a string of at most 100 characters and strip no quotes. It also checked `routes/api.php:6`, where only `auth:sanctum` guards the route, so any logged-in user reaches it. The Laravel precedent that the query builder binds values does not apply, because the raw `DB::select()` string interpolates input.",
+        "fix": "Bind the values, or go back to the query builder: `User::query()->where(fn ($q) => $q->where('name', 'like', '%'.$term.'%')->orWhere('email', 'like', '%'.$term.'%'))->orderBy('name')->limit(20)->get(['id', 'name', 'email'])`. With raw SQL, use placeholders: `DB::select('SELECT id, name, email FROM users WHERE name LIKE ? OR email LIKE ? ORDER BY name LIMIT 20', [\"%{$term}%\", \"%{$term}%\"])`. Add a test with a quote in `q`.",
+        "omitted_by": null
+      }
+    ],
+    "needs_verification": [],
+    "pre_existing": [],
+    "already_raised": [],
+    "verification": {"checked": 1, "refuted": 0},
+    "omitted_by_configuration": null,
+    "triage": {
+      "review_effort": "2/5 — up to 50 changed lines in 2 files; personal data.",
+      "relevant_tests": "changed — `tests/Feature/UserSearchTest.php` runs the endpoint: `test_it_finds_users_by_name` covers the name match and the new `test_it_finds_users_by_email` covers the email match, each with one user. Neither sends a quote or SQL metacharacter, so the injection goes untested. Execution: not run.",
+      "look_first": "`app/Http/Controllers/UserSearchController.php` (Critical SQL injection in the raw `DB::select()` query), `tests/Feature/UserSearchTest.php` (no test with special characters in `q`).",
+      "ready_to_merge": "No — 1 Critical finding must be fixed before merging."
+    },
+    "verdict": {"ready_to_merge": "No", "row": 2},
+    "audit": {
+      "files_reviewed": {"reviewed": 2, "changed": 2, "paths": ["app/Http/Controllers/UserSearchController.php", "tests/Feature/UserSearchTest.php"]},
+      "read_for_context": ["composer.json", "routes/api.php", "skill:references/api-design.md", "skill:references/intent.md", "skill:references/json-output.md", "skill:references/privacy.md", "skill:stacks/laravel.md"],
+      "checked_with_no_findings": ["Performance", "Tests/Coverage", "Architecture", "Code & File Size", "Potential Bugs", "API Design", "Privacy/Compliance", "Stack-Specific"],
+      "already_raised_not_verified": null,
+      "not_verified": []
+    }
+  }
+}

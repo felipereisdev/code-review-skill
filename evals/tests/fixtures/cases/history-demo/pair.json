@@ -1,0 +1,16 @@
+{
+  "topic": "history-demo",
+  "stack": "python",
+  "description": "Runner test fixture with git history; not part of the suite.",
+  "history": [
+    {"dir": "history/01", "message": "feat: add handle", "date": "2026-02-01T09:00:00Z"},
+    {"dir": "history/02", "message": "fix: reject a missing value (#12)", "date": "2026-02-10T09:00:00Z"}
+  ],
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": ["None|missing"],
+    "location": {"path": "app.py", "side": "old"},
+    "scenario": "handle(None) now raises AttributeError instead of ValueError."
+  },
+  "clean": {"why_safe": "The clean version keeps the None check."}
+}

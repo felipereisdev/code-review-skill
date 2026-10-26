@@ -1,0 +1,58 @@
+diff --git a/src/price-label.test.ts b/src/price-label.test.ts
+new file mode 100644
+index 0000000..78a81bc
+--- /dev/null
++++ b/src/price-label.test.ts
+@@ -0,0 +1,8 @@
++import { describe, expect, it } from 'vitest';
++import { priceLabel } from './price-label';
++
++describe('priceLabel', () => {
++  it('formats the unit price in dollars', () => {
++    expect(priceLabel('mug')).toBe('$12.50');
++  });
++});
+diff --git a/src/price-label.ts b/src/price-label.ts
+new file mode 100644
+index 0000000..abacbce
+--- /dev/null
++++ b/src/price-label.ts
+@@ -0,0 +1,6 @@
++import { getPrice } from './pricing';
++
++/** Formats the unit price of `sku` for the product page, such as "$12.50". */
++export function priceLabel(sku: string): string {
++  return `$${getPrice(sku).toFixed(2)}`;
++}
+diff --git a/src/pricing.test.ts b/src/pricing.test.ts
+index a6072f1..f6d678e 100644
+--- a/src/pricing.test.ts
++++ b/src/pricing.test.ts
+@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
+ import { getPrice } from './pricing';
+ 
+ describe('getPrice', () => {
+-  it('returns the unit price in cents', () => {
+-    expect(getPrice('mug')).toBe(1250);
++  it('returns the unit price in dollars', () => {
++    expect(getPrice('mug')).toBe(12.5);
+   });
+ 
+   it('rejects an unknown sku', () => {
+diff --git a/src/pricing.ts b/src/pricing.ts
+index 5332171..89f7a84 100644
+--- a/src/pricing.ts
++++ b/src/pricing.ts
+@@ -1,10 +1,10 @@
+ import { products } from './catalog';
+ 
+-/** Returns the price of one unit of `sku` in cents. */
++/** Returns the price of one unit of `sku` in dollars, for display. */
+ export function getPrice(sku: string): number {
+   const product = products.find((p) => p.sku === sku);
+   if (!product) {
+     throw new Error(`unknown sku: ${sku}`);
+   }
+-  return product.priceCents;
++  return product.priceCents / 100;
+ }

@@ -1,0 +1,40 @@
+diff --git a/src/main/java/com/example/shop/InvalidQuantityException.java b/src/main/java/com/example/shop/InvalidQuantityException.java
+new file mode 100644
+index 0000000..0307954
+--- /dev/null
++++ b/src/main/java/com/example/shop/InvalidQuantityException.java
+@@ -0,0 +1,11 @@
++package com.example.shop;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.web.bind.annotation.ResponseStatus;
++
++@ResponseStatus(HttpStatus.BAD_REQUEST)
++public class InvalidQuantityException extends RuntimeException {
++    public InvalidQuantityException(int quantity) {
++        super("quantity must be at least 1, got " + quantity);
++    }
++}
+diff --git a/src/main/java/com/example/shop/OrderService.java b/src/main/java/com/example/shop/OrderService.java
+index a5067e2..f77c61e 100644
+--- a/src/main/java/com/example/shop/OrderService.java
++++ b/src/main/java/com/example/shop/OrderService.java
+@@ -13,9 +13,17 @@ public class OrderService {
+         this.stock = stock;
+     }
+ 
++    /** Validates the request, then saves the order and reserves its stock. */
++    public Order placeOrder(String sku, int quantity) {
++        if (quantity < 1) {
++            throw new InvalidQuantityException(quantity);
++        }
++        return persist(sku, quantity);
++    }
++
+     /** Saves the order and reserves its stock; both happen or neither does. */
+     @Transactional
+-    public Order placeOrder(String sku, int quantity) {
++    public Order persist(String sku, int quantity) {
+         Order order = orders.save(new Order(sku, quantity));
+         stock.reserve(sku, quantity);
+         return order;

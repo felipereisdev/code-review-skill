@@ -1,0 +1,41 @@
+diff --git a/shop/refunds.py b/shop/refunds.py
+new file mode 100644
+index 0000000..fad446b
+--- /dev/null
++++ b/shop/refunds.py
+@@ -0,0 +1,12 @@
++from datetime import datetime, timedelta
++
++from shop.orders import Order
++
++REFUND_WINDOW = timedelta(days=30)
++
++
++def is_refundable(order: Order, now: datetime) -> bool:
++    """Return True when the order can still be refunded (policy/refund-policy.md)."""
++    if order.delivered_at is None:
++        return False
++    return now - order.delivered_at <= REFUND_WINDOW
+diff --git a/tests/test_refunds.py b/tests/test_refunds.py
+new file mode 100644
+index 0000000..069f748
+--- /dev/null
++++ b/tests/test_refunds.py
+@@ -0,0 +1,17 @@
++from datetime import datetime
++
++from shop.orders import Order
++from shop.refunds import is_refundable
++
++
++def make_order(delivered_at):
++    return Order(id=7, created_at=datetime(2026, 3, 1, 9, 0), delivered_at=delivered_at, total_cents=1999)
++
++
++def test_undelivered_order_is_not_refundable():
++    assert is_refundable(make_order(None), datetime(2026, 3, 5)) is False
++
++
++def test_refund_on_the_next_day_is_accepted():
++    order = make_order(datetime(2026, 3, 2, 9, 0))
++    assert is_refundable(order, datetime(2026, 3, 3, 9, 0)) is True

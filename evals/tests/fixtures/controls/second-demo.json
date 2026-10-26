@@ -1,0 +1,8 @@
+{
+  "name": "second-demo",
+  "description": "Runner test fixture for the second-opinion control; not part of the suite.",
+  "case": "demo/clean",
+  "arguments": "staged --second-opinion codex",
+  "check": "second_opinion_unavailable",
+  "expect": {"cli": "codex"}
+}

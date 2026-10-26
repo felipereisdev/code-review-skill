@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "id": "block-location-exact",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `shop/refunds.py:12`\n**Issue:** The window starts at created_at, not at delivery.\n**Evidence:** An order delivered 20 days after it was placed is refused 21 days after delivery.\n**Confidence:** High\n**Fix:** Use delivered_at.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": true,
+      "reason": "The block Location contains the exact expected path and the Warning finding matches the bug pattern; this is the existing COMPLETE_REPORT finding."
+    },
+    {
+      "id": "block-file-exact",
+      "report": "### Potential Bugs — Warning\n\n**File:** `shop/refunds.py:12-14`\n**Issue:** The window starts at created_at, not at delivery.\n**Fix:** Use delivered_at.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": true,
+      "reason": "The legacy File field is an actual location; a line range does not change its exact path identity."
+    },
+    {
+      "id": "compact-leading-path-exact",
+      "report": "- shop/refunds.py:12: Warning: window counted from created_at → use delivered_at\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": true,
+      "reason": "This is the existing location-scoring compact positive: its leading path is the expected location."
+    },
+    {
+      "id": "compact-decorated-range-exact",
+      "report": "* `shop/refunds.py:12-14`: **Warning**: window counted from created_at → use delivered_at\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": true,
+      "reason": "Backticked path-plus-range, star bullet and emphasized severity are supported compact decorations; the leading path is still exact."
+    },
+    {
+      "id": "i1-wrong-block-location-issue-mention",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Issue:** shop/refunds.py:12 counts the window from created_at and no test covers it.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "Task2 review I1 probe 1: this finding is located in tests/test_refunds.py; naming shop/refunds.py in Issue cannot satisfy the expected location."
+    },
+    {
+      "id": "i1-longer-block-path-myshop",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `myshop/refunds.py:12`\n**Issue:** The window starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "Task2 review I1 probe 2: myshop/refunds.py is a different path even though it contains shop/refunds.py as a substring."
+    },
+    {
+      "id": "compact-wrong-leading-path-prose-mention",
+      "report": "- tests/test_refunds.py:9: Warning: shop/refunds.py:12 counts the window from created_at and no test covers it → add coverage\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The actual compact location is its leading tests/test_refunds.py path; a later path in the problem prose is not the location."
+    },
+    {
+      "id": "block-wrong-location-evidence-mention",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Issue:** No test covers a window counted from created_at.\n**Evidence:** `shop/refunds.py:12` rejects an order 21 days after delivery.\n**Fix:** Add a delivery-window test.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The expected path appears only in Evidence; the finding remains located in the test file."
+    },
+    {
+      "id": "block-wrong-location-fix-mention",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Issue:** No test covers a window counted from created_at.\n**Fix:** Cover the delivery window implemented in `shop/refunds.py:12`.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The expected path appears only in Fix; correction advice is not this finding's location."
+    },
+    {
+      "id": "block-wrong-location-history-mention",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Issue:** No test covers a window counted from created_at.\n**History:** The earlier delivery guard was in `shop/refunds.py:12`.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The expected path appears only in History; historical context cannot relocate a test-file finding."
+    },
+    {
+      "id": "block-wrong-location-rule-citation-only",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Rule:** `shop/refunds.py:L12-L14`\n**Issue:** No test covers a window counted from created_at.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "A Rule citation is contextual evidence rather than an actual File/Location field, regardless of its exact path spelling."
+    },
+    {
+      "id": "block-wrong-location-fenced-location-data",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Issue:** No test covers a window counted from created_at.\n**Evidence:** The test embeds this report example:\n```text\n**Location:** `shop/refunds.py:12`\n```\n**Fix:** Add a delivery-window test.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The exact-looking Location inside fenced example data cannot override the real outside-fence test-file Location."
+    },
+    {
+      "id": "prose-only-path-and-pattern",
+      "report": "The window in shop/refunds.py:12 starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "A plain prose mention has no supported finding structure or severity and cannot become a detection."
+    },
+    {
+      "id": "fenced-compact-only",
+      "report": "Example syntax only:\n~~~text\n- shop/refunds.py:12: Warning: window counted from created_at → use delivered_at\n~~~\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The existing fence grammar excludes the entire compact-shaped example from findings."
+    },
+    {
+      "id": "block-nested-different-path",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `vendor/shop/refunds.py:12`\n**Issue:** The window starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "A slash before the expected substring is part of a longer repository path; vendor/shop/refunds.py is not shop/refunds.py."
+    },
+    {
+      "id": "block-extension-suffix-different-path",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `shop/refunds.py.bak:12`\n**Issue:** The window starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "A suffix after the expected spelling is still part of the filename; a backup file is a different location."
+    },
+    {
+      "id": "block-literal-dot-path-identity",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `shop/refundsXpy:12`\n**Issue:** The window starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The dot in the expected filename is literal, not a regex wildcard; refundsXpy is a different file."
+    },
+    {
+      "id": "block-case-mismatch",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `Shop/refunds.py:12`\n**Issue:** The window starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "Location paths use exact case-sensitive identity, independently of case-insensitive bug-pattern matching."
+    },
+    {
+      "id": "compact-case-mismatch-correct-case-prose",
+      "report": "- shop/Refunds.py:12: Warning: created_at starts the wrong window; compare shop/refunds.py:12 → use delivered_at\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "The leading path differs in case; an exact-case prose comparison cannot repair the wrong actual location."
+    },
+    {
+      "id": "legacy-null-location-keeps-pattern-scoring",
+      "report": "### Tests/Coverage — Warning\n\n**Location:** `tests/test_refunds.py:9`\n**Issue:** shop/refunds.py:12 counts the window from created_at and no test covers it.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": null,
+      "expected_detected": true,
+      "reason": "This is byte-identical to I1 probe 1 but explicitly disables the location filter; legacy severity and pattern scoring must continue to detect it."
+    },
+    {
+      "id": "compact-backticked-space-path-exact",
+      "report": "- `src/my file.py:9`: Warning: empty input returns the wrong result → guard it\n",
+      "patterns": ["empty input"],
+      "min_severity": "Warning",
+      "location_path": "src/my file.py",
+      "expected_detected": true,
+      "reason": "This is an existing compact unusual-path example; backticks permit spaces inside the actual path token."
+    },
+    {
+      "id": "exact-location-below-severity",
+      "report": "### Potential Bugs — Suggestion\n\n**Location:** `shop/refunds.py:12`\n**Issue:** The window starts at created_at, not at delivery.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "Exact location must not bypass the existing minimum-severity filter."
+    },
+    {
+      "id": "exact-location-human-verification-excluded",
+      "report": "## Needs human verification\n\n### Potential Bugs — Warning\n\n**Location:** `shop/refunds.py:12`\n**Issue:** The window starts at created_at, not at delivery.\n**Confidence:** Medium\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "A matching path cannot turn an existing Needs human verification finding into a scored main-list detection."
+    },
+    {
+      "id": "exact-location-missing-bug-pattern",
+      "report": "### Potential Bugs — Warning\n\n**Location:** `shop/refunds.py:12`\n**Issue:** The window starts at delivered_at after delivery.\n**Fix:** Keep delivered_at.\n",
+      "patterns": ["created_at"],
+      "min_severity": "Warning",
+      "location_path": "shop/refunds.py",
+      "expected_detected": false,
+      "reason": "Exact location is necessary but cannot replace the unchanged bug-pattern requirement."
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "json-clean",
+  "description": "F15: a --format json review of a clean diff is one valid document whose gate passes with no Critical finding.",
+  "case": "null-node/clean",
+  "arguments": "staged --format json --fail-on critical",
+  "check": "json_gate",
+  "expect": {"status": "complete", "gate_status": "pass", "gate_exit": 0, "critical_path": null}
+}

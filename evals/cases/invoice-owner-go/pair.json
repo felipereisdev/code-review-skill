@@ -1,0 +1,18 @@
+{
+  "topic": "removed-authorization",
+  "stack": "go",
+  "description": "Serves invoices as attachments; the bug drops the owner check that an earlier fix added, the clean diff drops it too but loads the invoice with the owner in the query.",
+  "history": [
+    {"dir": "history/01", "message": "feat: download invoices as PDF", "date": "2026-02-03T10:00:00Z"},
+    {"dir": "history/02", "message": "fix: only the owner of an invoice can download it (#57)\n\nAny signed-in user could download another customer's invoice by changing the id in the URL.", "date": "2026-02-17T15:30:00Z"}
+  ],
+  "bug": {
+    "min_severity": "Critical",
+    "patterns": ["owner|ownership|authori[sz]|access control|\\bIDOR\\b|forbidden|\\b403\\b|another (?:user|customer)|other (?:users|customers)", "invoice|Download"],
+    "location": {"path": "internal/invoices/handler.go", "side": "old"},
+    "scenario": "A signed-in user u2 requests GET /invoices/inv-1, owned by u1: auth.Require checks only the session, Store.Find loads the invoice by id alone, and the handler now writes u1's PDF to u2."
+  },
+  "clean": {
+    "why_safe": "The handler loads the invoice with FindForOwner, whose query adds owner_id = $2 with the session user's ID, so another user's invoice id finds no row and gets 404: the removed check is enforced by the query."
+  }
+}

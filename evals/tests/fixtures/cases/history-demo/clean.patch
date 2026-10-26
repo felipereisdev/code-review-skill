@@ -1,0 +1,10 @@
+diff --git a/app.py b/app.py
+index 378221c..d7bd58b 100644
+--- a/app.py
++++ b/app.py
+@@ -1,4 +1,4 @@
+ def handle(value):
+     if value is None:
+         raise ValueError("value is required")
+-    return value.strip()
++    return value.strip().lower()
