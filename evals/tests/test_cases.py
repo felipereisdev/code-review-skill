@@ -18,6 +18,7 @@ Wave 6 replaces probe archaeology with the frozen acceptance corpus: 100 rows
 variants do not expand it.
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -26,10 +27,12 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from score import score_bug  # noqa: E402
+import run as eval_run  # noqa: E402
 
 
 TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 EVALS_DIR = os.path.dirname(TESTS_DIR)
+REPO_ROOT = os.path.dirname(EVALS_DIR)
 CASES_DIR = os.path.join(EVALS_DIR, "cases")
 BASELINE_DIR = os.path.join(EVALS_DIR, "baseline", "reports")
 
@@ -431,14 +434,44 @@ every render; memoize it for long comment bodies.
                          {"detected": False, "matched_finding": None})
 
 
+INITIAL_BASELINE_SHA256 = {
+    "evals/baseline/initial-2026-10-23.json": "ca33dc8c7c74757a642bf2ddd584ea37a7f579f412364c00f834cb337f84918a",
+    "evals/baseline/summary.md": "c22408cfdf1f73f06b406e3774c23ad69d50f0021c146a234b0606f03e6f47fb",
+    "evals/baseline/reports/n-plus-one-laravel__bug.md": "038db865a107747db8d1200e7edb222904a8f68adf6eb884b837470cdc46d8c8",
+    "evals/baseline/reports/n-plus-one-laravel__clean.md": "43e21e460846accfcd0ffe5bd1952e8605dd5066ff17dfd4a768ffd5d21edd56",
+    "evals/baseline/reports/null-node__bug.md": "dbc966d855568cfac3f95e0ec7b9dd4f776ec90a51d65c94553956a4fc4c14e6",
+    "evals/baseline/reports/null-node__clean.md": "6f33c0e3b215cc940ddec6e9daf4bd1beee5b767491278f7ec2293eae517ecef",
+    "evals/baseline/reports/off-by-one-python__bug.md": "6c9eb6b0a5617ab0d5990eadac83fc4f25f7db27b6431328d24d8c1e0869741b",
+    "evals/baseline/reports/off-by-one-python__clean.md": "1d5174e52b09ec9a381d585e4b513caa966017c86315d5ad21c0a341c6fb6490",
+    "evals/baseline/reports/sqli-laravel__bug.md": "8c8cbea15efb773cfd3ba9785b5cdfe530f7f4101acea1cd2ec7ec7efd4de402",
+    "evals/baseline/reports/sqli-laravel__clean.md": "5e47190e97ac2dd0bcdb7280acfeb93fe37177ba01f4a38ca2589c4a987c8ce9",
+    "evals/baseline/reports/swallowed-error-ts__bug.md": "476f1f4db34181e2bd7975482aa46b0dea5932797516d9cdbb754a4fc5483e84",
+    "evals/baseline/reports/swallowed-error-ts__clean.md": "f2465e4b03f0d64a962ec5c8ffc6afab217c7fd54b579df7bf6b4a28682ee3fe",
+    "evals/baseline/reports/xss-react__bug.md": "412a7722f0acf77edaaebee345b9b1ad5b9a07ca350f049624803a5977ee6845",
+    "evals/baseline/reports/xss-react__clean.md": "029a2ed8f53a9ac6de40cb3983297106578258e03d63d797b653251fb0a6b8a3",
+}
+
+
+class LegacyCorpusTest(unittest.TestCase):
+    """The six pairs and the run of 2026-10-23 are historical evidence: their bytes never change."""
+
+    def test_legacy_cases_are_byte_identical(self):
+        paths = eval_run.files_under(*("evals/cases/" + name for name in eval_run.LEGACY_PAIRS))
+        self.assertEqual(len(paths), 46)
+        self.assertEqual(eval_run.tree_sha256(paths), eval_run.LEGACY_CASES_SHA256)
+
+    def test_initial_baseline_evidence_is_byte_identical(self):
+        for path, digest in INITIAL_BASELINE_SHA256.items():
+            with self.subTest(path=path):
+                with open(os.path.join(REPO_ROOT, path), "rb") as handle:
+                    self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), digest)
+
+
 class BaselineBugReportTest(unittest.TestCase):
     """Tightening the expectations must keep the measured detections."""
 
     def test_every_baseline_bug_report_still_matches_its_expectation(self):
-        cases = sorted(
-            name for name in os.listdir(CASES_DIR)
-            if os.path.isfile(os.path.join(CASES_DIR, name, "pair.json"))
-        )
+        cases = list(eval_run.LEGACY_PAIRS)
         self.assertTrue(cases)
 
         for case in cases:

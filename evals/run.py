@@ -27,6 +27,36 @@ DEFAULT_CASES_DIR = os.path.join(REPO_ROOT, "evals", "cases")
 REQUIRED_TOPICS = ("null-undefined", "sql-injection", "off-by-one", "swallowed-error", "n-plus-one", "xss-false-alarm")
 MIN_PAIRS = 6
 GIT_IDENTITY = ["-c", "user.name=code-review-eval", "-c", "user.email=eval@example.invalid"]
+LEGACY_PAIRS = ("n-plus-one-laravel", "null-node", "off-by-one-python", "sqli-laravel", "swallowed-error-ts", "xss-react")
+# tree_sha256 of the six pairs as the initial baseline measured them (also the GATE2 cases-tree hash).
+LEGACY_CASES_SHA256 = "a1a47fb084020e9a56e0be52a2e668e05945f894ad4da136a7ad8dfd9f055706"
+_SKIPPED_NAMES = {"__pycache__", ".DS_Store"}
+
+
+def files_under(*roots: str) -> list[str]:
+    """Return the repo-relative POSIX paths of the files under each root (a file or a directory), sorted."""
+    paths = []
+    for root in roots:
+        full = os.path.join(REPO_ROOT, root)
+        if os.path.isfile(full):
+            paths.append(os.path.relpath(full, REPO_ROOT).replace(os.sep, "/"))
+            continue
+        for current, dirs, files in os.walk(full):
+            dirs[:] = sorted(d for d in dirs if d not in _SKIPPED_NAMES)
+            for name in files:
+                if name in _SKIPPED_NAMES or name.endswith(".pyc"):
+                    continue
+                paths.append(os.path.relpath(os.path.join(current, name), REPO_ROOT).replace(os.sep, "/"))
+    return sorted(paths)
+
+
+def tree_sha256(paths: list[str]) -> str:
+    """sha256 of one '<sha256>  <path>' line per repo-relative path, sorted: `find | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256`."""
+    lines = []
+    for path in sorted(paths):
+        with open(os.path.join(REPO_ROOT, path), "rb") as handle:
+            lines.append("%s  %s\n" % (hashlib.sha256(handle.read()).hexdigest(), path))
+    return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()
 DEFAULT_AGENT_CMD = (
     'claude -p --safe-mode --disable-slash-commands --strict-mcp-config '
     '--no-session-persistence --permission-mode dontAsk '
