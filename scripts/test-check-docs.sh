@@ -1106,8 +1106,8 @@ replace_first "$work/reconcilematerial/SKILL.md" 'With no `material` item in the
 expect_fail "a verdict line without material limits that may add a note fails" "$work/reconcilematerial" "Step 3 is missing: With no \`material\` item in the Audit, the verdict line has neither"
 
 make_copy "$work/reconciledrop"
-replace_first "$work/reconciledrop/SKILL.md" 'Never drop a file you opened, a limit or a finding to make a count or a line agree' 'Drop what does not fit'
-expect_fail "dropping a file to make a count agree fails" "$work/reconciledrop" "Step 3 is missing: Never drop a file you opened, a limit or a finding to make a count or a line agree"
+replace_first "$work/reconciledrop/SKILL.md" 'Never drop a file whose content you saw, a limit or a finding to make a count or a line agree' 'Drop what does not fit'
+expect_fail "dropping a file to make a count agree fails" "$work/reconciledrop" "Step 3 is missing: Never drop a file whose content you saw, a limit or a finding to make a count or a line agree"
 
 make_copy "$work/headlinefindings"
 replace_first "$work/headlinefindings/SKILL.md" 'write no headline at all, whatever the **Ready to merge:** line says' 'write the headline that the **Ready to merge:** line selects'

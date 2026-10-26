@@ -1409,7 +1409,7 @@ for s in (
         "**Reconcile before you deliver.**",
         "Before you write the first line of the report, settle these facts",
         "With no `material` item in the Audit, the verdict line has neither",
-        "Never drop a file you opened, a limit or a finding to make a count or a line agree",
+        "Never drop a file whose content you saw, a limit or a finding to make a count or a line agree",
         "When `## Findings` lists at least one finding, write no headline at all, whatever the **Ready to merge:** line says.",
         "**Relevant tests:** <status> — <tests and what they cover>. Execution: <execution>.",
         "- `not verified`: you could not check which tests run the changed code",
