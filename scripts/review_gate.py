@@ -35,7 +35,7 @@ GUIDE = "skill:references/json-output.md"
 SURROGATE_RE = re.compile("[\ud800-\udfff]")
 UNPAIRED = "a string holds an unpaired UTF-16 surrogate, which is not valid text"
 LOCATION_RE = re.compile(r"^.+:\d+(?:-\d+)?$")
-RULE_RE = re.compile(r"^\S+:L\d+(?:-L\d+)?$")
+RULE_RE = re.compile(r"^.+:L\d+(?:-L\d+)?$")
 EXCLUDED_RE = re.compile(r"^\*\*Excluded by configuration:\*\* (\d+) changed files? match(?:es)? ignore_paths and "
                          r"(?:was|were) not reviewed: (.+)\.$")
 MORE_RE = re.compile(r", and (\d+) more$")
@@ -227,10 +227,14 @@ def _accounting_errors(errors, review):
             errors.append("review.context_lines: the **Excluded by configuration:** line must count and list the "
                           "excluded files as references/configuration.md writes it")
             return
-        excluded_count = int(match.group(1))
+        excluded_count = _count(match.group(1))
         excluded = re.findall(r"`([^`]+)`", match.group(2))
         more = MORE_RE.search(match.group(2))
-        listed = len(excluded) + (int(more.group(1)) if more else 0)
+        more_count = _count(more.group(1)) if more else 0
+        if excluded_count is None or more_count is None:
+            errors.append("review.context_lines: the **Excluded by configuration:** line counts too many files to read")
+            return
+        listed = len(excluded) + more_count
         if excluded_count == 0 or listed != excluded_count:
             errors.append(f"review.context_lines: the **Excluded by configuration:** line counts {excluded_count} "
                           f"files and lists {listed}")
@@ -268,6 +272,14 @@ def _accounting_errors(errors, review):
     in_context = [path for path in audit["read_for_context"] if path in counted]
     if in_context:
         errors.append(f"review.audit.read_for_context lists a changed file: {', '.join(in_context)}")
+
+
+def _count(digits: str):
+    """The whole number written in the document, or None when int() refuses a digit sequence this long."""
+    try:
+        return int(digits)
+    except ValueError:
+        return None
 
 
 def expected_row(review: dict) -> int:

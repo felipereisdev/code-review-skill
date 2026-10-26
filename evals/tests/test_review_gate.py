@@ -342,6 +342,64 @@ class FileAccountingTest(unittest.TestCase):
         self.assert_only_error(doc, "review.audit.read_for_context lists a changed file: src/cart.js")
 
 
+class RuleCitationTest(unittest.TestCase):
+    """A rule citation is path:Lstart-Lend; its path may hold spaces, as any repository path may."""
+
+    def spaced_rule_doc(self, rule):
+        doc = fixture("pass")
+        doc["review"]["findings"][0]["rule"] = rule
+        doc["review"]["audit"]["read_for_context"].append(rule.split(":L")[0])
+        return doc
+
+    def test_rule_path_with_a_space_exits_0(self):
+        doc = self.spaced_rule_doc("src/Web App/AGENTS.md:L4-L5")
+        self.assertEqual(review_gate.contract_errors(doc), [])
+        self.assertEqual(run_gate_all("-", stdin=json.dumps(doc).encode()),
+                         (0, "review-gate: pass: complete review with no verified Critical finding\n", ""))
+
+    def test_rule_path_without_a_space_still_exits_0(self):
+        doc = self.spaced_rule_doc("src/WebApp/AGENTS.md:L4-L5")
+        self.assertEqual(run_gate("-", stdin=json.dumps(doc).encode())[0], 0)
+
+    def test_malformed_rule_suffix_is_still_invalid(self):
+        for rule in ("src/Web App/AGENTS.md:4", "src/Web App/AGENTS.md:L4-5", "src/Web App/AGENTS.md"):
+            with self.subTest(rule=rule):
+                errors = review_gate.contract_errors(self.spaced_rule_doc(rule))
+                self.assertEqual(errors, ["review.findings[0].rule must be null or path:Lstart-Lend"])
+
+
+class CountTextTest(unittest.TestCase):
+    """A count in the Excluded by configuration line that int() cannot read is invalid input (exit 3), never a crash."""
+
+    PREFIX = "review-gate: invalid: review.context_lines: the **Excluded by configuration:** line counts "
+
+    def excluded_doc(self, line, changed):
+        doc = fixture("pass")
+        doc["review"]["context_lines"] = [line]
+        doc["review"]["audit"]["files_reviewed"]["changed"] = changed
+        return doc
+
+    def test_one_excluded_file_exits_0_without_stderr(self):
+        doc = self.excluded_doc("**Excluded by configuration:** 1 changed file matches ignore_paths and was not "
+                                "reviewed: `docs/setup.md`.", 2)
+        code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
+        self.assertEqual((code, err), (0, ""), out)
+
+    def test_oversized_excluded_count_exits_3_without_a_traceback(self):
+        doc = self.excluded_doc("**Excluded by configuration:** " + "1" * 5000 + " changed files match ignore_paths and "
+                                "were not reviewed: `docs/setup.md`.", 2)
+        code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
+        self.assertEqual((code, err), (3, ""), out)
+        self.assertTrue(out.startswith(self.PREFIX), out)
+
+    def test_oversized_more_count_exits_3_without_a_traceback(self):
+        doc = self.excluded_doc("**Excluded by configuration:** 2 changed files match ignore_paths and were not "
+                                "reviewed: `docs/setup.md`, and " + "1" * 5000 + " more.", 3)
+        code, out, err = run_gate_all("-", stdin=json.dumps(doc).encode())
+        self.assertEqual((code, err), (3, ""), out)
+        self.assertTrue(out.startswith(self.PREFIX), out)
+
+
 def json_paths(value, path=()):
     yield path
     if isinstance(value, dict):
