@@ -2387,8 +2387,24 @@ replace_first "$work/sonotool/references/second-opinion.md" 'call no tool, and r
 expect_fail "a prompt that allows tool calls fails" "$work/sonotool" "references/second-opinion.md is missing: call no tool, and read nothing else"
 
 make_copy "$work/solive"
-replace_first "$work/solive/references/second-opinion.md" 'no tool of the call reads a live file while it runs' 'no channel reads a live file while it runs'
-expect_fail "a drift rule that claims no channel at all fails" "$work/solive" "references/second-opinion.md is missing: no tool of the call reads a live file while it runs"
+replace_first "$work/solive/references/second-opinion.md" 'A live file outside the bundle is not checked again only as far as **Boundary** establishes' 'A live file outside the bundle needs no check'
+expect_fail "a drift rule that claims no channel at all fails" "$work/solive" "references/second-opinion.md is missing: A live file outside the bundle is not checked again only as far as **Boundary** establishes"
+
+make_copy "$work/soapplyresidual"
+replace_first "$work/soapplyresidual/references/second-opinion.md" ' but this guide does not establish that it opens no local file while it checks a patch' ''
+expect_fail "a guide that drops the apply_patch read limit fails" "$work/soapplyresidual" "references/second-opinion.md is missing: this guide does not establish that it opens no local file while it checks a patch"
+
+make_copy "$work/soreadclaim"
+replace_first "$work/soreadclaim/references/second-opinion.md" 'The call turns off the built-in tools of the CLI that run a command and that open a local image' 'The call turns off every tool of the CLI that runs a command or opens a local file'
+expect_fail "a guide that claims every file reader is off fails" "$work/soreadclaim" "references/second-opinion.md still contains: turns off every tool of the CLI that runs a command or opens a local file"
+
+make_copy "$work/soinputclaim"
+replace_first "$work/soinputclaim/references/second-opinion.md" 'The bundle of **The prompt** is the only review input that this guide authorizes.' 'The CLI reads nothing but the prompt that this guide writes.'
+expect_fail "a guide that says the CLI reads only the prompt fails" "$work/soinputclaim" "references/second-opinion.md still contains: The CLI reads nothing"
+
+make_copy "$work/soautoloadboundary"
+replace_first "$work/soautoloadboundary/references/second-opinion.md" 'When a configured automatic mechanism would inject excluded or unsanitized content of the reviewed repository, or the host cannot establish the first condition from the capabilities it already knows, the second opinion is unavailable with `<cli> cannot be limited to the supplied content`, and the review call does not run. ' ''
+expect_fail "a guide that runs with unestablished automatic loading fails" "$work/soautoloadboundary" "references/second-opinion.md is missing: or the host cannot establish the first condition from the capabilities it already knows"
 # End of second opinion tests.
 
 # README fix and second opinion (README.md).
@@ -2435,8 +2451,8 @@ make_copy "$work/rfexpected"
 replace_first "$work/rfexpected/README.md" 'compares it with the reviewed text plus its own earlier edits' 'compares it with the last commit'
 expect_fail "README that refuses the skill's own earlier edits fails" "$work/rfexpected" "README.md is missing: Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits"
 make_copy "$work/rfboundary"
-replace_first "$work/rfboundary/README.md" 'with its tools that run commands or open local files, its app' 'with its usual tools, its app'
-expect_fail "README that trusts the CLI reads fails" "$work/rfboundary" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository, with its tools that run commands or open local files"
+replace_first "$work/rfboundary/README.md" 'only from a new empty directory outside the repository, with its tools' 'only from a new empty directory, with its tools'
+expect_fail "README that drops the repository boundary fails" "$work/rfboundary" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository"
 
 make_copy "$work/rfsamer"
 replace_first "$work/rfsamer/README.md" 'two fixes of one round never overlap' 'two fixes never overlap'
@@ -2445,6 +2461,10 @@ expect_fail "README that forbids overlap across rounds fails" "$work/rfsamer" "R
 make_copy "$work/rsgemini"
 replace_first "$work/rsgemini/README.md" '`gemini cannot be limited to the supplied content`' '`gemini` runs in plan mode'
 expect_fail "README that runs gemini without a limit fails" "$work/rsgemini" "README.md is missing: \`gemini cannot be limited to the supplied content\`"
+
+make_copy "$work/rsreadlimits"
+replace_first "$work/rsreadlimits/README.md" 'its tools that run commands, its tool that opens local images, its app connectors and its memories turned off for that call' 'its app connectors and its memories turned off for that call'
+expect_fail "README that omits the command and local-image limit fails" "$work/rsreadlimits" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository, with its tools that run commands, its tool that opens local images"
 # End of README fix and second opinion tests.
 
 if [ "$failures" -gt 0 ]; then

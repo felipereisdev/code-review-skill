@@ -2724,7 +2724,7 @@ REQUIRED = (
     "`**Second opinion:** <cli> returned no candidates.`",
     "`**Second opinion:** <cli> unavailable: <reason>.`",
     "`**Second opinion:** <cli> failed: <reason>.`",
-    "The CLI reads nothing but the prompt that this guide writes.",
+    "The bundle of **The prompt** is the only review input that this guide authorizes.",
     "they do not limit what it reads",
     "A CLI runs only when all of these hold for it",
     "The CLI starts in a new empty directory, `<dir>/run`, made for this run, never in the reviewed repository or "
@@ -2746,13 +2746,20 @@ REQUIRED = (
     "each context file of the bundle is read again and compared with the text that the review read",
     "Record the SHA-256 of `<dir>/prompt.md` before the call, and compare it after the call",
     "A change to the bundle, to the diff or to the refs while it ran invalidates the answer",
-    "no tool of the call reads a live file while it runs",
+    "A live file outside the bundle is not checked again only as far as **Boundary** establishes",
+    "The built-in `apply_patch` tool stays on",
+    "this guide does not establish that it opens no local file while it checks a patch",
+    "or the host cannot establish the first condition from the capabilities it already knows",
+    "are the only configuration overrides of this profile",
     "`the supplied content changed while it ran`",
     "`the reviewed snapshot is not the current one`",
 )
 # Text that the guide must never contain again: the reads that the bundle replaces.
 FORBIDDEN_TEXT = ("the files themselves", "git show", "git ls-tree", "Read code outside the diff only from the snapshot",
-                  "A later revision of this guide may run", "--cd '<root>'")
+                  "A later revision of this guide may run", "--cd '<root>'", "The CLI reads nothing",
+                  "no tool of the call reads a live file", "every file reader is removed", "no tool can inspect",
+                  "turns off every tool of the CLI that runs a command or opens a local file",
+                  "are the only settings of the call")
 # Each command must keep these flags, and never add a flag that widens access, trusts the repository or sets it up.
 REQUIRED_FLAGS = {"codex": ("codex exec ", "--cd '<dir>/run'", "--sandbox read-only", "--disable shell_tool",
                             "--disable view_image", "--disable apps", "--disable memories", "--ephemeral",
@@ -2893,7 +2900,8 @@ README_REQUIRED = (
     "The skill sends it only a bundle of the change and the code around it, with secrets replaced by `[REDACTED]`",
     "The read-only flags limit writes and shell commands, not what a CLI reads",
     "the skill runs `codex` only from a new empty directory outside the repository, with its tools that run "
-    "commands or open local files",
+    "commands, its tool that opens local images, its app connectors and its memories turned off for that call",
+    "Its `apply_patch` tool stays on",
     "`gemini cannot be limited to the supplied content`",
     "It never stages, commits, pushes or publishes, and never rewrites the report above it",
     "Agreement between the two reviews is never a vote, a candidate outside the diff never becomes a finding",
