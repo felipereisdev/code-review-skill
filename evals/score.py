@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 SEVERITIES = ("Suggestion", "Warning", "Critical")
@@ -44,6 +45,8 @@ _NORMALIZED_SEVERITY = {
     "suggestion": "Suggestion",
 }
 
+_READY_VALUES = {"yes": "Yes", "no": "No", "with fixes": "With fixes"}
+
 
 def _normalize_severity(match: re.Match | None) -> str | None:
     if match is None:
@@ -67,6 +70,19 @@ def _active_fence(line: str, fence: str | None) -> str | None:
     if marker[0] != fence[0] or len(marker) < len(fence) or line[match.end():].strip():
         return fence
     return None
+
+
+def _outside_fences(report: str) -> list[str]:
+    """Return the lines of ``report`` that are not inside a code fence."""
+    fence = None
+    outside = []
+    for line in report.splitlines():
+        in_fence = fence is not None
+        fence = _active_fence(line, fence)
+        if in_fence or fence is not None:
+            continue
+        outside.append(line)
+    return outside
 
 
 def parse_findings(report: str) -> list[dict]:
@@ -167,13 +183,18 @@ def parse_findings(report: str) -> list[dict]:
     return findings
 
 
-def score_bug(report: str, patterns: list[str], min_severity: str) -> dict:
-    """Report whether one main-list finding at ``min_severity`` or above matches every pattern."""
+def score_bug(report: str, patterns: list[str], min_severity: str, location_path: str | None = None) -> dict:
+    """Report whether one main-list finding at ``min_severity`` or above matches every pattern.
+
+    When ``location_path`` is given, the matching finding must also name that path.
+    """
     minimum = SEVERITIES.index(min_severity)
     for finding in parse_findings(report):
         if finding["needs_verification"] or finding["pre_existing"] or finding["already_raised"]:
             continue
         if SEVERITIES.index(finding["severity"]) < minimum:
+            continue
+        if location_path is not None and location_path not in finding["text"]:
             continue
         if all(re.search(pattern, finding["text"], re.I) for pattern in patterns):
             return {"detected": True, "matched_finding": finding["heading"]}
@@ -214,6 +235,43 @@ def _incomplete_report(lines: list[str]) -> bool:
     return (any(INCOMPLETE_LINE.match(line) for line in lines)
             and bool(readiness) and "yes" not in readiness
             and any(_AUDIT_LINE_RE.match(line) for line in lines))
+
+
+def report_completeness(report: str) -> dict:
+    """Describe whether ``report`` is a finished review, not one cut off or left incomplete.
+
+    The verdict cannot tell an incomplete review that still lists findings (rows 1 and 3)
+    from a complete one (row 2), so those reports count as complete.
+    """
+    lines = _outside_fences(report)
+    readiness = [m.group(1).lower() for m in map(_READY_LINE_RE.match, lines) if m]
+    ready = _READY_VALUES[readiness[-1]] if readiness else None
+    audit = any(_AUDIT_LINE_RE.match(line) for line in lines)
+    incomplete = any(INCOMPLETE_LINE.match(line) for line in lines)
+    return {
+        "ready_to_merge": ready,
+        "audit": audit,
+        "incomplete_headline": incomplete,
+        "complete": looks_like_report(report) and ready is not None and audit and not incomplete,
+    }
+
+
+def observations(report: str, meta: dict) -> dict:
+    """Record whether the report states its intent and cites the spec or history labels.
+
+    These facts never change a score.
+    """
+    intent = [line for line in _outside_fences(report) if line.lstrip("*_ ").startswith("Intent:")]
+    main = [
+        finding for finding in parse_findings(report)
+        if not (finding["needs_verification"] or finding["pre_existing"] or finding["already_raised"])
+    ]
+    spec_path = meta.get("spec_path")
+    return {
+        "intent_line": bool(intent),
+        "spec_cited": None if not spec_path else any(spec_path in line for line in intent),
+        "history_cited": None if not meta.get("history") else any("History:" in f["text"] for f in main),
+    }
 
 
 def stack_mentioned(report: str, stack: str) -> bool:
