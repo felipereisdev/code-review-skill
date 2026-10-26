@@ -86,6 +86,27 @@ DIMENSION_ITEM_RE = re.compile(r"^(bugs|security|repository rules) dimension$")
 LARGE_DIFFS = read(os.path.join("..", "..", "references", "large-diffs.md"))
 SKIP_RE = re.compile(r"^(skipped in a large diff as a (lockfile|generated file)|left unread in a large diff)\b")
 LARGE_SIZES = ("501 to 1000", "more than 1000")
+INTENT = read(os.path.join("..", "..", "references", "intent.md"))
+HISTORY = read(os.path.join("..", "..", "references", "removed-code-history.md"))
+INTENT_GUIDE = "skill:references/intent.md"
+HISTORY_GUIDE = "skill:references/removed-code-history.md"
+INTENT_LINE_RE = re.compile(r"^\*\*Intent:\*\* (?:(inferred|uncertain): )?\S.* \(([^()]+)\)\.$")
+REQUIREMENTS_RE = re.compile(r"^\*\*Requirements:\*\* (?:none stated|(\d+) met, (\d+) not met, (\d+) not judged)\.$")
+REQUIREMENT_RE = re.compile(r"^- (Met|Not met|Not judged) — (\S.*) \(([^()]+)\): (\S.*)\.$")
+CREEP_RE = re.compile(r"^\*\*Scope creep:\*\* (?:(none found in the reviewed files)|not judged: (\S.*)|compared only "
+                      r"with ([^:`]+): (none found in the reviewed files|`.+)|(`.+))\.$")
+CREEP_ENTRY_RE = re.compile(r"`([^`]+)` \(([^()]+)\)")
+SOURCES_RE = re.compile(r"^\*\*Sources not read:\*\* (\S.*)\.$")
+CITED_RE = re.compile(r"`([^`\s]+):(\d+)(?:-(\d+))?`")
+UNREAD_RANGE_RE = re.compile(r"^`([^`]+)` lines (\d+)-(\d+)$")
+HISTORY_ITEM_RE = re.compile(r"^history of `([^`]+)` from `([^`]+)`$")
+# The two History notes of references/removed-code-history.md: a blame at the old side, or a log from the old side or,
+# partial and without the commits of the pull request, from the head commit only.
+HISTORY_NOTE_RE = re.compile(r"^History: git (?:blame at `[^`]+` shows `[^`]+` last changed these lines|log -S from "
+                             r"(?:the head commit `[^`]+` \(partial, without the commits of this pull request\)|"
+                             r"`[^`]+`) lists `[^`]+`, which changed text matching `[^`]+`); its message says "
+                             r"\"[^\"]+\"\.$")
+DIFF_ALONE = "Code outside the diff was not read: the head commit "
 REPORT_END = "The report ends with the Audit above."
 CRITICAL_VERDICT = ("**Ready to merge:** No — 2 Critical findings must be fixed before merging. "
                     "Not fully reviewed: see the Audit.")
@@ -140,6 +161,145 @@ def large_diff_errors(effort, items):
                                          not in lockfile_names(LARGE_DIFFS)):
             errors.append(f"{what} is skipped as a lockfile, but its file name is not a lockfile of "
                           "references/large-diffs.md")
+    return errors
+
+
+def intent_lines(text):
+    """The non-blank lines of the ## Intent section of references/intent.md; None when the report has none."""
+    lines = text.split("\n")
+    if "## Intent" not in lines:
+        return None
+    body = []
+    for line in lines[lines.index("## Intent") + 1:]:
+        if line.startswith("#") or line == "---":
+            break
+        if line.strip():
+            body.append(line)
+    return body
+
+
+def _unread_ranges(items):
+    """{path: [(first, last)]} of the not read items that name lines of a file."""
+    ranges = {}
+    for what, tag, _weight, _detail in items:
+        m = UNREAD_RANGE_RE.match(what)
+        if tag == "not read" and m:
+            ranges.setdefault(m.group(1), []).append((int(m.group(2)), int(m.group(3))))
+    return ranges
+
+
+def intent_errors(text, audit):
+    """Errors of the ## Intent section of references/intent.md: its place and form, the intent guide on Read for
+    context, a labelled inference for an intent from the diff, requirements from a source and judged met or not met
+    only on cited code that the review reviewed or read, and scope creep limited by the sources not read."""
+    body = intent_lines(text)
+    if body is None:
+        return []
+    lines = text.split("\n")
+    errors = []
+    at, scope = lines.index("## Intent"), find_line(lines, "**Scope:**")
+    later = [i for i, line in enumerate(lines) if line in ("### What Was Done Well", "## Findings")]
+    if scope is None or scope > at or (later and min(later) < at):
+        errors.append("## Intent must come after the **Scope:** line and before What Was Done Well and ## Findings")
+    if INTENT_GUIDE not in audit["context"]:
+        errors.append(f"the report has ## Intent, but Read for context does not name `{INTENT_GUIDE}`")
+    reviewed, context, unread = set(audit["paths"]), set(audit["context"]), _unread_ranges(audit["items"])
+    intent = INTENT_LINE_RE.match(body[0]) if body else None
+    if intent is None:
+        return errors + ["**Intent:** line is missing or malformed"]
+    label, sources = intent.group(1), [s.strip() for s in intent.group(2).split(",")]
+    if label and sources != ["diff"]:
+        errors.append("an inferred or uncertain intent names only the diff as its source")
+    if not label and "diff" in sources:
+        errors.append("an intent taken from the diff must be labelled inferred or uncertain")
+    counts = REQUIREMENTS_RE.match(body[1]) if len(body) > 1 else None
+    if counts is None:
+        return errors + ["**Requirements:** line is missing or malformed"]
+    rest, tally = body[2:], {"Met": 0, "Not met": 0, "Not judged": 0}
+    while rest and rest[0].startswith("- "):
+        req = REQUIREMENT_RE.match(rest.pop(0))
+        if req is None:
+            errors.append("a requirement line is malformed")
+            continue
+        status, _requirement, source, detail = req.groups()
+        tally[status] += 1
+        if source == "diff":
+            errors.append("a requirement must come from a source, never from the diff")
+        if status == "Not judged":
+            continue  # its citations name what was not read, never what was reviewed
+        cited = CITED_RE.findall(detail)
+        if not cited:
+            errors.append(f"a {status.lower()} requirement must cite the code that makes it "
+                          f"{'true' if status == 'Met' else 'false'}")
+        for path, a, b in cited:
+            first, last = int(a), int(b or a)
+            if path in reviewed:
+                if any(first <= y and x <= last for x, y in unread.get(path, [])):
+                    errors.append(f"a {status.lower()} requirement cites lines of `{path}` that were not read")
+            elif path not in context:
+                errors.append(f"a {status.lower()} requirement cites `{path}`, which the review neither reviewed nor "
+                              "read for context")
+    stated = counts.group(1) is not None
+    if stated and [int(n) for n in counts.groups()] != list(tally.values()):
+        errors.append(f"**Requirements:** counts {counts.group(1)} met, {counts.group(2)} not met and "
+                      f"{counts.group(3)} not judged, but the lines give {tally['Met']}, {tally['Not met']} and "
+                      f"{tally['Not judged']}")
+    if not stated and sum(tally.values()):
+        errors.append("**Requirements:** says none stated, but requirement lines follow it")
+    creep = CREEP_RE.match(rest.pop(0)) if rest else None
+    if creep is None:
+        return errors + ["**Scope creep:** line is missing or malformed"]
+    unread_sources = SOURCES_RE.match(rest.pop(0)) if rest else None
+    if unread_sources is None:
+        return errors + ["**Sources not read:** line is missing or malformed"]
+    if rest:
+        errors.append(f"## Intent has an unexpected line: {rest[0]}")
+    none_found, not_judged, _compared, limited, listed = creep.groups()
+    if not stated and not_judged is None:
+        errors.append("scope creep is judged, but no source states a requirement")
+    if unread_sources.group(1) != "none" and (none_found or listed):
+        errors.append("scope creep is compared with every source, but a source was not read")
+    entries_text = listed or (limited if limited and limited.startswith("`") else None)
+    if entries_text:
+        entries = CREEP_ENTRY_RE.findall(entries_text)
+        if ", ".join(f"`{p}` ({w})" for p, w in entries) != entries_text:
+            errors.append("**Scope creep:** line is malformed")
+        for path in (re.sub(r":\d+(?:-\d+)?$", "", p) for p, _w in entries):
+            if path not in reviewed:
+                errors.append(f"scope creep names `{path}`, which is not a reviewed file")
+        if [p for p, _w in entries] != sorted(p for p, _w in entries):
+            errors.append("scope creep paths must be in alphabetical order")
+    return errors
+
+
+def history_errors(text, audit):
+    """Errors of the history of references/removed-code-history.md in a report: git history is never a file on Read
+    for context, a failed history read is a context not read item that names a reviewed file and its start, a History
+    note says only what the commands showed, both need the history guide, and a review of the diff alone reads none."""
+    lines = text.split("\n")
+    errors = []
+    for path in audit["context"]:
+        if path.startswith("history:"):
+            errors.append(f"Read for context names `{path}`, but git history is not a file")
+    failed = []
+    for what, tag, _weight, _detail in audit["items"]:
+        if not what.startswith("history of "):
+            continue
+        m = HISTORY_ITEM_RE.match(what)
+        if m is None or tag != "context not read":
+            errors.append(f"{what} must be a context not read item in the form history of `<path>` from `<start>`")
+        elif m.group(1) not in audit["paths"]:
+            errors.append(f"the Audit names the history of `{m.group(1)}`, which is not a reviewed file")
+        failed.append(what)
+    notes = [line[line.index("History: "):] for line in lines
+             if line.startswith("**Evidence:**") and "History: " in line]
+    for note in notes:
+        if not HISTORY_NOTE_RE.match(note):
+            errors.append(f"a History note must say only what git blame or git log -S showed: {note}")
+    if (failed or notes) and HISTORY_GUIDE not in audit["context"]:
+        errors.append(f"the report uses history, but Read for context does not name `{HISTORY_GUIDE}`")
+    if (failed or notes) and any(line.startswith(DIFF_ALONE) for line in lines):
+        errors.append("the review read the diff alone, so it read no history")
     return errors
 
 
@@ -611,6 +771,8 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0, changed_lines=None
             unreviewed.update(owners[m.group(1)])
 
     errors += large_diff_errors(triage["Review effort"], items)
+    errors += intent_errors(text, audit)
+    errors += history_errors(text, audit)
     errors += _check_files(audit, excluded, excluded_paths)
     errors += _check_clean(audit, finding_categories, tests_not_verified, unreviewed)
     errors += _check_raised(audit, is_pr, lines)
@@ -1718,6 +1880,226 @@ class LargeDiffTests(Base):
         items = parse_audit(example_block(LARGE_DIFFS))["items"]
         skips = [weight for _what, _tag, weight, detail in items if detail.startswith("skipped in a large diff")]
         self.assertEqual(skips, ["material", "material"])
+
+
+INTENT_SECTION = (
+    "## Intent\n\n"
+    "**Intent:** List a customer's orders by status with the total of each order (request).\n"
+    "**Requirements:** 2 met, 1 not met, 1 not judged.\n"
+    "- Met — orders can be filtered by status (request): `src/routes.js:4-9` passes `status` to `listOrders`.\n"
+    "- Met — only signed-in customers see orders (request): `src/routes.js:4-9` adds the route to the router that "
+    "`src/middleware/auth.js:3-11` guards with `requireAuth`.\n"
+    "- Not met — the total includes every order line (request): the Warning finding at `src/orders.js:20-22` skips "
+    "the last line.\n"
+    "- Not judged — the list loads in under a second for large shops (request): it depends on the data size, which "
+    "the review could not see.\n"
+    "**Scope creep:** none found in the reviewed files.\n"
+    "**Sources not read:** none.\n")
+INTENT_CONTEXT = ("**Read for context:** 4 files: `package.json`, `skill:references/intent.md`, "
+                  "`src/middleware/auth.js`, `tests/orders.test.js`.")
+NO_REQUIREMENT = ("## Intent\n\n**Intent:** inferred: list orders by status (diff).\n**Requirements:** none stated.\n"
+                  "**Scope creep:** not judged: no source states a requirement.\n**Sources not read:** none.\n")
+UNREAD_SOURCE = "**Sources not read:** PAY-7 (no read-only tool for its tracker).\n"
+HISTORY_NOTE = ('History: git blame at `9f8e7d6` shows `4be1c2d` last changed these lines; its message says '
+                '"fix: bind the order status (#88)".')
+HEAD_NOTE = ('History: git log -S from the head commit `3f1c2a9` (partial, without the commits of this pull request) '
+             'lists `4be1c2d`, which changed text matching `bindStatus(`; its message says "fix: bind the order status '
+             '(#88)".')
+HISTORY_CONTEXT = ("**Read for context:** 4 files: `package.json`, `skill:references/removed-code-history.md`, "
+                   "`src/db.js`, `tests/orders.test.js`.")
+HISTORY_ITEM = ("- history of `src/orders.js` from `9f8e7d6` — context not read, not material: `git log` failed; the "
+                "removed status binding was judged from the code.")
+ORDER_EVIDENCE = "**Evidence:** `GET /orders?status=' OR '1'='1` → the query returns the orders of every customer."
+
+
+def with_intent(text, section=INTENT_SECTION, context=INTENT_CONTEXT):
+    """The fixture with an Intent section after its Scope line and the intent guide on Read for context."""
+    text = replace_once(text, "### What Was Done Well\n", section + "\n### What Was Done Well\n")
+    return set_line(text, "Read for context", context)
+
+
+def with_history(text, note=HISTORY_NOTE, context=HISTORY_CONTEXT):
+    """The fixture with a History note at the end of the Evidence of its Critical finding."""
+    text = replace_once(text, ORDER_EVIDENCE, ORDER_EVIDENCE + " " + note)
+    return set_line(text, "Read for context", context)
+
+
+class IntentTests(Base):
+    """The Intent section of references/intent.md, as the Output Format of SKILL.md places it."""
+
+    def test_intent_section_is_consistent(self):
+        text = with_intent(FIXTURE)
+        self.assertEqual(check_report(text), [])
+        self.assertEqual(line_of(text, "Ready to merge"), line_of(FIXTURE, "Ready to merge"))
+
+    def test_intent_section_is_not_a_finding(self):
+        self.assertEqual(parse_findings(with_intent(FIXTURE)), parse_findings(FIXTURE))
+
+    def test_intent_needs_the_intent_guide_on_context(self):
+        context = "**Read for context:** 3 files: `package.json`, `src/middleware/auth.js`, `tests/orders.test.js`."
+        self.assertError(check_report(with_intent(FIXTURE, context=context)),
+                         "Read for context does not name `skill:references/intent.md`")
+
+    def test_intent_comes_before_the_findings(self):
+        text = replace_once(FIXTURE, "### Security — Critical\n", INTENT_SECTION + "\n### Security — Critical\n")
+        text = set_line(text, "Read for context", INTENT_CONTEXT)
+        self.assertError(check_report(text), "## Intent must come after the **Scope:** line and before")
+
+    def test_met_requirement_on_a_file_not_reviewed_fails(self):
+        section = INTENT_SECTION.replace("`src/routes.js:4-9` passes", "`src/billing.js:4-9` passes")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "a met requirement cites `src/billing.js`, which the review neither reviewed nor read for "
+                         "context")
+
+    def test_met_requirement_through_code_read_for_context(self):
+        self.assertEqual(intent_errors(with_intent(FIXTURE), parse_audit(with_intent(FIXTURE))), [])
+        context = ("**Read for context:** 3 files: `package.json`, `skill:references/intent.md`, "
+                   "`tests/orders.test.js`.")
+        self.assertError(check_report(with_intent(FIXTURE, context=context)),
+                         "a met requirement cites `src/middleware/auth.js`, which the review neither reviewed nor "
+                         "read for context")
+
+    def test_met_requirement_on_unread_lines_fails(self):
+        text = with_items(with_intent(FIXTURE), "- `src/routes.js` lines 1-20 — not read, material: the diff output "
+                          "was cut off.")
+        self.assertError(check_report(text), "a met requirement cites lines of `src/routes.js` that were not read")
+
+    def test_met_requirement_needs_a_citation(self):
+        section = INTENT_SECTION.replace("`src/routes.js:4-9` passes `status` to `listOrders`",
+                                         "the route passes the status")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "a met requirement must cite the code that makes it true")
+
+    def test_not_met_needs_a_citation_even_when_every_file_was_reviewed(self):
+        section = INTENT_SECTION.replace("the Warning finding at `src/orders.js:20-22` skips the last line",
+                                         "no changed line sums the order lines")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "a not met requirement must cite the code that makes it false")
+
+    def test_not_judged_may_name_lines_that_were_not_read(self):
+        section = INTENT_SECTION.replace("it depends on the data size, which the review could not see",
+                                         "`src/routes.js:30-40` and `src/billing.js:1-5` decide it, and neither "
+                                         "was read")
+        text = with_items(with_intent(FIXTURE, section), "- `src/routes.js` lines 30-40 — not read, not material: the "
+                          "diff output was cut off, and these lines are a comment.")
+        self.assertEqual(check_report(text), [])
+
+    def test_requirement_counts_must_match(self):
+        section = INTENT_SECTION.replace("2 met, 1 not met, 1 not judged", "3 met, 1 not met, 0 not judged")
+        self.assertError(check_report(with_intent(FIXTURE, section)), "**Requirements:** counts 3 met")
+
+    def test_requirements_never_come_from_the_diff(self):
+        section = INTENT_SECTION.replace("orders can be filtered by status (request)",
+                                         "orders can be filtered by status (diff)")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "a requirement must come from a source, never from the diff")
+
+    def test_intent_from_the_diff_is_labelled(self):
+        self.assertEqual(check_report(with_intent(FIXTURE, NO_REQUIREMENT)), [])
+        section = NO_REQUIREMENT.replace("inferred: list orders by status (diff)", "list orders by status (diff)")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "an intent taken from the diff must be labelled inferred or uncertain")
+        section = NO_REQUIREMENT.replace("inferred: list orders by status (diff)",
+                                         "uncertain: list orders by status (request)")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "an inferred or uncertain intent names only the diff as its source")
+
+    def test_no_requirement_leaves_scope_creep_not_judged(self):
+        section = NO_REQUIREMENT.replace("not judged: no source states a requirement",
+                                         "`src/routes.js` (adds a status filter)")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "scope creep is judged, but no source states a requirement")
+
+    def test_scope_creep_names_reviewed_files(self):
+        section = INTENT_SECTION.replace("**Scope creep:** none found in the reviewed files.",
+                                         "**Scope creep:** `src/billing.js` (adds invoices).")
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "scope creep names `src/billing.js`, which is not a reviewed file")
+
+    def test_scope_creep_with_a_source_not_read_is_limited(self):
+        section = INTENT_SECTION.replace("**Sources not read:** none.\n", UNREAD_SOURCE)
+        self.assertError(check_report(with_intent(FIXTURE, section)),
+                         "scope creep is compared with every source, but a source was not read")
+        for creep in ("compared only with the request: `src/routes.js:10-12` (adds a CSV export of the orders)",
+                      "compared only with the request: none found in the reviewed files",
+                      "not judged: PAY-7 may ask for any of the changes"):
+            limited = section.replace("none found in the reviewed files.\n**Sources", creep + ".\n**Sources")
+            self.assertEqual(check_report(with_intent(FIXTURE, limited)), [], creep)
+
+    def test_intent_section_has_only_its_lines(self):
+        section = INTENT_SECTION.replace("**Sources not read:** none.\n",
+                                         "**Sources not read:** none.\n**Verdict:** the change is ready.\n")
+        self.assertError(check_report(with_intent(FIXTURE, section)), "## Intent has an unexpected line")
+
+    def test_reference_examples_are_well_formed(self):
+        audit = {"paths": ["src/admin/export.ts", "src/checkout/coupons.ts"],
+                 "context": ["db/schema.sql", INTENT_GUIDE], "items": []}
+        text = "**Scope:** pr 7 (gh pr diff 7)\n\n" + example_block(INTENT)
+        self.assertEqual(intent_errors(text, audit), [])
+        self.assertError(intent_errors(text, dict(audit, context=[INTENT_GUIDE])),
+                         "a met requirement cites `db/schema.sql`, which the review neither reviewed nor read for "
+                         "context")
+        inferred = "**Scope:** staged (git diff --cached)\n\n" + example_block(INTENT, "## Example with no source")
+        self.assertEqual(intent_errors(inferred, dict(audit, paths=["src/api/orders.ts"])), [])
+
+    def test_compact_mode_repeats_the_intent_lines(self):
+        compact = EXAMPLE[EXAMPLE.index("## Compact Mode"):EXAMPLE.index("## Coverage Limits")].split("\n")
+        body = intent_lines(example_full())
+        start = compact.index(body[0])
+        self.assertEqual(compact[start:start + len(body)], body)
+        self.assertLess(find_line(compact, "**Scope:**"), start)
+        self.assertNotIn("## Intent", compact)
+
+
+class HistoryTests(Base):
+    """The history of references/removed-code-history.md in a report: commit metadata in the Evidence and the Audit,
+    never a file on Read for context."""
+
+    def test_history_with_its_guide_and_real_files_is_consistent(self):
+        self.assertEqual(check_report(with_history(FIXTURE)), [])
+        self.assertEqual(check_report(with_history(FIXTURE, HEAD_NOTE)), [])
+
+    def test_history_is_never_a_file_on_read_for_context(self):
+        context = ("**Read for context:** 5 files: `history:src/orders.js`, `package.json`, "
+                   "`skill:references/removed-code-history.md`, `src/db.js`, `tests/orders.test.js`.")
+        self.assertError(check_report(with_history(FIXTURE, context=context)),
+                         "Read for context names `history:src/orders.js`, but git history is not a file")
+
+    def test_history_needs_the_history_guide(self):
+        self.assertError(check_report(with_history(FIXTURE, context=line_of(FIXTURE, "Read for context"))),
+                         "the report uses history, but Read for context does not name "
+                         "`skill:references/removed-code-history.md`")
+
+    def test_history_note_says_only_what_the_commands_show(self):
+        for note in (HISTORY_NOTE.replace("shows `4be1c2d` last changed these lines", "shows that `4be1c2d` added "
+                                          "these lines"),
+                     HEAD_NOTE.replace(" (partial, without the commits of this pull request)", ""),
+                     HISTORY_NOTE.replace("git blame at `9f8e7d6`", "git blame at the head commit `3f1c2a9`"),
+                     'History: `4be1c2d` fixed this regression (#88).'):
+            self.assertError(check_report(with_history(FIXTURE, note)),
+                             "a History note must say only what git blame or git log -S showed")
+
+    def test_failed_history_read_is_a_context_item(self):
+        context = ("**Read for context:** 3 files: `package.json`, `skill:references/removed-code-history.md`, "
+                   "`tests/orders.test.js`.")
+        text = with_items(set_line(FIXTURE, "Read for context", context), HISTORY_ITEM)
+        self.assertEqual(check_report(text), [])
+        self.assertError(check_report(text.replace("history of `src/orders.js`", "history of `src/billing.js`")),
+                         "the Audit names the history of `src/billing.js`, which is not a reviewed file")
+        self.assertError(check_report(text.replace(" from `9f8e7d6`", "")),
+                         "must be a context not read item in the form history of `<path>` from `<start>`")
+
+    def test_a_review_of_the_diff_alone_reads_no_history(self):
+        text = as_pr(with_history(FIXTURE))
+        text = replace_once(text, "**Scope:** pr 7 (gh pr diff 7)\n", "**Scope:** pr 7 (gh pr diff 7)\n" + DIFF_ALONE +
+                            "3f1c2a9 is not in this repository.\n")
+        self.assertError(check_report(text), "the review read the diff alone, so it read no history")
+
+    def test_reference_example_says_only_what_the_commands_show(self):
+        audit = {"paths": ["src/routes/users.ts"],
+                 "context": [HISTORY_GUIDE, "src/middleware/auth.ts", "src/routes/index.ts"], "items": []}
+        self.assertEqual(history_errors(example_block(HISTORY), audit), [])
+        self.assertNotIn("`history:", HISTORY)
 
 
 if __name__ == "__main__":
