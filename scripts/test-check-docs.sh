@@ -2054,6 +2054,419 @@ drop_lines "$work/jrstructure/README.md" '── review_gate.py'
 expect_fail "README Project Structure without the gate script fails" "$work/jrstructure" "README Project Structure is missing: scripts/review_gate.py"
 # End of README JSON output tests.
 
+# Fix flow (references/fix.md, SKILL.md Step 0, Pull Request Scope, Step 4 and Output Format).
+make_copy "$work/fxflag"
+replace_first "$work/fxflag/SKILL.md" ' The flag `--fix` is not part of the scope either: after the report is complete, it applies the fixes that the user approved, as **Step 4 — Fix** says.' ''
+expect_fail "removing the --fix flag from Step 0 fails" "$work/fxflag" "Step 0 — Scope Selection is missing: The flag \`--fix\` is not part of the scope either"
+
+make_copy "$work/fxjson"
+replace_first "$work/fxjson/SKILL.md" '`--fix cannot be combined with --format json; fix from a Markdown review`' '`--fix writes its result into the JSON document`'
+expect_fail "fixing from a JSON run fails" "$work/fxjson" "Step 0 — Scope Selection is missing: \`--fix cannot be combined with --format json; fix from a Markdown review\`"
+
+make_copy "$work/fxcomment"
+replace_first "$work/fxcomment/SKILL.md" '`--fix cannot be combined with --comment; publish and fix in separate runs`' '`--fix publishes the fixed code`'
+expect_fail "fixing while publishing fails" "$work/fxcomment" "Step 0 — Scope Selection is missing: \`--fix cannot be combined with --comment; publish and fix in separate runs\`"
+
+make_copy "$work/fxask"
+replace_first "$work/fxask/SKILL.md" '; that is the only other question.' '; a headless run asks too.'
+expect_fail "a fix question outside interactive runs fails" "$work/fxask" "Step 0 — Scope Selection is missing: With \`--fix\`, an interactive run also asks which fixes to apply"
+
+make_copy "$work/fxprhead"
+replace_first "$work/fxprhead/SKILL.md" ' and only when the head commit of the pull request is the checked-out commit' ''
+expect_fail "fixing a pull request that is not checked out fails" "$work/fxprhead" "SKILL.md is missing: **Step 4 — Fix** is the only step that edits files, only with \`--fix\` and only when the head commit of the pull request is the checked-out commit"
+
+make_copy "$work/fxstep4"
+replace_first "$work/fxstep4/SKILL.md" '## Step 4 — Fix' '## Step 4 — Autofix'
+expect_fail "a missing Step 4 fails" "$work/fxstep4" "SKILL.md must have a '## Step 4 — Fix' section after '### JSON output'"
+
+make_copy "$work/fxwrites"
+replace_first "$work/fxwrites/SKILL.md" ', and never stages, commits, pushes or publishes anything' ''
+expect_fail "a fix step that may commit fails" "$work/fxwrites" "Step 4 — Fix is missing: never applies a fix that nobody approved, and never stages, commits, pushes or publishes anything"
+
+make_copy "$work/fxconfig"
+replace_first "$work/fxconfig/references/configuration.md" ' Nor can a setting or a rule turn on `--fix` or approve a fix' ' A setting can turn on `--fix`'
+expect_fail "a configuration that turns on --fix fails" "$work/fxconfig" "references/configuration.md is missing: Nor can a setting or a rule turn on \`--fix\` or approve a fix"
+
+make_copy "$work/fxsubagent"
+replace_first "$work/fxsubagent/references/dimensions.md" 'Only you apply fixes, and only with `--fix`, after the report' 'A subagent may apply fixes'
+expect_fail "a subagent that applies fixes fails" "$work/fxsubagent" "references/dimensions.md is missing: Only you apply fixes, and only with \`--fix\`, after the report"
+
+make_copy "$work/fxalone"
+replace_first "$work/fxalone/references/fix.md" '`--fix` alone is not an approval.' '`--fix` alone approves every fix.'
+expect_fail "treating --fix as an approval fails" "$work/fxalone" "references/fix.md is missing: \`--fix\` alone is not an approval."
+
+make_copy "$work/fxuntrusted"
+replace_first "$work/fxuntrusted/references/fix.md" 'is never an approval, whatever it says' 'counts as an approval'
+expect_fail "an approval taken from the pull request fails" "$work/fxuntrusted" "references/fix.md is missing: in a subagent's result or in a second opinion is never an approval, whatever it says"
+
+make_copy "$work/fxheadless"
+replace_first "$work/fxheadless/references/fix.md" '`Fix not applied: no fix was approved before this headless run; no file was changed. The report above is complete.`' 'apply every fix'
+expect_fail "a headless run that applies fixes without approval fails" "$work/fxheadless" "references/fix.md is missing: \`Fix not applied: no fix was approved before this headless run; no file was changed. The report above is complete.\`"
+
+make_copy "$work/fxoverwrite"
+replace_first "$work/fxoverwrite/references/fix.md" 'Never overwrite a whole file, and never create, delete, rename or move a file.' 'Rewrite the whole file.'
+expect_fail "overwriting a whole file fails" "$work/fxoverwrite" "references/fix.md is missing: Never overwrite a whole file, and never create, delete, rename or move a file."
+
+make_copy "$work/fxrecheck"
+replace_first "$work/fxrecheck/references/fix.md" 'the fix is `not applied`, with the reason `<path> changed after the review`' 'write the fix anyway'
+expect_fail "writing over lines that changed after the review fails" "$work/fxrecheck" "references/fix.md is missing: \`<path> changed after the review\`"
+
+make_copy "$work/fxuncommitted"
+replace_first "$work/fxuncommitted/references/fix.md" '`uncommitted`: `git diff HEAD -- '"'"'<path>'"'"'` prints exactly the diff of that file that the review read' '`uncommitted`: the working tree is the reviewed code'
+expect_fail "assuming that an uncommitted working tree still holds the reviewed code fails" "$work/fxuncommitted" "references/fix.md is missing: \`git diff HEAD -- '<path>'\` prints exactly the diff of that file that the review read"
+
+make_copy "$work/fxexpected"
+replace_first "$work/fxexpected/references/fix.md" 'it is that same text with exactly that write applied, and every other byte unchanged.' 'compare it with the index again.'
+expect_fail "a missing expected state after an own write fails" "$work/fxexpected" "references/fix.md is missing: After each write of this flow that succeeded, it is that same text with exactly that write applied"
+
+make_copy "$work/fxownwrites"
+replace_first "$work/fxownwrites/references/fix.md" 'Never run the checks of **Before the first write in a file** again for a file that this flow already wrote' 'Run the checks of **Before the first write in a file** again before every write'
+expect_fail "refusing a file because of the flow's own writes fails" "$work/fxownwrites" "references/fix.md is missing: Never run the checks of **Before the first write in a file** again for a file that this flow already wrote"
+
+make_copy "$work/fxlines"
+replace_first "$work/fxlines/references/fix.md" 'Find the lines that a fix replaces in the text you expect, never at the line numbers of the report alone' 'Find the lines that a fix replaces at the line numbers of the report'
+expect_fail "editing at stale line numbers fails" "$work/fxlines" "references/fix.md is missing: Find the lines that a fix replaces in the text you expect, never at the line numbers of the report alone"
+
+make_copy "$work/fxrounds"
+replace_first "$work/fxrounds/references/fix.md" 'A run has at most 2 rounds.' 'A run repeats rounds until no finding is left.'
+expect_fail "an unbounded fix loop fails" "$work/fxrounds" "references/fix.md is missing: A run has at most 2 rounds."
+
+make_copy "$work/fxround2"
+replace_first "$work/fxround2/references/fix.md" 'needs no new answer: never ask again only because this is round 2.' 'needs a new answer in round 2.'
+expect_fail "asking again only because it is round 2 fails" "$work/fxround2" "references/fix.md is missing: never ask again only because this is round 2"
+
+make_copy "$work/fxpersist"
+replace_first "$work/fxpersist/references/fix.md" 'An approval stays valid across the turns of the conversation and across both rounds of this run for as long as its words still cover the finding and the edit' 'An approval covers only the message that started this run'
+expect_fail "an approval that expires after one message fails" "$work/fxpersist" "references/fix.md is missing: An approval stays valid across the turns of the conversation and across both rounds of this run"
+
+make_copy "$work/fxexact"
+replace_first "$work/fxexact/references/fix.md" 'An approval of one exact edit never approves a different edit' 'An approval of one edit approves any edit for that finding'
+expect_fail "an approved edit that approves a different edit fails" "$work/fxexact" "references/fix.md is missing: An approval of one exact edit never approves a different edit"
+
+make_copy "$work/fxclaim"
+replace_first "$work/fxclaim/references/fix.md" 'Call a fix `fixed` only when you wrote it and the re-review found that its Evidence scenario can no longer happen.' 'Call a fix `fixed` once you wrote it.'
+expect_fail "calling an unverified fix fixed fails" "$work/fxclaim" "references/fix.md is missing: Call a fix \`fixed\` only when you wrote it"
+
+make_copy "$work/fxcommit"
+printf 'When every fix is fixed, run `git commit -am fix`.\n' >> "$work/fxcommit/references/fix.md"
+expect_fail "a fix guide that commits fails" "$work/fxcommit" "references/fix.md runs a git command that is not allowed: git commit"
+
+make_copy "$work/fxpush"
+printf 'Then git push the branch.\n' >> "$work/fxpush/references/fix.md"
+expect_fail "a fix guide that pushes fails" "$work/fxpush" "references/fix.md names a git command that writes: git push"
+
+make_copy "$work/fxagent"
+printf 'Claude applies the edits.\n' >> "$work/fxagent/references/fix.md"
+expect_fail "naming an agent in the fix guide fails" "$work/fxagent" "references/fix.md names an agent-specific tool: Claude"
+
+make_copy "$work/fxresult"
+replace_first "$work/fxresult/references/fix.md" '**Result:** Partial — 4 of 5' '**Result:** Fixed — 4 of 5'
+expect_fail "an example result that contradicts its items fails" "$work/fxresult" "references/fix.md example: **Result:** is Fixed, the items give Partial"
+
+make_copy "$work/fxfiles"
+replace_first "$work/fxfiles/references/fix.md" '**Files changed:** `src/orders.js`, `src/report.js`.' '**Files changed:** `src/orders.js`.'
+expect_fail "an example that hides a changed file fails" "$work/fxfiles" "references/fix.md example: **Files changed:** must be \`src/orders.js\`, \`src/report.js\`."
+
+make_copy "$work/fxapproved"
+replace_first "$work/fxapproved/references/fix.md" '**Approved:** 5 findings, before the review.' '**Approved:** 4 findings, before the review.'
+expect_fail "an example whose approvals do not add up fails" "$work/fxapproved" "references/fix.md example approves 4 findings but lists 5"
+
+make_copy "$work/fxstatus"
+replace_first "$work/fxstatus/references/fix.md" 'Potential Bugs: fixed — round 2 corrects the lines' 'Potential Bugs: mostly fixed — round 2 corrects the lines'
+expect_fail "an example item with an unknown status fails" "$work/fxstatus" "references/fix.md example item does not match"
+
+make_copy "$work/fxoverlap"
+replace_first "$work/fxoverlap/references/fix.md" '`src/orders.js:71` Warning' '`src/orders.js:43` Warning'
+expect_fail "an example that applies two overlapping fixes of one round fails" "$work/fxoverlap" "references/fix.md example: two written fixes in \`src/orders.js\` overlap: lines 42-44 and 43-43 in round 1"
+
+make_copy "$work/fxsamefile"
+replace_first "$work/fxsamefile/references/fix.md" '`src/orders.js:71` Warning' '`src/totals.js:71` Warning'
+replace_first "$work/fxsamefile/references/fix.md" '`src/report.js:19` Warning' '`src/items.js:19` Warning'
+expect_fail "an example without two applied fixes in one file fails" "$work/fxsamefile" "references/fix.md example must show two fixes in one file, on lines that do not overlap, that both apply"
+
+make_copy "$work/fxexternal"
+replace_first "$work/fxexternal/references/fix.md" 'not applied — `src/export.js` has changes that the review did not read.' 'not applied — the write failed.'
+expect_fail "an example without a file that someone else changed fails" "$work/fxexternal" "references/fix.md example must show a fix not applied because someone else changed its file"
+make_copy "$work/fxrunwide"
+replace_first "$work/fxrunwide/references/fix.md" 'an earlier fix of this round changed the same lines' 'an earlier fix of this run changed the same lines'
+expect_fail "a run-wide overlap prohibition that blocks round 2 fails" "$work/fxrunwide" "references/fix.md still contains: an earlier fix of this run"
+
+make_copy "$work/fxsameround"
+drop_lines "$work/fxsameround/references/fix.md" 'Two fixes of the same round never overlap.'
+expect_fail "dropping the same-round overlap refusal fails" "$work/fxsameround" "references/fix.md is missing: Two fixes of the same round never overlap."
+
+make_copy "$work/fxbaseline"
+replace_first "$work/fxbaseline/references/fix.md" 'Round 2 starts from the baseline that the re-review of round 1 read.' 'Round 2 starts from the original report.'
+expect_fail "a round 2 that ignores the round 1 baseline fails" "$work/fxbaseline" "references/fix.md is missing: Round 2 starts from the baseline that the re-review of round 1 read."
+
+make_copy "$work/fxcrossrule"
+replace_first "$work/fxcrossrule/references/fix.md" 'may replace the lines that round 1 wrote' 'may not replace the lines that round 1 wrote'
+expect_fail "forbidding round 2 corrections of round 1 lines fails" "$work/fxcrossrule" "references/fix.md is missing: may replace the lines that round 1 wrote"
+
+make_copy "$work/fxcrossok"
+replace_first "$work/fxcrossok/references/fix.md" '`src/report.js:19` Warning' '`src/orders.js:42-44` Warning'
+expect_pass "a round 2 fix on lines that round 1 replaced passes the example" "$work/fxcrossok"
+
+make_copy "$work/fxroundtwo"
+replace_first "$work/fxroundtwo/references/fix.md" '`src/report.js:19` Warning' '`src/report.js:17` Warning'
+expect_fail "two fixes of round 2 on the same lines fail" "$work/fxroundtwo" "references/fix.md example: two written fixes in \`src/report.js\` overlap: lines 17-17 and 17-17 in round 2"
+
+make_copy "$work/fxrounds"
+replace_first "$work/fxrounds/references/fix.md" '**Rounds:** 2 of 2.' '**Rounds:** 1 of 2.'
+expect_fail "an example that marks round 2 items as round 1 fails" "$work/fxrounds" "references/fix.md example: **Rounds:** 1 of 2. does not match its round 2 items"
+
+make_copy "$work/fxrbaseline"
+replace_first "$work/fxrbaseline/references/fix.md" 'round 2 corrects the lines that round 1 wrote' 'round 2 corrects the lines round 1 replaced'
+expect_fail "an example without a same-line round 2 correction fails" "$work/fxrbaseline" "references/fix.md example must show a round 2 fix of lines that round 1 wrote"
+
+make_copy "$work/fxrnew"
+replace_first "$work/fxrnew/references/fix.md" 'round 2 corrects a new finding of round 1' 'round 2 corrects a finding'
+expect_fail "an example without a new round 1 finding corrected in round 2 fails" "$work/fxrnew" "references/fix.md example must show a new finding of round 1 corrected in round 2"
+# End of fix flow tests.
+
+# Second opinion (references/second-opinion.md, SKILL.md Step 0, Step 1.7, Step 3 and Output Format).
+make_copy "$work/soflag"
+replace_first "$work/soflag/SKILL.md" '`--second-opinion codex` or `--second-opinion gemini` also asks that CLI to review the same change' '`--second-opinion` asks any CLI'
+expect_fail "removing the --second-opinion flag from Step 0 fails" "$work/soflag" "Step 0 — Scope Selection is missing: The flag \`--second-opinion\` is not part of the scope either"
+
+make_copy "$work/sovalue"
+replace_first "$work/sovalue/SKILL.md" '`--second-opinion needs codex or gemini`' '`--second-opinion runs any command`'
+expect_fail "a second opinion of any CLI fails" "$work/sovalue" "Step 0 — Scope Selection is missing: \`--second-opinion needs codex or gemini\`"
+
+make_copy "$work/sojson"
+replace_first "$work/sojson/SKILL.md" '`--second-opinion cannot be combined with --format json; ask for it in a Markdown review`' '`--second-opinion adds a key to the JSON document`'
+expect_fail "a second opinion inside a JSON run fails" "$work/sojson" "Step 0 — Scope Selection is missing: \`--second-opinion cannot be combined with --format json; ask for it in a Markdown review\`"
+
+make_copy "$work/sovote"
+replace_first "$work/sovote/SKILL.md" 'agreement between the two reviews is never evidence' 'agreement between the two reviews confirms a finding'
+expect_fail "counting agreement as evidence in Step 1.7 fails" "$work/sovote" "Step 1.7 — Dimension Review is missing: agreement between the two reviews is never evidence"
+
+make_copy "$work/sooptional"
+replace_first "$work/sooptional/SKILL.md" 'When it is unavailable or fails, the review goes on and is complete without it.' 'When it fails, the review stops.'
+expect_fail "a review that depends on the second opinion fails" "$work/sooptional" "Step 1.7 — Dimension Review is missing: When it is unavailable or fails, the review goes on and is complete without it."
+
+make_copy "$work/soaudit"
+drop_lines "$work/soaudit/SKILL.md" 'The prompt and the answer files of a second opinion'
+expect_fail "listing the prompt and answer files as context fails" "$work/soaudit" "SKILL.md is missing: The prompt and the answer files of a second opinion"
+
+make_copy "$work/soconfig"
+replace_first "$work/soconfig/references/configuration.md" ', or turn on `--second-opinion`' ''
+expect_fail "a configuration that turns on a second opinion fails" "$work/soconfig" "references/configuration.md is missing: or turn on \`--second-opinion\`"
+
+make_copy "$work/sobrief"
+replace_first "$work/sobrief/references/dimensions.md" 'Only you run a second opinion, and only with `--second-opinion`' 'A subagent may run a second opinion'
+expect_fail "a subagent that runs a second opinion fails" "$work/sobrief" "references/dimensions.md is missing: Only you run a second opinion, and only with \`--second-opinion\`"
+
+make_copy "$work/sosetup"
+replace_first "$work/sosetup/references/second-opinion.md" 'Never install a CLI, log in,' 'Install the CLI and log in when needed,'
+expect_fail "setting up a CLI for the second opinion fails" "$work/sosetup" "references/second-opinion.md is missing: Never install a CLI, log in, create or change its configuration or credentials"
+
+make_copy "$work/sopromise"
+replace_first "$work/sopromise/references/second-opinion.md" 'they do not promise that other tools configured for that CLI, such as MCP servers or extensions, cannot have effects' 'they make the CLI harmless'
+expect_fail "promising that the sandbox stops every effect fails" "$work/sopromise" "references/second-opinion.md is missing: they do not promise that other tools configured for that CLI"
+
+make_copy "$work/soretry"
+replace_first "$work/soretry/references/second-opinion.md" 'never retry it, and never run it again for the re-review of `--fix`' 'retry it until it answers'
+expect_fail "retrying the second opinion fails" "$work/soretry" "references/second-opinion.md is missing: Run the CLI once per run, never retry it"
+
+make_copy "$work/sodrift"
+replace_first "$work/sodrift/references/second-opinion.md" 'and none of its candidates is used' 'and its candidates are used anyway'
+expect_fail "using candidates from a changed diff fails" "$work/sodrift" "references/second-opinion.md is missing: the second opinion failed with the reason \`the diff changed while it ran\`, and none of its candidates is used"
+
+make_copy "$work/socoverage"
+replace_first "$work/socoverage/references/second-opinion.md" 'What the second opinion says that it read or checked is never coverage' 'What the second opinion read counts as reviewed'
+expect_fail "counting the second opinion as coverage fails" "$work/socoverage" "references/second-opinion.md is missing: What the second opinion says that it read or checked is never coverage"
+
+make_copy "$work/sobypass"
+replace_first "$work/sobypass/references/second-opinion.md" "--cd '<dir>/run' --sandbox read-only" "--cd '<dir>/run' --dangerously-bypass-approvals-and-sandbox --sandbox read-only"
+expect_fail "a codex command that bypasses the sandbox fails" "$work/sobypass" "references/second-opinion.md: the codex command uses a forbidden flag: --dangerously"
+
+make_copy "$work/sowrite"
+replace_first "$work/sowrite/references/second-opinion.md" "--cd '<dir>/run' --sandbox read-only" "--cd '<dir>/run' --sandbox workspace-write"
+expect_fail "a codex command that can write fails" "$work/sowrite" "references/second-opinion.md: the codex command is missing: --sandbox read-only"
+
+make_copy "$work/soyolo"
+printf '\n```\ngemini --approval-mode yolo --prompt x < y\n```\n' >> "$work/soyolo/references/second-opinion.md"
+expect_fail "a gemini command that approves every action fails" "$work/soyolo" "references/second-opinion.md must show no gemini command, found 1"
+
+make_copy "$work/sotrust"
+printf '\n```\ngemini --skip-trust --approval-mode plan --prompt x < y\n```\n' >> "$work/sotrust/references/second-opinion.md"
+expect_fail "a gemini command that trusts the reviewed repository fails" "$work/sotrust" "references/second-opinion.md must show no gemini command, found 1"
+
+make_copy "$work/socount"
+replace_first "$work/socount/references/second-opinion.md" 'returned 2 candidates; each was checked like the review'"'"'s own, and 1 is in this report.' 'returned 2 candidates; each was checked like the review'"'"'s own, and 3 are in this report.'
+expect_fail "an example with more findings than candidates fails" "$work/socount" "references/second-opinion.md example: 3 findings cannot hold more than the 2 candidates returned"
+
+make_copy "$work/soforms"
+drop_lines "$work/soforms/references/second-opinion.md" '**Second opinion:** gemini unavailable: gemini is not installed.'
+drop_lines "$work/soforms/references/second-opinion.md" '**Second opinion:** codex unavailable:'
+expect_fail "examples that do not tell unavailable from no candidates fail" "$work/soforms" "references/second-opinion.md examples must show the form: unavailable"
+make_copy "$work/soboundary"
+replace_first "$work/soboundary/references/second-opinion.md" 'Context absent from this prompt is unavailable to the second reviewer' 'The second reviewer may read the working tree'
+expect_fail "a second reviewer that may read the working tree fails" "$work/soboundary" "references/second-opinion.md is missing: Context absent from this prompt is unavailable to the second reviewer"
+
+make_copy "$work/soreads"
+printf 'Read the files themselves at the head commit.\n' >> "$work/soreads/references/second-opinion.md"
+expect_fail "a second reviewer that may read the files themselves fails" "$work/soreads" "references/second-opinion.md still contains: the files themselves"
+
+make_copy "$work/sogitshow"
+printf "Read it with \`git show '<sha>:<path>'\`.\n" >> "$work/sogitshow/references/second-opinion.md"
+expect_fail "a second reviewer that reads git objects fails" "$work/sogitshow" "references/second-opinion.md still contains: git show"
+
+make_copy "$work/socaller"
+replace_first "$work/socaller/references/second-opinion.md" 'an excluded or binary file that a changed file calls or imports' 'an excluded file'
+expect_fail "dropping the excluded file reached from a changed caller fails" "$work/socaller" "references/second-opinion.md is missing: an excluded or binary file that a changed file calls or imports"
+
+make_copy "$work/sosecret"
+replace_first "$work/sosecret/references/second-opinion.md" 'Secrets outside the changed hunks are replaced too, because' 'Secrets are replaced in the changed hunks, because'
+replace_first "$work/sosecret/references/second-opinion.md" 'Secrets outside the changed hunks are replaced too.' 'Secrets are replaced in the changed hunks.'
+expect_fail "a secret outside the changed hunk that is not replaced fails" "$work/sosecret" "references/second-opinion.md is missing: Secrets outside the changed hunks are replaced too"
+
+make_copy "$work/sopatterns"
+replace_first "$work/sopatterns/references/second-opinion.md" 'the ignore_paths patterns of `.code-review/config.yml`' 'the configured paths'
+expect_fail "dropping the configured exclusion patterns fails" "$work/sopatterns" "references/second-opinion.md is missing: the ignore_paths patterns of \`.code-review/config.yml\`"
+
+make_copy "$work/socontext"
+replace_first "$work/socontext/references/second-opinion.md" 'each context file of the bundle is read again and compared with the text that the review read' 'the diff is read again'
+expect_fail "a drift check that ignores unstaged context bytes fails" "$work/socontext" "references/second-opinion.md is missing: each context file of the bundle is read again and compared with the text that the review read"
+
+make_copy "$work/sodigest"
+replace_first "$work/sodigest/references/second-opinion.md" 'Record the SHA-256 of `<dir>/prompt.md` before the call, and compare it after the call' 'Read the prompt again after the call'
+expect_fail "a drift check without a digest of the supplied content fails" "$work/sodigest" "references/second-opinion.md is missing: Record the SHA-256 of \`<dir>/prompt.md\` before the call, and compare it after the call"
+
+make_copy "$work/socanbeinvalid"
+replace_first "$work/socanbeinvalid/references/second-opinion.md" 'invalidates the answer' 'is noted in the answer'
+expect_fail "a changed bundle that does not invalidate the answer fails" "$work/socanbeinvalid" "references/second-opinion.md is missing: A change to the bundle, to the diff or to the refs while it ran invalidates the answer"
+
+make_copy "$work/socli"
+replace_first "$work/socli/references/second-opinion.md" 'A CLI runs only when all of these hold for it' 'A CLI runs when it is installed'
+expect_fail "a CLI that is trusted to read only the bundle without a limit fails" "$work/socli" "references/second-opinion.md is missing: A CLI runs only when all of these hold for it"
+
+make_copy "$work/soreason"
+replace_first "$work/soreason/references/second-opinion.md" '**Second opinion:** codex unavailable: codex cannot be limited to the supplied content.' '**Second opinion:** codex unavailable: codex is slow.'
+expect_fail "an unavailable reason outside the defined forms fails" "$work/soreason" "references/second-opinion.md example line matches no form of The Second opinion line: **Second opinion:** codex unavailable: codex is slow."
+
+make_copy "$work/sorepo"
+replace_first "$work/sorepo/references/second-opinion.md" "--cd '<dir>/run' --sandbox" "--cd '<root>' --sandbox"
+expect_fail "a codex call from the reviewed repository fails" "$work/sorepo" "references/second-opinion.md: the codex command is missing: --cd '<dir>/run'"
+
+make_copy "$work/soshell"
+replace_first "$work/soshell/references/second-opinion.md" '--sandbox read-only --disable shell_tool' '--sandbox read-only'
+expect_fail "a codex call that keeps its command tools fails" "$work/soshell" "references/second-opinion.md: the codex command is missing: --disable shell_tool"
+
+make_copy "$work/sohooks"
+replace_first "$work/sohooks/references/second-opinion.md" '--disable memories --ephemeral' '--disable memories --disable hooks --ephemeral'
+expect_fail "a codex call that turns off a feature Boundary does not name fails" "$work/sohooks" "references/second-opinion.md: the codex command turns off a feature that Boundary does not name: hooks"
+
+make_copy "$work/sosearch"
+replace_first "$work/sosearch/references/second-opinion.md" '--disable memories --ephemeral' '--disable memories --search --ephemeral'
+expect_fail "a codex call that adds a tool fails" "$work/sosearch" "references/second-opinion.md: the codex command uses a forbidden flag: --search"
+
+make_copy "$work/soskip"
+replace_first "$work/soskip/references/second-opinion.md" "codex exec --cd '<dir>/run'" "codex exec --skip-git-repo-check --cd '<dir>/run'"
+expect_fail "a codex call that skips the repository check fails" "$work/soskip" "references/second-opinion.md: the codex command uses a forbidden flag: --skip-git-repo-check"
+
+make_copy "$work/soconfirm"
+replace_first "$work/soconfirm/references/second-opinion.md" '`codex features list --disable shell_tool --disable view_image --disable apps --disable memories` must exit 0' '`codex --version` must exit 0'
+expect_fail "a codex call without the check of its tools fails" "$work/soconfirm" "references/second-opinion.md is missing: \`codex features list --disable shell_tool --disable view_image --disable apps --disable memories\` must exit 0"
+
+make_copy "$work/sogitinit"
+replace_first "$work/sogitinit/references/second-opinion.md" "\`git init -q '<dir>/run'\` must exit 0" "\`mkdir '<dir>/run'\` must exit 0"
+expect_fail "a codex call without its own empty repository fails" "$work/sogitinit" "references/second-opinion.md is missing: \`git init -q '<dir>/run'\` must exit 0"
+
+make_copy "$work/sorevision"
+printf 'A later revision of this guide may run a CLI only with a limit that its own text establishes.\n' >> "$work/sorevision/references/second-opinion.md"
+expect_fail "a guide that leaves every CLI to a later revision fails" "$work/sorevision" "references/second-opinion.md still contains: A later revision of this guide may run"
+
+make_copy "$work/soresidual"
+replace_first "$work/soresidual/references/second-opinion.md" 'but this guide cannot limit what they read' 'and they read nothing'
+expect_fail "a guide that promises what configured tools read fails" "$work/soresidual" "references/second-opinion.md is missing: but this guide cannot limit what they read"
+
+make_copy "$work/sonotool"
+replace_first "$work/sonotool/references/second-opinion.md" 'call no tool, and read nothing else' 'read nothing else'
+expect_fail "a prompt that allows tool calls fails" "$work/sonotool" "references/second-opinion.md is missing: call no tool, and read nothing else"
+
+make_copy "$work/solive"
+replace_first "$work/solive/references/second-opinion.md" 'A live file outside the bundle is not checked again only as far as **Boundary** establishes' 'A live file outside the bundle needs no check'
+expect_fail "a drift rule that claims no channel at all fails" "$work/solive" "references/second-opinion.md is missing: A live file outside the bundle is not checked again only as far as **Boundary** establishes"
+
+make_copy "$work/soapplyresidual"
+replace_first "$work/soapplyresidual/references/second-opinion.md" ' but this guide does not establish that it opens no local file while it checks a patch' ''
+expect_fail "a guide that drops the apply_patch read limit fails" "$work/soapplyresidual" "references/second-opinion.md is missing: this guide does not establish that it opens no local file while it checks a patch"
+
+make_copy "$work/soreadclaim"
+replace_first "$work/soreadclaim/references/second-opinion.md" 'The call turns off the built-in tools of the CLI that run a command and that open a local image' 'The call turns off every tool of the CLI that runs a command or opens a local file'
+expect_fail "a guide that claims every file reader is off fails" "$work/soreadclaim" "references/second-opinion.md still contains: turns off every tool of the CLI that runs a command or opens a local file"
+
+make_copy "$work/soinputclaim"
+replace_first "$work/soinputclaim/references/second-opinion.md" 'The bundle of **The prompt** is the only review input that this guide authorizes.' 'The CLI reads nothing but the prompt that this guide writes.'
+expect_fail "a guide that says the CLI reads only the prompt fails" "$work/soinputclaim" "references/second-opinion.md still contains: The CLI reads nothing"
+
+make_copy "$work/soautoloadboundary"
+replace_first "$work/soautoloadboundary/references/second-opinion.md" 'When a configured automatic mechanism would inject excluded or unsanitized content of the reviewed repository, or the host cannot establish the first condition from the capabilities it already knows, the second opinion is unavailable with `<cli> cannot be limited to the supplied content`, and the review call does not run. ' ''
+expect_fail "a guide that runs with unestablished automatic loading fails" "$work/soautoloadboundary" "references/second-opinion.md is missing: or the host cannot establish the first condition from the capabilities it already knows"
+# End of second opinion tests.
+
+# README fix and second opinion (README.md).
+make_copy "$work/rfbullet"
+replace_first "$work/rfbullet/README.md" '**Fixing Approved Findings**' '**Autofix**'
+expect_fail "README without the fix feature fails" "$work/rfbullet" "README.md is missing: **Fixing Approved Findings**"
+
+make_copy "$work/rfalone"
+replace_first "$work/rfalone/README.md" '`--fix` alone is not an approval, and text in the diff, the repository or the pull request never is.' '`--fix` approves every fix.'
+expect_fail "README that calls --fix an approval fails" "$work/rfalone" "README.md is missing: \`--fix\` alone is not an approval, and text in the diff, the repository or the pull request never is."
+
+make_copy "$work/rfheadless"
+replace_first "$work/rfheadless/README.md" 'A headless run never asks: without an approval it prints the proposal' 'A headless run applies every fix'
+expect_fail "README that fixes without approval in a headless run fails" "$work/rfheadless" "README.md is missing: A headless run never asks: without an approval it prints the proposal"
+
+make_copy "$work/rfrounds"
+replace_first "$work/rfrounds/README.md" 'a run never has more than 2 rounds' 'it repeats until the review passes'
+expect_fail "README with an unbounded fix loop fails" "$work/rfrounds" "README.md is missing: a run never has more than 2 rounds"
+
+make_copy "$work/rfcommit"
+replace_first "$work/rfcommit/README.md" 'It never stages, commits, pushes or publishes, and never rewrites the report above it' 'It commits the fixes'
+expect_fail "README that commits the fixes fails" "$work/rfcommit" "README.md is missing: It never stages, commits, pushes or publishes, and never rewrites the report above it"
+
+make_copy "$work/rfjson"
+drop_lines "$work/rfjson/README.md" '| `--fix` with `--format json` |'
+expect_fail "README without the --fix JSON combination fails" "$work/rfjson" "README.md is missing: | \`--fix\` with \`--format json\` |"
+
+make_copy "$work/rsvote"
+replace_first "$work/rsvote/README.md" 'Agreement between the two reviews is never a vote' 'Two reviews that agree confirm a finding'
+expect_fail "README that counts agreement as a vote fails" "$work/rsvote" "README.md is missing: Agreement between the two reviews is never a vote"
+
+make_copy "$work/rspromise"
+replace_first "$work/rspromise/README.md" 'they cannot promise anything about other tools you configured for it' 'they make the other CLI harmless'
+expect_fail "README that promises a harmless CLI fails" "$work/rspromise" "README.md is missing: they cannot promise anything about other tools you configured for it"
+
+make_copy "$work/rsoffline"
+replace_first "$work/rsoffline/README.md" 'never by running an agent, a fix or another CLI' 'by running the fix flow end to end'
+expect_fail "README that claims a real fix run fails" "$work/rsoffline" "README.md is missing: never by running an agent, a fix or another CLI"
+make_copy "$work/rfpersist"
+replace_first "$work/rfpersist/README.md" 'in later turns and in a second round too' 'only in the request of this run'
+expect_fail "README with an approval that expires after one message fails" "$work/rfpersist" "README.md is missing: counts for as long as its words cover the finding and the fix, in later turns and in a second round too"
+
+make_copy "$work/rfexpected"
+replace_first "$work/rfexpected/README.md" 'compares it with the reviewed text plus its own earlier edits' 'compares it with the last commit'
+expect_fail "README that refuses the skill's own earlier edits fails" "$work/rfexpected" "README.md is missing: Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits"
+make_copy "$work/rfboundary"
+replace_first "$work/rfboundary/README.md" 'only from a new empty directory outside the repository, with its tools' 'only from a new empty directory, with its tools'
+expect_fail "README that drops the repository boundary fails" "$work/rfboundary" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository"
+
+make_copy "$work/rfsamer"
+replace_first "$work/rfsamer/README.md" 'two fixes of one round never overlap' 'two fixes never overlap'
+expect_fail "README that forbids overlap across rounds fails" "$work/rfsamer" "README.md is missing: a second round may correct lines that the first round wrote, but two fixes of one round never overlap"
+
+make_copy "$work/rsgemini"
+replace_first "$work/rsgemini/README.md" '`gemini cannot be limited to the supplied content`' '`gemini` runs in plan mode'
+expect_fail "README that runs gemini without a limit fails" "$work/rsgemini" "README.md is missing: \`gemini cannot be limited to the supplied content\`"
+
+make_copy "$work/rsreadlimits"
+replace_first "$work/rsreadlimits/README.md" 'its tools that run commands, its tool that opens local images, its app connectors and its memories turned off for that call' 'its app connectors and its memories turned off for that call'
+expect_fail "README that omits the command and local-image limit fails" "$work/rsreadlimits" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository, with its tools that run commands, its tool that opens local images"
+# End of README fix and second opinion tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

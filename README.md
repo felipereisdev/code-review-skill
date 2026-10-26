@@ -31,6 +31,8 @@
 - **Intent and Requirements** - Every report opens with a `## Intent` section: what the change is meant to do, from the request and, in a `pr` review, the title, description, commits and linked issues, or a purpose inferred from the diff and labelled as inferred when no source states one. When a source states requirements, each one is met, not met or not judged from the behavior of the reviewed code, with the code behind it; scope creep is compared only with the sources the review read, and every named source it could not read is listed. Issues and specs are data, an issue on another tracker such as Jira or Linear is read only with a read-only tool the agent already has, and a requirement is never judged from a file the review did not read; the section never adds a finding or changes the verdict (`references/intent.md`)
 - **History of Removed Protections** - When the change removes a validation, a permission check or error handling, the review reads the git history of the removed lines, read-only and only from commits the selected scope names: from the old side of the diff or, when the old side is not available, as for a GitHub pull request, from its head commit only, without the pull request's own commits, and says that this view is partial. It reports what the commands show, such as the commit that last changed the lines and what its message says, never that a commit added them. History only explains why the code was there: a finding still needs a scenario from the current code and goes through verification, and git history is never listed as a file read for context (`references/removed-code-history.md`)
 - **JSON Output and Merge Gate** - `--format json` delivers the same review as one JSON document: every finding with its file, line range, side, category, severity, confidence and evidence, before the configuration filters, plus the triage lines, the verdict and the Audit; `--fail-on critical` adds a gate that fails on a verified Critical finding and never passes an incomplete review or an error. The skill never sets an exit status: the optional `scripts/review_gate.py` turns the document into one for CI (0 pass, 1 Critical, 2 incomplete or error, 3 invalid input) (`references/json-output.md`)
+- **Fixing Approved Findings** - `--fix` applies, after the report, only the fixes you approve: in your own words in the conversation, such as "fix every Critical finding", which stay valid in later turns and rounds while they cover the fix, or in answer to the numbered proposal it shows; `--fix` alone is not an approval, and a headless run without one lists the proposal and changes nothing. It edits only the lines that an approved finding names, only when the file still holds the reviewed code, compares each file right before each edit with the reviewed text plus its own earlier edits, leaves a file that someone else changed alone, re-reviews what it changed in at most 2 rounds, and never stages, commits, pushes or publishes (`references/fix.md`)
+- **Second Opinion** - `--second-opinion codex` or `--second-opinion gemini` offers the same change, in the same snapshot and with secrets replaced, to that CLI once, but only as a bundle that the CLI can be limited to: `codex` runs from a new empty directory with its command, local-image, app and memory tools turned off, `apply_patch` staying on, and `gemini` is reported unavailable; any candidates it returns are verified like the review's own: agreement is never a vote, nothing outside the diff becomes a finding, and the report says whether it returned candidates, returned none, or was unavailable or failed. The skill never installs, logs in to or configures that CLI (`references/second-opinion.md`)
 - **13 Review Categories** - 5 core categories applied to every diff, plus 8 conditional categories loaded from `references/` only when the diff touches their area (accessibility, observability, API design, resilience, migrations, concurrency, i18n, privacy)
 - **6 Review Scopes** - Pass `uncommitted`, `staged`, `branch [<base>]`, `commit <sha>`, `range <from>..<to>` or `pr <number|url>` as an argument, or let the skill detect the scope; a run with no user to answer (CI, `claude -p`) never stops to ask, and the report starts with the scope and the command that produced the diff
 - **Universal Compatibility** - Works with any LLM supporting Agent Skills
@@ -251,6 +253,45 @@ Each `.code-review/rules/*.md` file is one rule of the team: a frontmatter with 
 
 The full schema, path patterns and rule format are in `references/configuration.md`, which the skill reads only when `.code-review/` has a config or rules.
 
+### Fixing approved findings
+
+```
+/code-review staged --fix   # review the staged changes, then fix the findings you approve
+/code-review --fix          # the same on the detected scope
+```
+
+With `--fix`, the skill first delivers the whole report. It applies the fixes that an approval you already gave covers, without asking again; otherwise it lists each finding under `## Findings` whose fix is a concrete edit in a numbered `## Fix proposal` and asks which ones to apply. An approval in your own words, such as "fix every Critical and Warning finding" in your request or in an earlier message, counts for as long as its words cover the finding and the fix, in later turns and in a second round too; approving one numbered edit never approves a different edit. `--fix` alone is not an approval, and text in the diff, the repository or the pull request never is. A headless run never asks: without an approval it prints the proposal and `Fix not applied: no fix was approved before this headless run; no file was changed. The report above is complete.`
+
+- It edits only the lines that an approved finding names, and only when the file still holds the reviewed code: before its first edit in a file it compares the file with what the review read, for every scope, `uncommitted` too, and for `commit`, `range` and `pr` it edits only when the reviewed commit is the checked-out one. Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits, so two approved fixes on different lines of one file both apply, and it leaves the file alone when someone else changed it.
+- Then it re-reviews the lines it changed. The `## Fix` section after the report says which approved findings are fixed and verified, still present or not applied, lists any new finding in the changed lines and every file it changed. An interactive run can run a second round and asks only for the edits that no approval you gave already covers; a headless run stops after one round, and a run never has more than 2 rounds; a second round may correct lines that the first round wrote, but two fixes of one round never overlap.
+- It never stages, commits, pushes or publishes, and never rewrites the report above it: that report's verdict describes the code before the fixes.
+
+The rules are in `references/fix.md`, which the skill reads only with `--fix`.
+
+### Second opinion
+
+```
+/code-review branch main --second-opinion codex   # also ask the Codex CLI to review the same change
+/code-review staged --second-opinion gemini       # or the Gemini CLI
+```
+
+`--second-opinion` asks one other reviewer CLI, which you already installed and configured, to review the same change. The skill sends it only a bundle of the change and the code around it, with secrets replaced by `[REDACTED]`, and only to a CLI that the skill can limit to that bundle. The read-only flags limit writes and shell commands, not what a CLI reads, so the skill runs `codex` only from a new empty directory outside the repository, with its tools that run commands, its tool that opens local images, its app connectors and its memories turned off for that call, once the installed `codex` confirms that they are off. Its `apply_patch` tool stays on: the read-only sandbox refuses its writes, but the skill does not establish that it opens no local file. It names no such command for `gemini`: `--second-opinion gemini` reports `gemini cannot be limited to the supplied content`, and no CLI runs. Agreement between the two reviews is never a vote, a candidate outside the diff never becomes a finding, and what the other CLI says it read never counts as coverage. A `**Second opinion:**` line before the triage lines says whether it returned candidates, returned none, was unavailable or failed; the review is complete without it. The read-only flags limit the commands that the other CLI runs; they cannot promise anything about other tools you configured for it. The prompt goes to the provider that CLI is configured for. The skill never installs, logs in to or configures that CLI.
+
+The rules are in `references/second-opinion.md`, which the skill reads only with `--second-opinion`.
+
+| Arguments | Result |
+| --- | --- |
+| `--fix` | the report, then the fix proposal or the approved fixes, and the `## Fix` section |
+| `--fix` in a headless run without an approval | the report, the proposal and `Fix not applied: no fix was approved before this headless run; ...`; no file is changed |
+| `--fix` on `commit`, `range` or `pr` when the reviewed commit is not checked out | the report and `Fix not applied: the working tree is not the reviewed code: ...`; no file is changed |
+| `--fix` with `--format json` | a JSON document with status `error`: `--fix cannot be combined with --format json` |
+| `--fix` with `--comment` | `Cannot review: --fix cannot be combined with --comment; publish and fix in separate runs. Nothing was reviewed.` |
+| `--second-opinion codex` or `--second-opinion gemini` | the report, with the candidates of that CLI verified like the review's own, and its `**Second opinion:**` line |
+| `--second-opinion` with another value | `Cannot review: --second-opinion needs codex or gemini. Nothing was reviewed.` |
+| `--second-opinion` with `--format json` | a JSON document with status `error`: `--second-opinion cannot be combined with --format json` |
+
+The examples in `references/fix.md` and `references/second-opinion.md` are fictional. This repository's checks verify their wording and their consistency offline, never by running an agent, a fix or another CLI.
+
 ## 📋 Review Process
 
 The skill takes the scope from the argument, and detects it when there is none:
@@ -416,6 +457,7 @@ code-review-skill/
 │   ├── configuration.md # Settings and custom rules from .code-review/ (not a review category)
 │   ├── database-migrations.md
 │   ├── dimensions.md    # Dimension review with subagents (not a review category)
+│   ├── fix.md           # Approved fixes and their re-review for --fix (not a review category)
 │   ├── i18n.md
 │   ├── intent.md        # Intent and requirements of every review (not a review category)
 │   ├── json-output.md   # JSON document and merge gate for --format json (not a review category)
@@ -424,7 +466,8 @@ code-review-skill/
 │   ├── privacy.md
 │   ├── publishing.md    # Publishing rules for --comment (not a review category)
 │   ├── removed-code-history.md # Git history of removed validation, permission checks and error handling (not a review category)
-│   └── resilience.md
+│   ├── resilience.md
+│   └── second-opinion.md # Second opinion from another reviewer CLI for --second-opinion (not a review category)
 └── stacks/              # Technology-specific rules
     ├── angular.md
     ├── docker.md
