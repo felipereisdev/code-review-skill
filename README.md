@@ -442,7 +442,7 @@ code-review-skill/
 │   ├── aggregate.py     # Checks a measured study and computes its baseline metrics
 │   ├── make-patch.sh    # Builds a case patch from base/ and an edited copy
 │   ├── baseline.json    # Current baseline: the aggregate of baseline/expanded/
-│   ├── baseline/        # Initial run of 2026-10-23 and the expanded study (protocol, hashes, raw reports)
+│   ├── baseline/        # Initial run of 2026-10-23, the original, rescored and corrected expanded studies (protocol, hashes, raw reports)
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
 │   ├── controls/        # Behavior controls: JSON gate, headless --fix, unavailable second opinion
 │   ├── profiles/        # Frozen agent profiles for measured studies

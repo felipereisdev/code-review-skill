@@ -41,7 +41,7 @@ For each case the runner copies `base/` into a temporary git repo, commits it, s
 
 **Location rule.** When a pair has `bug.location`, a bug finding counts only if its primary `**File:**`/`**Location:**` block, or its compact path, names `bug.location.path` literally. A path that appears only in an `Also at` line is not credited, and a finding that only mentions the bug condition from another file (for example a test-gap finding in the test file) does not match. The `side` is recorded in the case but is not part of the check. The rule is literal path matching, not a proof of full location semantics.
 
-**Complete.** A report is complete when it has a Ready to merge line, an Audit, and no incomplete headline. A report cut off before the Audit, a passed headline with no Audit, and an empty, invalid or error output are never complete. A clean case therefore counts as a clean success only when its report is complete and has no Critical or Warning main-list finding. The verdict alone cannot tell an incomplete review that still lists findings (verdict rows 1 and 3) from a complete one (row 2), so a report with findings and an incomplete verdict is counted as complete. This is a known limit of the Markdown format, not a verified property of the review.
+**Complete.** A report is complete when it has a Ready to merge line, an Audit and no incomplete headline, and it marks itself neither unfinished nor contradictory: its last Ready to merge line does not say `not fully reviewed` (verdict rows 1 and 3, and the ` Not fully reviewed: see the Audit.` ending of row 2), its Audit marks no limit `material`, and the passed headline stands only beside `Ready to merge: Yes`. Lines inside code fences are never read for this. A report cut off before the Audit, a passed headline with no Audit, and an empty, invalid or error output are never complete. Complete is not Ready to merge Yes: a finished review that says No because of a Critical finding, or With fixes, is complete. A clean case counts as a clean success only when its report is complete and has no Critical or Warning main-list finding. The frozen corpus `tests/fixtures/completeness_probes.json` pins these forms with real reports of the original study and written examples.
 
 Each case record keeps its fields separate: `exit_code`, `status`, `error_class`, `report_valid`, `complete`, `detected` and `false_positives`, `worktree_unchanged`, and the prompt and report hashes. `error_class` is one of 5 values: `timeout`, `infrastructure`, `agent_exit`, `format` and `setup`. `observations` records text facts, such as whether the report states an `Intent:` line, cites the `spec_path`, or cites a `History:` label. Observations never change a score, and they are not proof that the agent read a file.
 
@@ -70,6 +70,7 @@ python3 evals/run.py --controls                    # the 4 behavior controls
 python3 evals/run.py --profile evals/profiles/sonnet-rtk-readonly.json --sample s1   # a measured sample
 python3 evals/run.py --provenance --profile evals/profiles/sonnet-rtk-readonly.json  # hashes of the source, the cases and the profile
 python3 evals/aggregate.py <study-dir> --json <study-dir>/aggregate.json --summary <study-dir>/summary.md
+python3 evals/aggregate.py --rescore evals/baseline/expanded --json evals/baseline/expanded-rescored/aggregate.json --summary evals/baseline/expanded-rescored/summary.md   # scorer-only: the same raw reports, no model
 ```
 
 `--sample` names one sample of a measured study. `--attempt 2` with `--cases` reruns one trial as a second attempt, and only for an infrastructure error (see **Expanded study**). `--provenance` prints the hashes and exits without running a case. `--profile` fixes the agent, model, parameters and prompt addendum from a frozen JSON file, and it cannot be combined with `--agent-cmd`, `--agent-name`, `--model`, `--timeout` or `--jobs`.
@@ -86,7 +87,13 @@ The allowlist limits what the agent is permitted to run. It is not an operating-
 
 ## Baseline
 
-`baseline.json` is the aggregate of `baseline/expanded/`, which holds the protocol, the freeze hashes, the per-sample raw results and reports, the retries and the summary. It is recomputable with `python3 evals/aggregate.py evals/baseline/expanded`.
+Three expanded records are kept, and none replaces another:
+
+- **Original study**, `baseline/expanded/`: the 84 trials of the first expanded protocol as the runner recorded and scored them, with the protocol, the freeze hashes, the per-sample raw results and reports, `aggregate.json`, `summary.md` and `manifest-sha256.txt`. Its files are never edited. Its scorer counted a report that says `not fully reviewed`, or a passed headline beside a verdict that is not Yes, as complete, and its `elapsed-timer-react` tests were not isolated (see **Limits**). It is integrity-valid evidence of what was measured, not a quality benchmark.
+- **Rescored original**, `baseline/expanded-rescored/`: the same 84 raw reports scored again by the corrected scorer, with no model call (`--rescore`, see **Run**). The rescore first checks every file of the original study against its manifest and the study's `aggregate.json` against its records. It keeps the original provenance, and it records the hashes of the original manifest and aggregate, the hashes of the scorer, runner and aggregator that rescored it, and every field it changed under `changes`. Only completeness and what follows from it may change (`complete`, `passed`, and the `complete` check of a control); any other difference stops the rescore. Its `elapsed-timer-react` reports still review the fixture without the cleanup.
+- **Corrected study**, `baseline/expanded-r2/`: a new complete study of the same 84 trials under its own frozen protocol, with the corrected scorer and the corrected `elapsed-timer-react` fixture, collected after the source was frozen. It reruns every trial, not a selection.
+
+`baseline.json` is still the aggregate of the original study, `baseline/expanded/`, until the corrected study is recorded.
 
 `baseline/initial-2026-10-23.json`, `baseline/summary.md` and `baseline/reports/` are the initial run of 2026-10-23: 6 pairs, 1 sample, the model alias `sonnet`, and the skill `ae62bbea`. They are kept unedited and are not causally comparable with the expanded study: the alias was not resolved to a model, and the runner, the prompt and the profile differ.
 
@@ -96,7 +103,7 @@ To refresh the baseline, run a new complete study under a new folder and keep th
 
 ## Expanded study
 
-The expanded study has 84 first-attempt trials: 72 primary trials (12 pairs, 24 cases, 3 samples each) and 12 control trials (4 controls, 3 samples each). Its protocol is `baseline/expanded/protocol.json`. The commands in it use `<study>` for the study directory, which is `evals/results/expanded/` while the study is collected:
+Each expanded study has 84 first-attempt trials: 72 primary trials (12 pairs, 24 cases, 3 samples each) and 12 control trials (4 controls, 3 samples each). The original study's protocol is `baseline/expanded/protocol.json`. The corrected study's protocol, `baseline/expanded-r2/protocol.json`, keeps the same inventory, commands and error policy and states the corrected completeness rule. The commands use `<study>` for the study directory, which is `evals/results/expanded/` or `evals/results/expanded-r2/` while the study is collected:
 
 - freeze: `python3 evals/run.py --provenance --profile evals/profiles/sonnet-rtk-readonly.json > <study>/freeze.json`
 - primary: `python3 evals/run.py --profile evals/profiles/sonnet-rtk-readonly.json --sample <sample> --out-dir <study>/samples/<sample>`
@@ -133,11 +140,12 @@ The deterministic checks prove the contracts of the scripts and the text of the 
 ## Limits
 
 - One model, one profile, 12 small pairs, 3 samples. The results do not generalize to other models, providers, prompts or diffs.
-- The labels are regex patterns plus a literal path, with frozen probe corpora in `evals/tests/fixtures/`. Markdown completeness cannot see verdict rows 1 and 3.
+- The labels are regex patterns plus a literal path, with frozen probe corpora in `evals/tests/fixtures/`. Completeness reads only the last Ready to merge line, the Audit and the headlines: a report that breaks the format in another way can still be counted as complete.
 - Observations are text facts in the report, not proof that the agent read a file.
 - Controls under a read-only profile cannot show write restraint.
 - Fixtures and fake agents are controlled. They show what the scripts do with an output, never what a real agent does.
 - The pairs are checked as patches and text. No repository test compiles, boots or runs the code of a pair: the Go, TypeScript, React (Vitest) and Spring pairs are not built or tested, and the Spring component fixture has no full application boot or database. The Python and Node pairs are not executed by the tests either.
+- The `elapsed-timer-react` tests import `cleanup` from `@testing-library/react` and call it in an `afterEach` imported from `vitest`, in `base/` and so in both after-trees. Vitest 2 has `globals: false` by default ([config](https://v2.vitest.dev/config/#globals)), and React Testing Library 16.0.1 registers its automatic cleanup only when a global `afterEach` exists ([source](https://github.com/testing-library/react-testing-library/blob/v16.0.1/src/index.js#L10-L21)), so without the call the two renders of the original fixture stayed in one document and the added `getByText` query could find two matches. The original study's reports review the fixture without the cleanup. This is read from the versioned sources, not run.
 - Repository identity is stable only in part. History overlays are committed with fixed dates, so their commits and the `git blame` context they give are stable. The final `base` commit (and the single commit of a legacy pair) uses the build time, so the full HEAD hash of the temporary repository can vary between repeats and is not part of a case's identity. The per-trial `worktree_state` fingerprint hashes that HEAD, so it must not be compared across samples as an identity.
 
 ## Add a pair
