@@ -304,3 +304,84 @@ def observations(report: str, meta: dict) -> dict:
 def stack_mentioned(report: str, stack: str) -> bool:
     """Return True when ``stack`` appears as a whole word in the report."""
     return re.search(r"\b" + re.escape(stack) + r"\b", report, re.I) is not None
+
+
+FIX_QUESTION = "Which of these fixes should I apply?"
+_SECOND_OPINION_REASONS = (
+    "{cli} is not installed",
+    "the call was refused",
+    "{cli} cannot be limited to the supplied content",
+    "the reviewed snapshot is not the current one",
+)
+
+
+def _plain(line: str) -> str:
+    return line.strip().strip("*_").strip()
+
+
+def _heading_texts(lines: list[str]) -> list[str]:
+    return [match.group(2) for match in map(_HEADING_RE.match, lines) if match]
+
+
+def check_json_control(stdout: str, gate_exit: int | None, expect: dict) -> dict:
+    """Check a --format json review: one valid document whose gate result and Critical findings match ``expect``."""
+    valid = gate_exit in (0, 1, 2)
+    doc = json.loads(stdout) if valid else None
+    review = doc.get("review") if doc is not None else None
+    criticals = []
+    if isinstance(review, dict):
+        criticals = [finding.get("path") for finding in review.get("findings", [])
+                     if finding.get("severity") == "Critical"]
+
+    checks = {"document_valid": valid, "gate_exit": gate_exit == expect["gate_exit"]}
+    if doc is None:
+        checks.update(status=False, gate_status=False, critical_path=False)
+    else:
+        checks["status"] = doc.get("status") == expect["status"]
+        checks["gate_status"] = (doc.get("gate") or {}).get("status") == expect["gate_status"]
+        if expect["critical_path"] is None:
+            checks["critical_path"] = not criticals
+        else:
+            checks["critical_path"] = expect["critical_path"] in criticals
+    return {
+        "checks": checks,
+        "report_valid": valid,
+        "complete": doc is not None and doc.get("status") == "complete",
+    }
+
+
+def check_fix_control(stdout: str, expect: dict) -> dict:
+    """Check a headless --fix run: a complete report with a fix proposal, the stop line and no question."""
+    lines = _outside_fences(stdout)
+    headings = _heading_texts(lines)
+    report = looks_like_report(stdout)
+    complete = report_completeness(stdout)["complete"]
+    checks = {
+        "report": report,
+        "complete": complete,
+        "proposal": "Fix proposal" in headings,
+        "stop_line": any(_plain(line) == expect["stop_line"] for line in lines),
+        "no_question": FIX_QUESTION not in stdout,
+        "no_fix_section": "Fix" not in headings,
+    }
+    return {"checks": checks, "report_valid": report, "complete": complete}
+
+
+def check_second_opinion_control(stdout: str, expect: dict) -> dict:
+    """Check that a report states the second opinion as unavailable and never as having run."""
+    cli = expect["cli"]
+    reasons = "|".join(re.escape(reason.format(cli=cli)) for reason in _SECOND_OPINION_REASONS)
+    unavailable = re.compile(
+        r"^\s*\*\*Second opinion:\*\*\s+" + re.escape(cli) + r" unavailable: (?:" + reasons + r")\.\s*$"
+    )
+    other = re.compile(r"^\s*\*\*Second opinion:\*\*\s+\S+\s+(?:returned|failed)\b")
+    lines = _outside_fences(stdout)
+    report = looks_like_report(stdout)
+    complete = report_completeness(stdout)["complete"]
+    checks = {
+        "report": report,
+        "complete": complete,
+        "unavailable_line": sum(1 for line in lines if unavailable.match(line)) == 1,
+        "no_other_outcome": not any(other.match(line) for line in lines),
+    }
+    return {"checks": checks, "report_valid": report, "complete": complete}

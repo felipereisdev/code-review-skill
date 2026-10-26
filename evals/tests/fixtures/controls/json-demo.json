@@ -1,0 +1,8 @@
+{
+  "name": "json-demo",
+  "description": "Runner test fixture for the JSON gate control; not part of the suite.",
+  "case": "demo/bug",
+  "arguments": "staged --format json --fail-on critical",
+  "check": "json_gate",
+  "expect": {"status": "complete", "gate_status": "fail", "gate_exit": 1, "critical_path": "src/orders.js"}
+}

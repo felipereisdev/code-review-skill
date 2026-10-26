@@ -13,6 +13,9 @@ EVALS = os.path.dirname(HERE)
 RUN = os.path.join(EVALS, "run.py")
 FIXTURES = os.path.join(HERE, "fixtures", "cases")
 FAKE_AGENT = os.path.join(HERE, "fixtures", "fake_agent.sh")
+CONTROLS = os.path.join(HERE, "fixtures", "controls")
+FAKE_CONTROL = os.path.join(HERE, "fixtures", "fake_control_agent.sh")
+CRITICAL_JSON = os.path.join(HERE, "fixtures", "json", "critical.json")
 
 sys.path.insert(0, EVALS)
 import run as eval_run  # noqa: E402
@@ -238,7 +241,7 @@ class RunTest(unittest.TestCase):
         with open(RUN, "rb") as f:
             self.assertEqual(data["runner_sha256"], hashlib.sha256(f.read()).hexdigest())
         for key in ("commit", "dirty", "skill_tree_sha256", "scorer_sha256", "gate_sha256", "cases_tree_sha256",
-                    "agent_cmd_sha256", "prompt_template_sha256"):
+                    "controls_tree_sha256", "agent_cmd_sha256", "prompt_template_sha256"):
             self.assertIn(key, data)
         self.assertEqual((data["profile"], data["profile_sha256"], data["prompt_addendum_sha256"]), (None, None, None))
         self.assertEqual(data["model"], "sonnet")
@@ -392,6 +395,76 @@ class PairMetadataTest(unittest.TestCase):
     def test_pair_prompt_keeps_the_legacy_text(self):
         self.assertEqual(eval_run.render_prompt(eval_run.PAIR_ARGUMENTS),
                          LEGACY_PROMPT.format(skill_dir=eval_run.REPO_ROOT))
+
+
+class ControlsTest(unittest.TestCase):
+    def setUp(self):
+        self.out = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.out, True)
+
+    def run_control(self, name, agent_cmd):
+        r = run("--controls", "--controls-dir", CONTROLS, "--cases-dir", FIXTURES, "--cases", name,
+                "--out-dir", self.out, "--agent-cmd", agent_cmd)
+        with open(os.path.join(self.out, "results.json"), encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["kind"], "controls", r.stdout + r.stderr)
+        return r, data["cases"][0]
+
+    def printed(self, text):
+        path = os.path.join(self.out, "canned.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        return "cat > /dev/null; cat " + path
+
+    def test_json_control_passes_through_the_gate(self):
+        r, case = self.run_control("json-demo", "cat > /dev/null; cat " + CRITICAL_JSON)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual((case["id"], case["gate_exit"], case["report"]),
+                         ("control/json-demo", 1, "reports/control__json-demo.json"))
+        self.assertEqual(case["checks"], {"document_valid": True, "status": True, "gate_status": True,
+                                          "gate_exit": True, "critical_path": True, "worktree_unchanged": True})
+        self.assertTrue(case["passed"])
+
+    def test_invalid_json_document_is_an_error(self):
+        r, case = self.run_control("json-demo", self.printed('{"schema": "x"}'))
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual((case["gate_exit"], case["report_valid"], case["status"], case["error_class"], case["passed"]),
+                         (3, False, "error", "format", False))
+
+    def test_headless_fix_control_passes(self):
+        r, case = self.run_control("fix-demo", "bash " + FAKE_CONTROL)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(sorted(case["checks"]), ["complete", "no_fix_section", "no_question", "proposal", "report",
+                                                  "stop_line", "worktree_unchanged"])
+        self.assertTrue(case["passed"], case["checks"])
+
+    def test_fix_control_that_asks_fails(self):
+        report = subprocess.run(["bash", FAKE_AGENT], input="",
+                                capture_output=True, text=True, cwd=tempfile.gettempdir()).stdout
+        r, case = self.run_control("fix-demo", self.printed(
+            report + "\n## Fix proposal\n\n1. `app.py:2` Critical — Security: bind it.\n\n"
+            "Which of these fixes should I apply? Answer with their numbers, all, or none.\n"))
+        self.assertEqual(case["status"], "ok")
+        self.assertEqual((case["checks"]["no_question"], case["checks"]["stop_line"], case["passed"]),
+                         (False, False, False))
+
+    def test_second_opinion_control_passes(self):
+        r, case = self.run_control("second-demo", "bash " + FAKE_CONTROL)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(case["passed"], case["checks"])
+
+    def test_second_opinion_that_ran_fails(self):
+        report = ("### Security — Critical\n\n**File:** `app.py:2`\n**Issue:** SQL injection.\n**Fix:** Bind it.\n\n"
+                  "## Summary\n\n**Second opinion:** codex returned 1 candidate; each was checked like the review's "
+                  "own, and 1 is in this report.\n\n**Ready to merge:** No — 1 Critical finding.\n\n## Audit\n")
+        r, case = self.run_control("second-demo", self.printed(report))
+        self.assertEqual((case["checks"]["unavailable_line"], case["checks"]["no_other_outcome"], case["passed"]),
+                         (False, False, False))
+
+    def test_real_controls_are_valid(self):
+        r = run("--validate", "--controls")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("4 control(s): all valid", r.stdout)
 
 
 if __name__ == "__main__":

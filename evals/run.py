@@ -24,6 +24,7 @@ import score  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DEFAULT_CASES_DIR = os.path.join(REPO_ROOT, "evals", "cases")
+DEFAULT_CONTROLS_DIR = os.path.join(REPO_ROOT, "evals", "controls")
 REQUIRED_TOPICS = ("null-undefined", "sql-injection", "off-by-one", "swallowed-error", "n-plus-one", "xss-false-alarm")
 MIN_PAIRS = 6
 GIT_IDENTITY = ["-c", "user.name=code-review-eval", "-c", "user.email=eval@example.invalid"]
@@ -34,6 +35,12 @@ _SKIPPED_NAMES = {"__pycache__", ".DS_Store"}
 GATE_SCRIPT = os.path.join(REPO_ROOT, "scripts", "review_gate.py")
 RUNTIME_ROOTS = ("SKILL.md", "stacks", "patterns", "references")
 PROFILE_KEYS = ("name", "agent_name", "model", "agent_cmd", "prompt_addendum", "timeout", "jobs")
+# The expect keys each behavior control check must state (see score.check_*_control).
+CONTROL_CHECKS = {
+    "json_gate": ("status", "gate_status", "gate_exit", "critical_path"),
+    "fix_headless": ("stop_line",),
+    "second_opinion_unavailable": ("cli",),
+}
 INFRA_RE = re.compile(
     r"concurrency limit reached|rate[ _-]?limit|overloaded|api error: ?(?:429|5\d\d)|econnreset|etimedout"
     r"|socket hang up|network error",
@@ -302,8 +309,61 @@ def _is_ignored(path: str) -> bool:
     return _git(REPO_ROOT, "check-ignore", "-q", rel_repo).returncode == 0
 
 
-def validate(pairs: list[dict], filtered: bool) -> int:
-    """Report every problem in the pairs; return a process exit code."""
+def load_controls(controls_dir: str) -> list[dict]:
+    """Return one record per control file in ``controls_dir``, broken ones included."""
+    if not os.path.isdir(controls_dir):
+        return []
+
+    records = []
+    for filename in sorted(os.listdir(controls_dir)):
+        if not filename.endswith(".json"):
+            continue
+        path = os.path.join(controls_dir, filename)
+        record = {"name": filename[: -len(".json")], "path": path, "control": None, "errors": []}
+        try:
+            with open(path, encoding="utf-8") as handle:
+                control = json.load(handle)
+        except (OSError, ValueError):
+            control = None
+        if isinstance(control, dict):
+            record["control"] = control
+        else:
+            record["errors"] = ["invalid control file"]
+        records.append(record)
+    return records
+
+
+def control_problems(name: str, control: dict, pairs_by_name: dict) -> list[str]:
+    """Return the problems in one control, in a stable order; an empty list means it is valid."""
+    problems = []
+    if control.get("name") != name:
+        problems.append(f"name must be the file name {name}")
+    if not _text(control.get("description")):
+        problems.append("description must be a non-empty string")
+
+    case = control.get("case")
+    pair_name, _, kind = case.partition("/") if isinstance(case, str) else ("", "", "")
+    pair = pairs_by_name.get(pair_name)
+    if kind not in ("bug", "clean") or pair is None or pair["errors"]:
+        problems.append("case must be <pair>/bug or <pair>/clean of a valid pair")
+
+    arguments = control.get("arguments")
+    if not (isinstance(arguments, str) and arguments.startswith("staged ")):
+        problems.append('arguments must be a string that starts with "staged "')
+
+    check = control.get("check")
+    if not isinstance(check, str) or check not in CONTROL_CHECKS:
+        problems.append("check must be one of " + ", ".join(sorted(CONTROL_CHECKS)))
+    else:
+        keys = CONTROL_CHECKS[check]
+        expect = control.get("expect")
+        if not (isinstance(expect, dict) and sorted(expect) == sorted(keys)):
+            problems.append("expect must have exactly the keys " + ", ".join(keys))
+    return problems
+
+
+def validate(pairs: list[dict], filtered: bool, controls: list[dict] | None = None) -> int:
+    """Report every problem in the pairs and, when ``controls`` is given, in the controls; return a process exit code."""
     ok = True
 
     for record in pairs:
@@ -405,6 +465,21 @@ def validate(pairs: list[dict], filtered: bool) -> int:
             ok = False
             print(f"FAIL suite: missing topics: {', '.join(missing)}")
 
+    if controls is not None:
+        pairs_by_name = {record["name"]: record for record in pairs}
+        controls_ok = True
+        for record in controls:
+            problems = record["errors"] or control_problems(record["name"], record["control"], pairs_by_name)
+            for problem in problems:
+                controls_ok = False
+                print(f"FAIL control/{record['name']}: {problem}")
+            if not problems:
+                print(f"OK control/{record['name']}")
+        if controls_ok:
+            print(f"{len(controls)} control(s): all valid")
+        else:
+            ok = False
+
     if ok:
         print(f"{len(pairs)} pair(s), {2 * len(pairs)} case(s): all valid")
         return 0
@@ -436,6 +511,26 @@ def invoke_agent(cmd: str, repo: str, prompt: str, env: dict, timeout: int) -> d
         return {"exit_code": None, "stdout": stdout, "stderr": stderr, "timed_out": True}
 
     return {"exit_code": proc.returncode, "stdout": stdout, "stderr": stderr, "timed_out": False}
+
+
+def run_agent(args, case_id: str, repo: str, prompt: str) -> tuple[dict, bool]:
+    """Run the agent on ``prompt`` in ``repo``; return its raw outcome and whether the worktree stayed unchanged."""
+    handle, prompt_path = tempfile.mkstemp(prefix="cr-eval-prompt-", text=True)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as prompt_file:
+            prompt_file.write(prompt)
+        env = dict(
+            os.environ,
+            EVAL_SKILL_DIR=REPO_ROOT,
+            EVAL_PROMPT_FILE=prompt_path,
+            EVAL_MODEL=args.model,
+            EVAL_CASE_ID=case_id,
+        )
+        before = worktree_state(repo)
+        run_result = invoke_agent(args.agent_cmd, repo, prompt, env, args.timeout)
+        return run_result, worktree_state(repo) == before
+    finally:
+        os.unlink(prompt_path)
 
 
 def classify(run_result: dict, report_valid: bool, timeout: int) -> tuple[str, str | None, str | None]:
@@ -489,7 +584,6 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
     """Run one case end to end and return its result record."""
     started = time.monotonic()
     repo = None
-    prompt_path = None
     result = {
         "trial_id": trial_id(args, case["id"]),
         "sample": args.sample,
@@ -529,20 +623,7 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
 
         prompt = render_prompt(PAIR_ARGUMENTS, case.get("request"), args.prompt_addendum)
         result["prompt_sha256"] = sha256_text(prompt)
-        handle, prompt_path = tempfile.mkstemp(prefix="cr-eval-prompt-", text=True)
-        with os.fdopen(handle, "w", encoding="utf-8") as prompt_file:
-            prompt_file.write(prompt)
-
-        env = dict(
-            os.environ,
-            EVAL_SKILL_DIR=REPO_ROOT,
-            EVAL_PROMPT_FILE=prompt_path,
-            EVAL_MODEL=args.model,
-            EVAL_CASE_ID=case["id"],
-        )
-        before = worktree_state(repo)
-        run_result = invoke_agent(args.agent_cmd, repo, prompt, env, args.timeout)
-        result["worktree_unchanged"] = worktree_state(repo) == before
+        run_result, result["worktree_unchanged"] = run_agent(args, case["id"], repo, prompt)
         result["exit_code"] = run_result["exit_code"]
 
         stdout = run_result["stdout"]
@@ -589,11 +670,90 @@ def evaluate(case: dict, args, out_dir: str) -> dict:
         result["duration_s"] = round(time.monotonic() - started, 1)
         if repo is not None:
             shutil.rmtree(repo, ignore_errors=True)
-        if prompt_path is not None:
-            try:
-                os.unlink(prompt_path)
-            except OSError:
-                pass
+
+
+def run_gate(path: str) -> tuple[int, str]:
+    """Run the JSON gate on the report at ``path``; return its exit code and the first line it printed."""
+    proc = subprocess.run([sys.executable, GATE_SCRIPT, path], capture_output=True, text=True)
+    lines = proc.stdout.strip().splitlines()
+    return proc.returncode, lines[0].strip() if lines else ""
+
+
+def evaluate_control(control: dict, pair_record: dict, args, out_dir: str) -> dict:
+    """Run one behavior control end to end on its pair's case and return its result record."""
+    started = time.monotonic()
+    name = control["name"]
+    check = control["check"]
+    case = select_cases([pair_record], control["case"])[0]
+    result = {
+        "trial_id": trial_id(args, "control/" + name),
+        "sample": args.sample,
+        "attempt": args.attempt,
+        "id": "control/" + name,
+        "control": name,
+        "case": control["case"],
+        "arguments": control["arguments"],
+        "check": check,
+        "status": "error",
+        "error": None,
+        "error_class": None,
+        "exit_code": None,
+        "duration_s": 0.0,
+        "report_valid": False,
+        "complete": False,
+        "gate_exit": None,
+        "gate_output": None,
+        "checks": {},
+        "passed": False,
+        "worktree_unchanged": None,
+        "prompt_sha256": None,
+        "report": None,
+        "report_sha256": None,
+    }
+
+    repo = None
+    try:
+        try:
+            repo = prepare_repo(case["dir"], case["patch"], case.get("history"))
+        except RuntimeError as exc:
+            result["error_class"] = "setup"
+            result["error"] = f"setup failed: {str(exc).strip()}"
+            return result
+
+        arguments = f'arguments "{control["arguments"]}" (the scope "staged" is git diff --cached)'
+        prompt = render_prompt(arguments, case.get("request"), args.prompt_addendum)
+        result["prompt_sha256"] = sha256_text(prompt)
+        run_result, unchanged = run_agent(args, result["id"], repo, prompt)
+        result["worktree_unchanged"] = unchanged
+        result["exit_code"] = run_result["exit_code"]
+
+        stdout = run_result["stdout"]
+        if stdout:
+            report_rel = f"reports/control__{name}." + ("json" if check == "json_gate" else "md")
+            report_path = os.path.join(out_dir, report_rel)
+            with open(report_path, "wb") as report_file:
+                report_file.write(stdout.encode("utf-8"))
+            result["report"] = report_rel
+            result["report_sha256"] = sha256_text(stdout)
+            if check == "json_gate":
+                result["gate_exit"], result["gate_output"] = run_gate(report_path)
+
+        if check == "json_gate":
+            checked = score.check_json_control(stdout, result["gate_exit"], control["expect"])
+        elif check == "fix_headless":
+            checked = score.check_fix_control(stdout, control["expect"])
+        else:
+            checked = score.check_second_opinion_control(stdout, control["expect"])
+        checks = dict(checked["checks"], worktree_unchanged=unchanged)
+
+        status, error_class, error = classify(run_result, checked["report_valid"], args.timeout)
+        result.update(status=status, error=error, error_class=error_class, report_valid=checked["report_valid"],
+                      complete=checked["complete"], checks=checks, passed=status == "ok" and all(checks.values()))
+        return result
+    finally:
+        result["duration_s"] = round(time.monotonic() - started, 1)
+        if repo is not None:
+            shutil.rmtree(repo, ignore_errors=True)
 
 
 def _skill_metadata() -> dict:
@@ -652,6 +812,7 @@ def provenance(args) -> dict:
         "scorer_sha256": file_sha256("evals/score.py"),
         "gate_sha256": file_sha256(os.path.relpath(GATE_SCRIPT, REPO_ROOT).replace(os.sep, "/")),
         "cases_tree_sha256": tree_sha256(files_under(os.path.relpath(args.cases_dir, REPO_ROOT))),
+        "controls_tree_sha256": tree_sha256(files_under(os.path.relpath(args.controls_dir, REPO_ROOT))),
         "profile": profile,
         "profile_sha256": file_sha256(profile) if profile is not None else None,
         "agent_name": args.agent_name,
@@ -769,6 +930,8 @@ def resolve_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--profile", default=None, metavar="PATH", help="frozen agent profile JSON")
     parser.add_argument("--sample", default=None, metavar="LABEL", help="name this run's sample")
     parser.add_argument("--attempt", type=int, default=1, metavar="N")
+    parser.add_argument("--controls", action="store_true", help="run the behavior controls instead of the pairs")
+    parser.add_argument("--controls-dir", default=DEFAULT_CONTROLS_DIR, metavar="DIR")
     parser.add_argument("--provenance", action="store_true", help="print the provenance hashes and exit")
     args = parser.parse_args(argv)
 
@@ -796,7 +959,129 @@ def resolve_args(argv: list[str] | None = None) -> argparse.Namespace:
         args.prompt_addendum = ""
 
     args.cases_dir = os.path.abspath(args.cases_dir)
+    args.controls_dir = os.path.abspath(args.controls_dir)
     return args
+
+
+def _control_metrics(results: list[dict]) -> dict:
+    return {
+        "controls": len(results),
+        "passed": sum(1 for result in results if result["passed"] is True),
+        "errors": sum(1 for result in results if result["status"] == "error"),
+    }
+
+
+def _controls_summary(result: dict) -> str:
+    metrics = result["metrics"]
+    lines = [
+        "# Code review behavior controls",
+        "",
+        f"- Generated: {result['generated_at']}",
+        f"- Agent: {result['agent']['name']} (model: {result['agent']['model']})",
+        f"- Controls: {metrics['passed']}/{metrics['controls']} passed",
+        f"- Errors: {metrics['errors']}",
+        "",
+        "| Control | Case | Status | Result | Failed checks |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for case in result["cases"]:
+        if case["status"] == "error":
+            failed = "error: " + (case["error"] or "").replace("|", "/").replace("\n", " ")
+        else:
+            failed = ", ".join(name for name, ok in case["checks"].items() if not ok) or "none"
+        passed = "PASS" if case["passed"] else "FAIL"
+        lines.append(f"| {case['id']} | {case['case']} | {case['status']} | {passed} | {failed} |")
+    return "\n".join(lines) + "\n"
+
+
+def _run_all(tasks: list[tuple], args) -> list[dict]:
+    """Run each ``(function, call_args)`` task on ``args.jobs`` threads; return the results in task order."""
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        futures = {pool.submit(function, *call_args): index for index, (function, call_args) in enumerate(tasks)}
+        for future in concurrent.futures.as_completed(futures):
+            case_result = future.result()
+            results[futures[future]] = case_result
+            verdict = "PASS" if case_result["passed"] else "FAIL"
+            print(f"{case_result['id']}: {case_result['status']} {verdict} "
+                  f"({case_result['duration_s']}s)", file=sys.stderr)
+    return [results[index] for index in range(len(tasks))]
+
+
+def _fresh_reports_dir(out_dir: str) -> None:
+    reports_dir = os.path.join(out_dir, "reports")
+    if os.path.isdir(reports_dir):
+        shutil.rmtree(reports_dir)
+    os.makedirs(reports_dir, exist_ok=True)
+
+
+def _write_results(args, data: dict, summary: str) -> None:
+    os.makedirs(args.out_dir, exist_ok=True)
+    json_dir = os.path.dirname(args.json)
+    if json_dir:
+        os.makedirs(json_dir, exist_ok=True)
+    with open(args.json, "w", encoding="utf-8") as json_file:
+        json.dump(data, json_file, indent=2, ensure_ascii=False)
+        json_file.write("\n")
+    with open(os.path.join(args.out_dir, "summary.md"), "w", encoding="utf-8") as summary_file:
+        summary_file.write(summary)
+    print(summary, end="")
+
+
+def _envelope(args, kind: str, prov: dict, prov_after: dict, metrics: dict, results: list[dict]) -> dict:
+    """Return the results document of one run."""
+    mcp = ("disabled; API-validation step skipped"
+           if args.agent_cmd == DEFAULT_AGENT_CMD else "unknown (custom agent command)")
+    return {
+        "schema_version": 2,
+        "kind": kind,
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "sample": args.sample,
+        "attempt": args.attempt,
+        "agent": {"name": args.agent_name, "model": args.model, "command": args.agent_cmd, "mcp": mcp,
+                  "profile": prov["profile"]},
+        "skill": _skill_metadata(),
+        "provenance": prov,
+        "provenance_after": prov_after,
+        "metrics": metrics,
+        "cases": results,
+    }
+
+
+def _run_controls(args) -> int:
+    pairs = load_pairs(args.cases_dir)
+    controls = load_controls(args.controls_dir)
+    if args.cases is not None:
+        controls = [record for record in controls if fnmatch.fnmatch(record["name"], args.cases)]
+    if not controls:
+        print(f"no controls match --cases {args.cases if args.cases is not None else '<all>'}")
+        return 1
+
+    if args.validate:
+        return validate(pairs, filtered=args.cases is not None, controls=controls)
+
+    pairs_by_name = {record["name"]: record for record in pairs}
+    problems = []
+    for record in controls:
+        for problem in record["errors"] or control_problems(record["name"], record["control"], pairs_by_name):
+            problems.append(f"FAIL control/{record['name']}: {problem}")
+    if problems:
+        print("\n".join(problems))
+        print("fix the controls above (python3 evals/run.py --validate --controls)")
+        return 1
+
+    _fresh_reports_dir(args.out_dir)
+    prov = provenance(args)
+    tasks = [
+        (evaluate_control, (record["control"], pairs_by_name[record["control"]["case"].partition("/")[0]],
+                            args, args.out_dir))
+        for record in controls
+    ]
+    results = _run_all(tasks, args)
+    prov_after = provenance(args)
+    data = _envelope(args, "controls", prov, prov_after, _control_metrics(results), results)
+    _write_results(args, data, _controls_summary(data))
+    return 1 if any(case["status"] == "error" for case in results) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -810,6 +1095,9 @@ def main(argv: list[str] | None = None) -> int:
         REPO_ROOT, "evals", "results", stamp
     )
     args.json = os.path.abspath(args.json) if args.json else os.path.join(args.out_dir, "results.json")
+
+    if args.controls:
+        return _run_controls(args)
 
     pairs = filter_pairs(load_pairs(args.cases_dir), args.cases)
     if not pairs:
@@ -830,53 +1118,12 @@ def main(argv: list[str] | None = None) -> int:
 
     cases = select_cases(pairs, args.cases)
 
-    reports_dir = os.path.join(args.out_dir, "reports")
-    if os.path.isdir(reports_dir):
-        shutil.rmtree(reports_dir)
-    os.makedirs(reports_dir, exist_ok=True)
-
+    _fresh_reports_dir(args.out_dir)
     prov = provenance(args)
-    by_id = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        futures = [pool.submit(evaluate, case, args, args.out_dir) for case in cases]
-        for future in concurrent.futures.as_completed(futures):
-            case_result = future.result()
-            by_id[case_result["id"]] = case_result
-            verdict = "PASS" if case_result["passed"] else "FAIL"
-            print(f"{case_result['id']}: {case_result['status']} {verdict} "
-                  f"({case_result['duration_s']}s)", file=sys.stderr)
-
+    results = _run_all([(evaluate, (case, args, args.out_dir)) for case in cases], args)
     prov_after = provenance(args)
-    results = [by_id[case["id"]] for case in cases]
-    mcp = ("disabled; API-validation step skipped"
-           if args.agent_cmd == DEFAULT_AGENT_CMD else "unknown (custom agent command)")
-    data = {
-        "schema_version": 2,
-        "kind": "pairs",
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "sample": args.sample,
-        "attempt": args.attempt,
-        "agent": {"name": args.agent_name, "model": args.model, "command": args.agent_cmd, "mcp": mcp,
-                  "profile": prov["profile"]},
-        "skill": _skill_metadata(),
-        "provenance": prov,
-        "provenance_after": prov_after,
-        "metrics": _metrics(results),
-        "cases": results,
-    }
-
-    os.makedirs(args.out_dir, exist_ok=True)
-    json_dir = os.path.dirname(args.json)
-    if json_dir:
-        os.makedirs(json_dir, exist_ok=True)
-    with open(args.json, "w", encoding="utf-8") as json_file:
-        json.dump(data, json_file, indent=2, ensure_ascii=False)
-        json_file.write("\n")
-
-    summary = _summary(data, mcp=mcp)
-    with open(os.path.join(args.out_dir, "summary.md"), "w", encoding="utf-8") as summary_file:
-        summary_file.write(summary)
-    print(summary, end="")
+    data = _envelope(args, "pairs", prov, prov_after, _metrics(results), results)
+    _write_results(args, data, _summary(data, mcp=data["agent"]["mcp"]))
 
     return 1 if any(case["status"] == "error" for case in results) else 0
 
