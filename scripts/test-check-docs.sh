@@ -1066,8 +1066,8 @@ replace_first "$work/effortlowerfive/SKILL.md" 'Rate it 5/5: never rate a smalle
 expect_fail "an at least count rated below 5/5 fails" "$work/effortlowerfive" "Step 3 is missing: Rate it 5/5: never rate a smaller size from a lower bound."
 
 make_copy "$work/effortexact"
-replace_first "$work/effortexact/SKILL.md" ' When a source above measures the whole diff, write its exact total, never `at least`.' ''
-expect_fail "a measured total that may still be written as at least fails" "$work/effortexact" "Step 3 is missing: When a source above measures the whole diff, write its exact total, never \`at least\`."
+replace_first "$work/effortexact/SKILL.md" ' When a source above measures the whole diff, write its size, never `at least`.' ''
+expect_fail "a measured total that may still be written as at least fails" "$work/effortexact" "Step 3 is missing: When a source above measures the whole diff, write its size, never \`at least\`."
 
 make_copy "$work/effortwhy"
 replace_first "$work/effortwhy/SKILL.md" ' (the total could not be measured: <why>)' ''
@@ -1120,6 +1120,78 @@ expect_fail "a README that does not say the effort is measured fails" "$work/rea
 make_copy "$work/readmeskillctx"
 replace_first "$work/readmeskillctx/README.md" ", the skill's own files as \`skill:<path>\`" ''
 expect_fail "a README that does not name skill identities fails" "$work/readmeskillctx" "README is missing: the skill's own files as \`skill:<path>\`"
+
+make_copy "$work/refusedgone"
+replace_first "$work/refusedgone/SKILL.md" '**Refused calls.**' '**Tool calls.**'
+expect_fail "a skill without the refused-call rule fails" "$work/refusedgone" "Step 0 — Scope Selection is missing: **Refused calls.**"
+
+make_copy "$work/refusedscope"
+replace_first "$work/refusedscope/SKILL.md" 'A refusal is not an exit status, and it refuses only that call' 'A refusal means that the tool is unavailable'
+expect_fail "a refusal read as a missing tool fails" "$work/refusedscope" "Step 0 — Scope Selection is missing: A refusal is not an exit status, and it refuses only that call"
+
+make_copy "$work/refusedform"
+replace_first "$work/refusedform/SKILL.md" 'Run each command this skill names as its own call, in its written form' 'Combine the commands this skill names as you need'
+expect_fail "chained commands after a refusal fail" "$work/refusedform" "Step 0 — Scope Selection is missing: Run each command this skill names as its own call, in its written form"
+
+make_copy "$work/refusedfile"
+replace_first "$work/refusedfile/SKILL.md" 'never save output to a file: search the output you already have instead' 'save long output to a file and search it'
+expect_fail "saving output to a file fails" "$work/refusedfile" "Step 0 — Scope Selection is missing: never save output to a file: search the output you already have instead"
+
+make_copy "$work/refusedline"
+replace_first "$work/refusedline/SKILL.md" 'with `was refused` in place of `failed`' 'with a request for permission'
+expect_fail "a refused essential read without its Cannot review line fails" "$work/refusedline" "Step 0 — Scope Selection is missing: with \`was refused\` in place of \`failed\`"
+
+make_copy "$work/refusedname"
+replace_first "$work/refusedname/SKILL.md" 'naming the refused command, never a whole tool or the session, and never a command you did not run' 'saying that the tool is unavailable'
+expect_fail "a limit that blames the whole tool fails" "$work/refusedname" "Step 0 — Scope Selection is missing: naming the refused command, never a whole tool or the session, and never a command you did not run"
+
+make_copy "$work/refusedask"
+replace_first "$work/refusedask/SKILL.md" 'Never ask for a permission, a tool or another mode in a headless run' 'Ask for a permission when a call is refused'
+expect_fail "asking for a permission in a headless run fails" "$work/refusedask" "Step 0 — Scope Selection is missing: Never ask for a permission, a tool or another mode in a headless run"
+
+make_copy "$work/effortbands"
+replace_first "$work/effortbands/SKILL.md" '`up to 50` gives 1, `51 to 200` gives 2, `201 to 500` gives 3, `501 to 1000` gives 4 and `more than 1000` gives 5' 'a small change gives 1'
+expect_fail "an effort without its size bands fails" "$work/effortbands" "Step 3 is missing: \`up to 50\` gives 1, \`51 to 200\` gives 2, \`201 to 500\` gives 3, \`501 to 1000\` gives 4 and \`more than 1000\` gives 5"
+
+make_copy "$work/effortsize"
+replace_first "$work/effortsize/SKILL.md" 'Write the size, never the total itself' 'Write the total'
+expect_fail "an effort that states the total fails" "$work/effortsize" "Step 3 is missing: Write the size, never the total itself"
+
+make_copy "$work/effortrisk"
+replace_first "$work/effortrisk/SKILL.md" 'A finding is not a risk area and adds nothing to the level.' 'Add 1 for each finding.'
+expect_fail "an effort level raised by findings fails" "$work/effortrisk" "Step 3 is missing: A finding is not a risk area and adds nothing to the level."
+
+make_copy "$work/efforttemplate"
+replace_first "$work/efforttemplate/SKILL.md" '<size> changed lines in <files> files; <risk' '<lines> changed lines in <files> files; <risk'
+expect_fail "an effort template with a line count fails" "$work/efforttemplate" "Step 3 is missing: **Review effort:** <n>/5 — <size> changed lines in <files> files; <risk areas, or no risk area>."
+
+make_copy "$work/headlineslot"
+replace_first "$work/headlineslot/SKILL.md" 'When `## Findings` has no finding, write exactly one line under it in place of the list' 'When `## Findings` has no finding, write `None.` under it'
+expect_fail "an empty Findings section without its headline fails" "$work/headlineslot" "Step 3 is missing: When \`## Findings\` has no finding, write exactly one line under it in place of the list"
+
+make_copy "$work/headlinefiller"
+replace_first "$work/headlinefiller/SKILL.md" 'Never write `None.`, `No findings.` or any other sentence there, and never write a headline anywhere else.' 'Write the headline after the Scope line.'
+expect_fail "a filler line under Findings fails" "$work/headlinefiller" "Step 3 is missing: Never write \`None.\`, \`No findings.\` or any other sentence there, and never write a headline anywhere else."
+
+make_copy "$work/headlineneeds"
+replace_first "$work/headlineneeds/SKILL.md" 'with only those, `## Findings` still holds the headline' 'with only those, `## Findings` is empty'
+expect_fail "Needs human verification in place of the headline fails" "$work/headlineneeds" "Step 3 is missing: with only those, \`## Findings\` still holds the headline"
+
+make_copy "$work/nhvlimit"
+replace_first "$work/nhvlimit/SKILL.md" 'A finding under `## Needs human verification` is not a limit by itself.' 'A finding under `## Needs human verification` is a material limit.'
+expect_fail "a Needs verification finding made a material limit fails" "$work/nhvlimit" "Step 3 is missing: A finding under \`## Needs human verification\` is not a limit by itself."
+
+make_copy "$work/nhvoutside"
+replace_first "$work/nhvoutside/SKILL.md" 'also list it as a `context not read` item and weigh it like any other limit' 'leave it out of the Audit'
+expect_fail "unread outside code left out of the Audit fails" "$work/nhvoutside" "Step 3 is missing: also list it as a \`context not read\` item and weigh it like any other limit"
+
+make_copy "$work/nhvtruth"
+replace_first "$work/nhvtruth/SKILL.md" 'say that the repository has none, never that a file was not read, and never name a file that does not exist' 'say that a file was not read'
+expect_fail "missing code described as an unread file fails" "$work/nhvtruth" "Step 3 is missing: say that the repository has none, never that a file was not read, and never name a file that does not exist"
+
+make_copy "$work/ctxnocount"
+replace_first "$work/ctxnocount/SKILL.md" '**Read for context:** `<path>`, `<path>`.' '**Read for context:** <k> files: `<path>`, `<path>`.'
+expect_fail "a context line with a count fails" "$work/ctxnocount" "Step 3 is missing: **Read for context:** \`<path>\`, \`<path>\`."
 
 make_copy "$work/triagenostep"
 replace_first "$work/triagenostep/SKILL.md" '## Step 3 — Triage, Verdict and Audit' '## Step 3 — Summary'
