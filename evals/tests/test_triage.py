@@ -19,8 +19,17 @@ CATEGORIES = ("Security", "Performance", "Tests/Coverage", "Architecture", "Code
 TRIAGE = ("Review effort", "Relevant tests", "Look first", "Ready to merge")
 TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified")
 WEIGHTS = ("material", "not material")
+SIZES = ("up to 50", "51 to 200", "201 to 500", "501 to 1000", "more than 1000")
+RISK_AREAS = ("authentication", "authorization", "payments", "personal data", "database schema or migrations",
+              "concurrency", "public API contracts")
+EFFORT_CLAIM = r"^\*\*Review effort:\*\* ([1-5])/5 — (?:(at least )?(\d+)|(" + "|".join(SIZES) + r")) changed lines?"
+EFFORT_CLAIM_RE = re.compile(EFFORT_CLAIM)
+EFFORT_LEVEL_RE = re.compile(r"\b[1-5]/5\b")
+EFFORT_SIZE_RE = re.compile("|".join(re.escape(size) for size in SIZES))
+EFFORT_TABLE_RE = re.compile(r"^\| `(" + "|".join(SIZES) + r")` \| ([1-5])/5 \| ([1-5])/5 \| ([1-5])/5 \|$", re.M)
 LINE_RES = {
-    "Review effort": re.compile(r"^\*\*Review effort:\*\* ([1-5])/5 — \d+ changed lines? in (\d+) files?; \S.*\.$"),
+    "Review effort": re.compile(EFFORT_CLAIM + r" in (\d+) files?( \(the total could not be measured: [^()]+\))?; "
+                                r"(\S.*)\.$"),
     "Relevant tests": re.compile(
         r"^\*\*Relevant tests:\*\* (changed|existing|missing|not applicable|not verified) — (\S.*?)\. "
         r"Execution: (not run|ran `[^`]+`(?:, `[^`]+`)*; \S.*|partly ran `[^`]+`(?:, `[^`]+`)*; \S.*; not run: \S.*)\.$"),
@@ -31,11 +40,12 @@ RESULT_RE = re.compile(r"(?i)(?:\b(?:tests?|suites?|specs?)\b|`[^`]*(?:test|spec
 ITEM_RE = re.compile(r"^- (.+?) — (not read|binary|context not read|API not validated|tests not verified), (material|not material): (\S.*)$")
 COMPACT_AUDIT = re.compile(r"^\*\*Audit:\*\* (\d+) of (\d+) changed files? reviewed; (\d+) files? read for context; no findings in (.+?); (?:already raised, not verified: (\d+) Warning candidates?; )?not verified: (.+)\.$")
 FILES_RE = re.compile(r"^\*\*Files reviewed:\*\* (\d+) of (\d+) changed files?(?:: (.+))?\.$")
-CONTEXT_RE = re.compile(r"^\*\*Read for context:\*\* (?:none|(\d+) files?: (.+))\.$")
+CONTEXT_RE = re.compile(r"^\*\*Read for context:\*\* (?:none|(\d+) files?: (.+)|(`.+))\.$")
 CLEAN_RE = re.compile(r"^\*\*Checked with no findings:\*\* (.+)\.$")
 RAISED_RE = re.compile(r"^\*\*Already raised, not verified:\*\* (.+)\.$")
 RAISED_ENTRY_RE = re.compile(r"`([^`]+)` \(([^)]+)\)")
 EXCLUDED_RE = re.compile(r"^\*\*Excluded by configuration:\*\* (\d+) changed files?\b")
+DIFF_HEADER_RE = re.compile(r"^diff --git a/(.+) b/(.+)$")
 RAISED_HEADING = "## Already raised in the PR (not repeated)"
 
 FINDING_BLOCKS = ("### Security — Critical", "### Potential Bugs — Warning", "### Performance — Warning")
@@ -70,6 +80,7 @@ def read(name):
 
 FIXTURE = read("fixtures/triage/report.md")
 EXAMPLE = read(os.path.join("..", "..", "example-output.md"))
+SKILL = read(os.path.join("..", "..", "SKILL.md"))
 REPORT_END = "The report ends with the Audit above."
 CRITICAL_VERDICT = ("**Ready to merge:** No — 2 Critical findings must be fixed before merging. "
                     "Not fully reviewed: see the Audit.")
@@ -133,6 +144,43 @@ def effort_level(changed_lines, risk_areas):
     return min(base + min(risk_areas, 2), 5)
 
 
+def size_of(changed_lines):
+    """The size band of SIZES that a measured total falls in."""
+    return SIZES[effort_level(changed_lines, 0) - 1]
+
+
+def effort_table(text):
+    """The level table of SKILL.md Step 3: {size: (no risk area, 1 risk area, 2 or more risk areas)}, in its order."""
+    return {m.group(1): (int(m.group(2)), int(m.group(3)), int(m.group(4))) for m in EFFORT_TABLE_RE.finditer(text)}
+
+
+def risk_count(text):
+    """The number of RISK_AREAS the text names; 0 for the whole sentinel `no risk area`; None for other wording."""
+    named = sum(area in text for area in RISK_AREAS)
+    if named:
+        return named
+    return 0 if " ".join(text.lower().split()) == "no risk area" else None
+
+
+def diff_line_count(diff, excluded=()):
+    """Measured stats of a unified diff: (added plus removed lines, changed files) without the `excluded` paths.
+    Only lines after a file's first @@ line count, so its --- and +++ headers never do; a binary file counts as a
+    changed file with no lines."""
+    lines = files = 0
+    path, in_hunk = None, False
+    for line in diff.split("\n"):
+        header = DIFF_HEADER_RE.match(line)
+        if header:
+            path, in_hunk = header.group(2), False
+            files += path not in excluded
+        elif path is not None and path not in excluded:
+            if line.startswith("@@"):
+                in_hunk = True
+            elif in_hunk and line[:1] in ("+", "-"):
+                lines += 1
+    return lines, files
+
+
 def find_line(lines, prefix):
     for i, line in enumerate(lines):
         if line.startswith(prefix):
@@ -194,7 +242,8 @@ def parse_audit(text):
     context_match = CONTEXT_RE.match(line)
     if not context_match:
         raise ValueError("**Read for context:** line is malformed")
-    context = parse_paths(context_match.group(2), "**Read for context:** line is malformed")
+    context = parse_paths(context_match.group(2) or context_match.group(3), "**Read for context:** line is malformed")
+    stated = int(context_match.group(1)) if context_match.group(1) else None
 
     line = body.pop(0) if body else ""
     clean_match = CLEAN_RE.match(line)
@@ -236,7 +285,8 @@ def parse_audit(text):
         "changed": int(files.group(2)),
         "paths": paths,
         "context": context,
-        "context_count": int(context_match.group(1) or 0),
+        "context_count": len(context) if stated is None else stated,
+        "context_stated": stated,
         "clean": clean,
         "raised": raised,
         "items": items,
@@ -267,7 +317,7 @@ def raised_locations(lines):
     return locations
 
 
-def _check_files(audit, excluded):
+def _check_files(audit, excluded, excluded_paths=()):
     reviewed, changed, paths = audit["reviewed"], audit["changed"], audit["paths"]
     context = audit["context"]
     errors = []
@@ -277,20 +327,63 @@ def _check_files(audit, excluded):
         errors.append(f"Files reviewed lists {len(paths)} paths but counts {reviewed}")
     if paths != sorted(set(paths)):
         errors.append("Files reviewed paths must be unique and in alphabetical order")
-    if len(context) != audit["context_count"]:
-        errors.append(f"Read for context lists {len(context)} paths but counts {audit['context_count']}")
-    if context != sorted(set(context)):
-        errors.append("Read for context paths must be unique and in alphabetical order")
     unread = [item for item in audit["items"] if item[1] == "not read" and item[0].endswith(" (whole file)")]
     binary = [item for item in audit["items"] if item[1] == "binary"]
     for what, tag, _weight, _detail in unread + binary:
         m = re.search(r"`([^`]+)`", what)
         if m and m.group(1) in paths:
             errors.append(f"Files reviewed lists `{m.group(1)}`, which the Audit also lists as {tag}")
+    changed_paths = set(paths) | set(excluded_paths)
+    for what, _tag, _weight, _detail in unread + binary:
+        changed_paths.update(re.findall(r"`([^`]+)`", what))
+    errors += _check_context(context, audit["context_stated"], changed_paths)
     u, b = len(unread), len(binary)
     if reviewed + excluded + b + u != changed:
         errors.append(f"Files reviewed: {reviewed} reviewed, {excluded} excluded, {b} binary and {u} not read "
                       f"do not add up to {changed} changed files")
+    return errors
+
+
+def _check_context(context, stated, changed_paths):
+    """The Read for context rules; the count is compared only when the line states one."""
+    errors = []
+    if stated is not None and len(context) != stated:
+        errors.append(f"Read for context lists {len(context)} paths but counts {stated}")
+    if context != sorted(set(context)):
+        errors.append("Read for context paths must be unique and in alphabetical order")
+    for path in context:
+        if path in changed_paths:
+            errors.append(f"Read for context names `{path}`, which is a changed file")
+        if path == "skill:SKILL.md":
+            errors.append("Read for context names `skill:SKILL.md`, the instructions of the review")
+    return errors
+
+
+def _check_audit_lines(text):
+    """The checks of the well-formed Files reviewed and Read for context lines of an Audit that parse_audit rejected."""
+    try:
+        body = audit_lines(text)
+    except ValueError:
+        return []
+    errors, reviewed = [], set()
+    for line in body:
+        files = FILES_RE.match(line)
+        context_match = CONTEXT_RE.match(line)
+        if files:
+            try:
+                paths = parse_paths(files.group(3), "")
+            except ValueError:
+                continue
+            if len(paths) != int(files.group(1)):
+                errors.append(f"Files reviewed lists {len(paths)} paths but counts {files.group(1)}")
+            reviewed.update(paths)
+        elif context_match:
+            try:
+                listed = parse_paths(context_match.group(2) or context_match.group(3), "")
+            except ValueError:
+                continue
+            stated = int(context_match.group(1)) if context_match.group(1) else None
+            errors += _check_context(listed, stated, reviewed)
     return errors
 
 
@@ -329,6 +422,49 @@ def _check_raised(audit, is_pr, lines):
     return errors
 
 
+def _check_effort(line, changed_lines=None):
+    """The Review effort rules. The count or size is checked even when the rest of the line is malformed; the level
+    is checked against the size and the named risk areas, and skipped when the line names none in those words."""
+    errors = []
+    levels = list(dict.fromkeys(EFFORT_LEVEL_RE.findall(line)))
+    sizes = list(dict.fromkeys(EFFORT_SIZE_RE.findall(line)))
+    if len(levels) > 1:
+        errors.append(f"Review effort states different levels: {', '.join(levels)}")
+    if len(sizes) > 1:
+        errors.append(f"Review effort names different sizes: {', '.join(sizes)}")
+    claim = EFFORT_CLAIM_RE.match(line)
+    if not claim:
+        return errors
+    full = LINE_RES["Review effort"].match(line)
+    level, at_least, size = int(claim.group(1)), claim.group(2), claim.group(4)
+    counted = int(claim.group(3)) if claim.group(3) else None
+    why = full.group(6) if full else None
+    if full and at_least and not why:
+        errors.append(f"Review effort counts at least {counted} changed lines without saying why the total "
+                      "could not be measured")
+    if why and size:
+        errors.append(f"Review effort gives {size} changed lines, but says the total could not be measured")
+    elif why and not at_least:
+        errors.append(f"Review effort counts exactly {counted} changed lines, but says the total could not be measured")
+    if at_least and level != 5:
+        errors.append(f"Review effort counts at least {counted} changed lines, so its level must be 5/5")
+    if at_least and changed_lines is not None:
+        errors.append(f"Review effort counts at least {counted} changed lines, but the diff has {changed_lines}, "
+                      "a complete measured total")
+    if counted is not None and not at_least and changed_lines is not None and counted != changed_lines:
+        errors.append(f"Review effort counts {counted} changed lines, but the diff has {changed_lines}")
+    if size and changed_lines is not None and size != size_of(changed_lines):
+        errors.append(f"Review effort gives {size} changed lines, but the diff has {changed_lines}")
+    risks = risk_count(full.group(7)) if full and not at_least else None
+    if risks is not None:
+        base = SIZES.index(size) + 1 if size else effort_level(counted, 0)
+        want = min(base + min(risks, 2), 5)
+        if level != want:
+            errors.append(f"Review effort is {level}/5, but {size or counted} changed lines with "
+                          f"{plural(risks, 'risk area')} give {want}/5")
+    return errors
+
+
 def _check_triage(triage, audit, excluded, tests_not_verified):
     errors = []
     paths, reviewed = audit["paths"], audit["reviewed"]
@@ -342,8 +478,8 @@ def _check_triage(triage, audit, excluded, tests_not_verified):
                 errors.append(f"Look first names {path}, which is not a reviewed file")
 
     effort = LINE_RES["Review effort"].match(triage["Review effort"])
-    if effort and int(effort.group(2)) != audit["changed"] - excluded:
-        errors.append(f"Review effort counts {effort.group(2)} files, but {audit['changed'] - excluded} "
+    if effort and int(effort.group(5)) != audit["changed"] - excluded:
+        errors.append(f"Review effort counts {effort.group(5)} files, but {audit['changed'] - excluded} "
                       "changed files are not excluded by configuration")
 
     relevant = LINE_RES["Relevant tests"].match(triage["Relevant tests"])
@@ -356,7 +492,7 @@ def _check_triage(triage, audit, excluded, tests_not_verified):
     return errors
 
 
-def check_report(text, *, omitted_warning=0, omitted_needs=0):
+def check_report(text, *, omitted_warning=0, omitted_needs=0, changed_lines=None):
     """Return the consistency errors of a canonical report; [] when its triage, Audit and findings agree."""
     errors = []
     lines = text.split("\n")
@@ -387,11 +523,11 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0):
     if relevant and relevant.group(3) == "not run" and RESULT_RE.search(relevant.group(2)):
         errors.append("**Relevant tests:** claims a test result, but Execution is not run")
 
-    excluded = 0
+    excluded, excluded_paths = 0, []
     for line in lines:
         m = EXCLUDED_RE.match(line)
         if m:
-            excluded = int(m.group(1))
+            excluded, excluded_paths = int(m.group(1)), re.findall(r"`([^`]+)`", line)
             break
 
     audit_at = lines.index("## Audit") if "## Audit" in lines else None
@@ -402,17 +538,18 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0):
             errors.append("## Audit must be the last section of the report")
 
     errors += headline_errors(text, omitted_warning + omitted_needs)
+    errors += _check_effort(triage["Review effort"], changed_lines)
     try:
         audit = parse_audit(text)
     except ValueError as error:
-        return errors + [str(error)]
+        return errors + [str(error)] + _check_audit_lines(text)
 
     scope = find_line(lines, "**Scope:**")
     is_pr = scope is not None and lines[scope].startswith("**Scope:** pr ")
     items = audit["items"]
     tests_not_verified = any(tag == "tests not verified" for _what, tag, _weight, _detail in items)
 
-    errors += _check_files(audit, excluded)
+    errors += _check_files(audit, excluded, excluded_paths)
     errors += _check_clean(audit, finding_categories, tests_not_verified)
     errors += _check_raised(audit, is_pr, lines)
     errors += _check_triage(triage, audit, excluded, tests_not_verified)
@@ -451,6 +588,15 @@ def headline_errors(text, omitted=0):
     elif found and found[0] == HEADLINE_INCOMPLETE and ready.startswith("**Ready to merge:** Yes — "):
         errors.append("the incomplete headline contradicts Ready to merge: Yes")
     return errors
+
+
+def missing_headline_errors(text):
+    """The error when no main finding is listed under ## Findings and the report carries no headline. Kept apart from
+    check_report: reports without findings are built without a headline on purpose in earlier tests."""
+    findings = [f for f in parse_findings(text) if not (f["pre_existing"] or f["already_raised"] or f["needs_verification"])]
+    if findings or headlines(text):
+        return []
+    return ["no finding is listed under ## Findings, so the report needs its headline"]
 
 
 def check_summary_triage(body, report, compact_line):
@@ -551,7 +697,7 @@ def wide(text, listed):
     """A 25-file change whose Files reviewed line lists the first `listed` paths."""
     paths = ", ".join(f"`src/f{i:02d}.js`" for i in range(listed))
     text = set_line(text, "Files reviewed", f"**Files reviewed:** 25 of 25 changed files: {paths}.")
-    text = set_line(text, "Review effort", "**Review effort:** 3/5 — 300 changed lines in 25 files; payments.")
+    text = set_line(text, "Review effort", "**Review effort:** 4/5 — 300 changed lines in 25 files; payments.")
     return set_line(text, "Look first", "**Look first:** `src/f00.js` (the largest change).")
 
 
@@ -931,6 +1077,267 @@ class HeadlineTests(Base):
         self.assertError(headline_errors(after_first_bullet(text, HEADLINE_PASSED)), "more than one headline")
 
 
+SAMPLE_DIFF = "\n".join([
+    "diff --git a/src/a.sql b/src/a.sql",
+    "index 1111111..2222222 100644",
+    "--- a/src/a.sql",
+    "+++ b/src/a.sql",
+    "@@ -1,2 +1,3 @@",
+    " SELECT 1;",
+    "--- old comment",
+    "+-- new comment",
+    "+++ counter",
+    "diff --git a/assets/logo.png b/assets/logo.png",
+    "index 3333333..4444444 100644",
+    "Binary files a/assets/logo.png and b/assets/logo.png differ",
+    "diff --git a/src/generated/client.ts b/src/generated/client.ts",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/src/generated/client.ts",
+    "@@ -0,0 +1,2 @@",
+    "+export const a = 1;",
+    "+export const b = 2;",
+    "",
+])
+CONTEXT_LINE = "**Read for context:** 2 files: `package.json`, `tests/orders.test.js`."
+EXCLUDED_SCOPE = ("**Scope:** staged (git diff --cached)\n**Excluded by configuration:** 2 changed files match "
+                  "ignore_paths and were not reviewed: `docs/a.md`, `docs/b.md`.\n")
+UNMEASURED = " (the total could not be measured: the diff output was cut off and no source counts the whole diff)"
+
+
+class ConsistencyProbeTests(Base):
+    """Synthetic probes for four contradiction shapes (headline, context, effort count), each with its consistent counterpart."""
+
+    def test_s1_headline_above_a_listed_warning_is_rejected(self):
+        text = with_verdict(drop_block(FIXTURE, FINDING_BLOCKS[0]), warning=1)
+        self.assertEqual(check_report(text), [])
+        bad = after_first_bullet(text, HEADLINE_INCOMPLETE + "\n\nThat headline is wrong for this report.")
+        self.assertError(check_report(bad), "contradicts the findings listed in the report")
+        self.assertError(headline_errors(compact_form(bad)), "contradicts the findings listed in the report")
+
+    def test_incomplete_headline_without_main_findings_stays_valid(self):
+        text = drop_block(drop_block(FIXTURE, FINDING_BLOCKS[0]), FINDING_BLOCKS[1])
+        text = after_first_bullet(with_verdict(drop_heading(text, "## Findings"), needs=1), HEADLINE_INCOMPLETE)
+        self.assertEqual(check_report(text), [])
+
+    def test_s2_context_count_must_match_its_paths(self):
+        bad = replace_once(FIXTURE, CONTEXT_LINE, CONTEXT_LINE.replace("2 files:", "3 files:"))
+        self.assertError(check_report(bad), "Read for context lists 2 paths but counts 3")
+
+    def test_s2_changed_file_is_never_context(self):
+        bad = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, `src/orders.js`, "
+                           "`tests/orders.test.js`.")
+        self.assertError(check_report(bad), "Read for context names `src/orders.js`, which is a changed file")
+        text = replace_once(FIXTURE, "**Scope:** staged (git diff --cached)\n", EXCLUDED_SCOPE)
+        text = with_verdict(replace_once(text, "**Files reviewed:** 2 of 2", "**Files reviewed:** 2 of 4"),
+                            critical=1, excluded=2)
+        self.assertEqual(check_report(text), [])
+        bad = replace_once(text, CONTEXT_LINE, "**Read for context:** 3 files: `docs/a.md`, `package.json`, "
+                           "`tests/orders.test.js`.")
+        self.assertError(check_report(bad), "Read for context names `docs/a.md`, which is a changed file")
+
+    def test_same_relative_path_in_repo_and_skill_is_two_files(self):
+        text = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 4 files: `package.json`, "
+                            "`references/configuration.md`, `skill:references/configuration.md`, `tests/orders.test.js`.")
+        self.assertEqual(check_report(text), [])
+        dup = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 2 files: `skill:stacks/node.md`, "
+                           "`skill:stacks/node.md`.")
+        self.assertError(check_report(dup), "Read for context paths must be unique and in alphabetical order")
+
+    def test_context_identities(self):
+        text = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 4 files: `/home/dev/.config/git/attributes`, "
+                            "`SKILL.md`, `package.json`, `tests/orders.test.js`.")
+        self.assertEqual(check_report(text), [])
+        active = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, `skill:SKILL.md`, "
+                              "`tests/orders.test.js`.")
+        self.assertError(check_report(active), "Read for context names `skill:SKILL.md`, the instructions of the review")
+        changed = replace_once(FIXTURE, "**Files reviewed:** 2 of 2 changed files: `src/orders.js`",
+                               "**Files reviewed:** 3 of 3 changed files: `SKILL.md`, `src/orders.js`")
+        changed = set_line(changed, "Review effort", "**Review effort:** 3/5 — 120 changed lines in 3 files; payments.")
+        own = replace_once(changed, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, "
+                           "`skill:stacks/node.md`, `tests/orders.test.js`.")
+        self.assertEqual(check_report(own), [])
+        bad = replace_once(changed, CONTEXT_LINE, "**Read for context:** 3 files: `SKILL.md`, `package.json`, "
+                           "`tests/orders.test.js`.")
+        self.assertError(check_report(bad), "Read for context names `SKILL.md`, which is a changed file")
+
+    def test_context_line_forms(self):
+        self.assertEqual(check_report(replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** none.")), [])
+        for bad in ("**Read for context:** 0 files: none.",
+                    CONTEXT_LINE[:-1] + ". I also read the skill files."):
+            with self.subTest(line=bad):
+                self.assertError(check_report(replace_once(FIXTURE, CONTEXT_LINE, bad)),
+                                 "**Read for context:** line is malformed")
+
+    def test_s3_material_limit_with_critical_needs_the_suffix(self):
+        text = with_items(FIXTURE, MATERIAL_CONTEXT)
+        self.assertError(check_report(with_verdict(text, critical=1)), "Ready to merge line is")
+        self.assertEqual(check_report(with_verdict(text, critical=1, material=[CTX])), [])
+
+    def test_s4_effort_count_must_match_the_diff(self):
+        self.assertEqual(check_report(FIXTURE), [])
+        self.assertEqual(check_report(FIXTURE, changed_lines=120), [])
+        exact = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — 711 changed lines in 2 files; payments.")
+        self.assertEqual(check_report(exact, changed_lines=711), [])
+        bad = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — 668 changed lines in 2 files; payments.")
+        self.assertError(check_report(bad, changed_lines=711), "Review effort counts 668 changed lines, but the diff has 711")
+
+    def test_lower_bound_only_when_the_total_is_not_measured(self):
+        bound = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — at least 600 changed lines in 2 files"
+                         + UNMEASURED + "; payments.")
+        self.assertEqual(check_report(bound), [])
+        self.assertError(check_report(bound, changed_lines=711),
+                         "Review effort counts at least 600 changed lines, but the diff has 711, a complete measured total")
+        self.assertError(check_report(bound.replace("5/5 — at least", "3/5 — at least")),
+                         "Review effort counts at least 600 changed lines, so its level must be 5/5")
+        self.assertError(check_report(bound.replace(UNMEASURED, "")),
+                         "Review effort counts at least 600 changed lines without saying why the total could not be measured")
+        self.assertError(check_report(bound.replace("at least 600", "600")),
+                         "Review effort counts exactly 600 changed lines, but says the total could not be measured")
+
+    def test_diff_line_count(self):
+        self.assertEqual(diff_line_count(SAMPLE_DIFF), (5, 3))
+        self.assertEqual(diff_line_count(SAMPLE_DIFF, excluded=("src/generated/client.ts",)), (3, 2))
+        self.assertEqual(diff_line_count(""), (0, 0))
+
+
+SIZED = "**Review effort:** 3/5 — 51 to 200 changed lines in 2 files; payments."
+BARE_CONTEXT = "**Read for context:** `package.json`, `tests/orders.test.js`."
+
+
+class RepairProbeTests(Base):
+    """Probes shaped like the failures of the 82d7dba candidate: an empty Findings section, size bands, a context
+    line without a count, and semantic checks that still run when another line of the report is malformed."""
+
+    def clean_yes(self, line):
+        """The fixture with no finding and Ready to merge Yes; `line`, when given, is the only line under ## Findings."""
+        text = with_verdict(drop_heading(no_findings(FIXTURE), "## Needs human verification"))
+        return replace_once(text, "## Findings\n", "## Findings\n\n" + line + "\n") if line else text
+
+    def test_empty_findings_section_needs_the_headline(self):
+        right = self.clean_yes(HEADLINE_PASSED)
+        self.assertEqual(check_report(right) + missing_headline_errors(right), [])
+        for filler in ("No findings.", "None.", None):
+            with self.subTest(filler=filler):
+                text = self.clean_yes(filler)
+                self.assertEqual(check_report(text), [])
+                self.assertError(missing_headline_errors(text), "needs its headline")
+        self.assertError(headline_errors(self.clean_yes(HEADLINE_INCOMPLETE)), "contradicts Ready to merge: Yes")
+
+    def test_needs_verification_does_not_replace_the_headline(self):
+        text = with_verdict(drop_block(drop_block(FIXTURE, FINDING_BLOCKS[0]), FINDING_BLOCKS[1]), needs=1)
+        self.assertError(missing_headline_errors(text), "needs its headline")
+        right = after_first_bullet(text, HEADLINE_INCOMPLETE)
+        self.assertEqual(missing_headline_errors(right), [])
+        self.assertEqual(missing_headline_errors(compact_form(right)), [])
+        self.assertEqual(missing_headline_errors(FIXTURE), [])
+        shown = after_first_bullet(with_verdict(no_findings(FIXTURE), warning=1, omitted_warning=1), NO_FINDINGS_SHOWN)
+        self.assertEqual(missing_headline_errors(shown), [])
+
+    def test_size_band_must_match_the_diff(self):
+        self.assertEqual([size_of(n) for n in (0, 50, 51, 200, 201, 500, 501, 1000, 1001)],
+                         ["up to 50", "up to 50", "51 to 200", "51 to 200", "201 to 500", "201 to 500",
+                          "501 to 1000", "501 to 1000", "more than 1000"])
+        sized = set_line(FIXTURE, "Review effort", SIZED)
+        self.assertEqual(check_report(sized), [])
+        self.assertEqual(check_report(sized, changed_lines=120), [])
+        self.assertError(check_report(sized, changed_lines=711),
+                         "Review effort gives 51 to 200 changed lines, but the diff has 711")
+        big = set_line(FIXTURE, "Review effort", "**Review effort:** 5/5 — 501 to 1000 changed lines in 2 files; payments.")
+        self.assertEqual(check_report(big, changed_lines=711), [])
+        why = set_line(FIXTURE, "Review effort", SIZED[:-len("; payments.")] + UNMEASURED + "; payments.")
+        self.assertError(check_report(why), "Review effort gives 51 to 200 changed lines, but says the total could not be measured")
+
+    def test_effort_level_follows_size_and_risk_areas(self):
+        for line, want in (
+                ("**Review effort:** 4/5 — 51 to 200 changed lines in 2 files; payments.",
+                 "Review effort is 4/5, but 51 to 200 changed lines with 1 risk area give 3/5"),
+                ("**Review effort:** 2/5 — 300 changed lines in 2 files; no risk area.",
+                 "Review effort is 2/5, but 300 changed lines with 0 risk areas give 3/5"),
+                ("**Review effort:** 3/5 — 300 changed lines in 2 files; payments, no risk area otherwise.",
+                 "Review effort is 3/5, but 300 changed lines with 1 risk area give 4/5")):
+            with self.subTest(line=line):
+                self.assertError(check_report(set_line(FIXTURE, "Review effort", line)), want)
+        for line in ("**Review effort:** 3/5 — up to 50 changed lines in 2 files; authorization, personal data, payments.",
+                     "**Review effort:** 4/5 — 51 to 200 changed lines in 2 files; the billing flow.",
+                     "**Review effort:** 4/5 — 300 changed lines in 2 files; payments, no risk area otherwise."):
+            with self.subTest(line=line):
+                self.assertEqual(check_report(set_line(FIXTURE, "Review effort", line)), [])
+
+    def test_count_is_checked_on_a_malformed_effort_line(self):
+        line = ("**Review effort:** 1/5 — 8 changed lines in 2 files (7 added, 1 removed in src/orders.js; 8 added in "
+                "src/routes.js); no risk area.")
+        errors = check_report(set_line(FIXTURE, "Review effort", line), changed_lines=16)
+        self.assertError(errors, "**Review effort:** line does not match its form")
+        self.assertError(errors, "Review effort counts 8 changed lines, but the diff has 16")
+        cut = ("**Review effort:** 3/5 — at least 668 changed lines in 2 files (the total could not be measured: output "
+               "cut (gh)); payments.")
+        errors = check_report(set_line(FIXTURE, "Review effort", cut), changed_lines=711)
+        self.assertError(errors, "**Review effort:** line does not match its form")
+        self.assertError(errors, "Review effort counts at least 668 changed lines, so its level must be 5/5")
+        self.assertError(errors, "Review effort counts at least 668 changed lines, but the diff has 711, a complete "
+                                 "measured total")
+
+    def test_semantic_checks_survive_a_malformed_audit(self):
+        text = set_line(FIXTURE, "Review effort", "**Review effort:** 4/5 — 668 changed lines in 2 files; no risk area.")
+        text = replace_once(text, CONTEXT_LINE, "**Read for context:** 0 files: none. I used `git show` to read "
+                            "`src/orders.js`.")
+        errors = check_report(text, changed_lines=711)
+        self.assertError(errors, "**Read for context:** line is malformed")
+        self.assertError(errors, "Review effort counts 668 changed lines, but the diff has 711")
+
+    def test_context_checks_survive_another_malformed_audit_line(self):
+        text = replace_once(FIXTURE, CHECKED, "**Checked with no findings:** Architecture and Code & File Size, as far "
+                            "as I can tell")
+        text = replace_once(text, CONTEXT_LINE, "**Read for context:** 3 files: `package.json`, `src/orders.js`.")
+        errors = check_report(text)
+        self.assertError(errors, "**Checked with no findings:** line is malformed")
+        self.assertError(errors, "Read for context lists 2 paths but counts 3")
+        self.assertError(errors, "Read for context names `src/orders.js`, which is a changed file")
+
+    def test_every_defect_of_one_report_is_reported(self):
+        text = set_line(self.clean_yes("No findings."), "Review effort",
+                        "**Review effort:** 1/5 — 6 changed lines in 2 files; no risk area.")
+        text = replace_once(text, CONTEXT_LINE, "**Read for context:** 2 files: `composer.json`, `package.json`, "
+                            "`tests/orders.test.js`.")
+        errors = check_report(text, changed_lines=7) + missing_headline_errors(text)
+        self.assertError(errors, "needs its headline")
+        self.assertError(errors, "Read for context lists 3 paths but counts 2")
+        self.assertError(errors, "Review effort counts 6 changed lines, but the diff has 7")
+
+    def test_context_line_without_a_count(self):
+        bare = replace_once(FIXTURE, CONTEXT_LINE, BARE_CONTEXT)
+        self.assertEqual(check_report(bare), [])
+        self.assertIn("; 2 files read for context;", compact_audit_line(parse_audit(bare)))
+        dup = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** `package.json`, `package.json`.")
+        self.assertError(check_report(dup), "Read for context paths must be unique and in alphabetical order")
+        changed = replace_once(FIXTURE, CONTEXT_LINE, "**Read for context:** `package.json`, `src/routes.js`.")
+        self.assertError(check_report(changed), "Read for context names `src/routes.js`, which is a changed file")
+
+    def test_effort_line_states_only_the_final_values(self):
+        for line, wants in (
+                ("**Review effort:** 2/5 — 51 to 200 changed lines is wrong here; the diff has 13 changed lines, so the "
+                 "size is up to 50 changed lines in 2 files; payments. Level: 1 + 1 = 2/5.",
+                 ("Review effort names different sizes: 51 to 200, up to 50",)),
+                ("**Review effort:** 1/5 — up to 50 changed lines in 2 files; payments (adds 1 to the level, giving 2/5).",
+                 ("Review effort states different levels: 1/5, 2/5",
+                  "Review effort is 1/5, but up to 50 changed lines with 1 risk area give 2/5")),
+                ("**Review effort:** 2/5 — up to 50 changed lines in 2 files; payments (giving 3/5).",
+                 ("Review effort states different levels: 2/5, 3/5",)),
+                ("**Review effort:** 1/5 + 1 — up to 50 changed lines in 2 files; payments. Level: 2/5.",
+                 ("Review effort states different levels: 1/5, 2/5",))):
+            errors = check_report(set_line(FIXTURE, "Review effort", line))
+            for want in wants:
+                with self.subTest(line=line, want=want):
+                    self.assertError(errors, want)
+        for line in ("**Review effort:** 2/5 — up to 50 changed lines in 2 files; payments.",
+                     "**Review effort:** 5/5 — at least 400 changed lines in 2 files" + UNMEASURED + "; payments."):
+            with self.subTest(line=line):
+                self.assertEqual(check_report(set_line(FIXTURE, "Review effort", line)), [])
+        same = "**Review effort:** 2/5 — up to 50 changed lines in 2 files; payments (adds 1 to the level, giving 2/5)."
+        self.assertEqual([e for e in check_report(set_line(FIXTURE, "Review effort", same)) if "different" in e], [])
+
+
 class MatrixTests(Base):
     def test_rows(self):
         cases = [
@@ -978,6 +1385,16 @@ class EffortTests(Base):
         for (changed_lines, risks), level in cases.items():
             with self.subTest(changed_lines=changed_lines, risks=risks):
                 self.assertEqual(effort_level(changed_lines, risks), level)
+
+    def test_skill_table_gives_effort_level(self):
+        table = effort_table(SKILL)
+        self.assertEqual(list(table), list(SIZES))
+        for n in (0, 50, 51, 200, 201, 500, 501, 1000, 1001):
+            with self.subTest(changed_lines=n):
+                self.assertEqual(table[size_of(n)], tuple(effort_level(n, r) for r in (0, 1, 2)))
+                self.assertEqual(table[size_of(n)][2], effort_level(n, 3))
+        drifted = SKILL.replace("| `51 to 200` | 2/5 | 3/5 | 4/5 |", "| `51 to 200` | 2/5 | 2/5 | 4/5 |")
+        self.assertNotEqual(effort_table(drifted), table)
 
 
 class ParserTests(Base):
@@ -1075,8 +1492,13 @@ class ExampleOutputTests(Base):
         self.assertIn("judged from the code", tests[0][1])
 
     def test_dry_run_summary(self):
-        full = example_full()
+        full = replace_once(example_full(), "`skill:references/observability.md`, ",
+                            "`skill:references/observability.md`, `skill:references/publishing.md`, ")
+        self.assertEqual(check_report(full), [])
         compact = compact_audit_line(parse_audit(full))
+        self.assertIn("; 11 files read for context;", compact)
+        intro = EXAMPLE[EXAMPLE.index("## Publishing Dry Run"):EXAMPLE.index("## Dry run — nothing was published")]
+        self.assertIn("`skill:references/publishing.md`", intro)
         dry = EXAMPLE[EXAMPLE.index("## Dry run — nothing was published"):]
         payloads = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", dry, re.S)]
         summaries = [p["body"] for p in payloads if p["body"].startswith("<!-- code-review-skill:summary -->")]
