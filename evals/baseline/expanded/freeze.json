@@ -1,0 +1,19 @@
+{
+  "commit": "2af654d2be9c8e9a7a448b6e8e43bfb14172a9f8",
+  "dirty": false,
+  "skill_tree_sha256": "e230ce6b116a04901d5a479aaef066b090b95da45b02e8da7a484ad03b0c9d02",
+  "runner_sha256": "9b552b320d309d41e16499d9b2d4a9d8fb9f6cf9a4875188973ba063e9045067",
+  "scorer_sha256": "fb070feccfc59ef610a4bee05dfdf216738f51e62ed60c1653dafafe2a6612ba",
+  "gate_sha256": "36764262aed42a66fb36e3863242eb95b23a6958eee5cfdd13eb115d52e6fdaa",
+  "cases_tree_sha256": "5ca0541a143fbc208aaa0dac35954755d0ae92b676ae8d9cd0d86131a774dc71",
+  "controls_tree_sha256": "edf78039f1c914d17fd7b9bd7d7cec32b4e335150fda3b024f12d1f0987b7923",
+  "profile": "evals/profiles/sonnet-rtk-readonly.json",
+  "profile_sha256": "8b9ea30aec21686af278b335e52aa503a1a8dc2b312dfcc8f5607a7bc573973f",
+  "agent_name": "claude",
+  "model": "claude-sonnet-5-5",
+  "timeout": 900,
+  "jobs": 3,
+  "agent_cmd_sha256": "97153fc182b57c2e2efa834d57a33d1f9349c8bb5fc339ac662de660d1e5bad3",
+  "prompt_template_sha256": "4b74f0b4511d71d9a463097c4de3801f6110a99890df192864a516cfca6aff26",
+  "prompt_addendum_sha256": "170564aa71f72fd0cc047938cba4e34ef52748c16e3d7b45dc131dd6d634b896"
+}

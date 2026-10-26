@@ -1,10 +1,13 @@
+import hashlib
+import json
 import os
 import sys
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-from score import looks_like_report, parse_findings, score_bug, score_clean, stack_mentioned  # noqa: E402
+from score import PASSED_LINE, looks_like_report, observations, parse_findings, report_completeness, score_bug, score_clean, stack_mentioned  # noqa: E402
 
 SKILL_FORMAT = """\
 Some intro text.
@@ -580,6 +583,128 @@ class AlreadyRaisedTest(unittest.TestCase):
         self.assertEqual([f["already_raised"] for f in parse_findings(report)], [False])
         self.assertEqual(score_bug(report, ["empty ID"], "Warning"),
                          {"detected": True, "matched_finding": "Security — Warning: already raised in a resolved thread"})
+
+
+COMPLETE_REPORT = """**Scope:** staged (git diff --cached)
+
+## Findings
+
+### Potential Bugs — Warning
+
+**Location:** `shop/refunds.py:12`
+**Issue:** The window starts at created_at, not at delivery.
+**Evidence:** An order delivered 20 days after it was placed is refused 21 days after delivery.
+**Confidence:** High
+**Fix:** Use delivered_at.
+
+## Summary
+
+**Ready to merge:** With fixes — 1 Warning finding should be fixed soon.
+
+## Audit
+
+**Files reviewed:** 1 of 1 changed files: `shop/refunds.py`.
+"""
+
+
+class CompletenessTest(unittest.TestCase):
+    def test_full_report_is_complete(self):
+        self.assertEqual(report_completeness(COMPLETE_REPORT),
+                         {"ready_to_merge": "With fixes", "audit": True, "incomplete_headline": False, "complete": True})
+
+    def test_report_cut_before_audit_is_not_complete(self):
+        result = report_completeness(COMPLETE_REPORT.split("## Audit")[0])
+        self.assertEqual((result["ready_to_merge"], result["audit"], result["complete"]), ("With fixes", False, False))
+
+    def test_passed_headline_alone_is_not_complete(self):
+        result = report_completeness("Code review passed — no issues found.\n")
+        self.assertEqual((result["ready_to_merge"], result["complete"]), (None, False))
+
+    def test_incomplete_headline_is_not_complete(self):
+        report = ("## Findings\n\nReview incomplete or pending — no confirmed findings in the code inspected.\n\n"
+                  "**Ready to merge:** No — no changed file was reviewed.\n\n## Audit\n")
+        self.assertEqual(report_completeness(report),
+                         {"ready_to_merge": "No", "audit": True, "incomplete_headline": True, "complete": False})
+
+    def test_ready_line_inside_a_fence_is_ignored(self):
+        report = "```\n**Ready to merge:** Yes — x\n```\nCode review passed — no issues found.\n\n## Audit\n"
+        result = report_completeness(report)
+        self.assertEqual((result["ready_to_merge"], result["complete"]), (None, False))
+
+    def test_quoted_passed_headline_beside_with_fixes_is_template_data(self):
+        headline = "Code review passed — no issues found."
+        for template in (f"> {headline}\n", f'"{headline}"\n'):
+            with self.subTest(template=template):
+                self.assertTrue(PASSED_LINE.match(template.strip()))
+                result = report_completeness(f"{COMPLETE_REPORT}\n## Notes\n\n{template}")
+                self.assertEqual((result["ready_to_merge"], result["complete"]), ("With fixes", True))
+
+
+class CompletenessProbeCorpusTest(unittest.TestCase):
+    def test_frozen_completeness_probes(self):
+        corpus = json.loads((Path(__file__).with_name("fixtures") / "completeness_probes.json").read_text(encoding="utf-8"))
+        self.assertEqual(corpus["schema_version"], 1)
+        probes = corpus["probes"]
+        self.assertEqual(len(probes), 29)
+        self.assertEqual(len({probe["id"] for probe in probes}), 29)
+        self.assertEqual(sum(1 for probe in probes if probe["expected_complete"]), 15)
+        repo = Path(__file__).resolve().parents[2]
+        for probe in probes:
+            with self.subTest(probe=probe["id"]):
+                if "report_path" in probe:
+                    data = (repo / probe["report_path"]).read_bytes()
+                    self.assertEqual(hashlib.sha256(data).hexdigest(), probe["report_sha256"])
+                    report = data.decode("utf-8")
+                else:
+                    report = probe["report"]
+                self.assertEqual(report_completeness(report)["complete"], probe["expected_complete"], probe["reason"])
+
+
+class LocationScoringTest(unittest.TestCase):
+    def test_location_path_must_appear_in_the_finding(self):
+        self.assertTrue(score_bug(COMPLETE_REPORT, ["created_at"], "Warning", "shop/refunds.py")["detected"])
+        self.assertFalse(score_bug(COMPLETE_REPORT, ["created_at"], "Warning", "shop/other.py")["detected"])
+
+    def test_without_location_scoring_is_unchanged(self):
+        self.assertEqual(score_bug(COMPLETE_REPORT, ["created_at"], "Warning"),
+                         {"detected": True, "matched_finding": "Potential Bugs — Warning"})
+
+    def test_compact_finding_matches_its_location(self):
+        report = "- shop/refunds.py:12: Warning: window counted from created_at → use delivered_at\n"
+        self.assertTrue(score_bug(report, ["created_at"], "Warning", "shop/refunds.py")["detected"])
+
+
+class LocationProbeCorpusTest(unittest.TestCase):
+    def test_frozen_location_probes(self):
+        corpus = json.loads((Path(__file__).with_name("fixtures") / "location_probes.json").read_text(encoding="utf-8"))
+        self.assertEqual(corpus["schema_version"], 1)
+        probes = corpus["probes"]
+        self.assertEqual(len(probes), 24)
+        self.assertEqual(len({probe["id"] for probe in probes}), 24)
+        for probe in probes:
+            with self.subTest(probe=probe["id"]):
+                result = score_bug(probe["report"], probe["patterns"], probe["min_severity"], probe["location_path"])
+                self.assertEqual(result["detected"], probe["expected_detected"], probe["reason"])
+
+
+class ObservationsTest(unittest.TestCase):
+    def test_spec_cited_in_the_intent_line(self):
+        report = ("## Intent\n\n**Intent:** Add the refund rule (request, `docs/refund-policy.md`).\n\n"
+                  + COMPLETE_REPORT)
+        self.assertEqual(observations(report, {"spec_path": "docs/refund-policy.md"}),
+                         {"intent_line": True, "spec_cited": True, "history_cited": None})
+
+    def test_history_counts_only_in_main_findings(self):
+        cited = COMPLETE_REPORT.replace("**Confidence:** High",
+                                        "History: git blame at `abc1234` shows `def5678` last changed these lines.\n"
+                                        "**Confidence:** High")
+        self.assertTrue(observations(cited, {"history": [{}]})["history_cited"])
+        hidden = cited.replace("## Findings", "## Needs human verification")
+        self.assertFalse(observations(hidden, {"history": [{}]})["history_cited"])
+
+    def test_observations_without_labels(self):
+        self.assertEqual(observations(COMPLETE_REPORT, {}),
+                         {"intent_line": False, "spec_cited": None, "history_cited": None})
 
 
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+{
+  "name": "sonnet-rtk-readonly",
+  "agent_name": "claude",
+  "model": "claude-sonnet-5-5",
+  "agent_cmd": "claude -p --safe-mode --disable-slash-commands --strict-mcp-config --no-session-persistence --permission-mode dontAsk --effort high --tools \"Read,Grep,Glob,Bash\" --allowedTools \"Read,Grep,Glob,Bash(rtk proxy git diff:*),Bash(rtk proxy git show:*),Bash(rtk proxy git status:*),Bash(rtk proxy git log:*),Bash(rtk proxy git blame:*),Bash(rtk proxy git rev-parse:*),Bash(rtk proxy git ls-tree:*),Bash(rtk proxy git ls-files:*),Bash(rtk proxy git merge-base:*),Bash(rtk proxy git rev-list:*),Bash(rtk proxy git symbolic-ref --quiet --short refs/remotes/origin/HEAD),Bash(rtk proxy git branch --show-current),Bash(rtk proxy git remote -v),Bash(rtk proxy git remote get-url:*),Bash(rtk proxy ls:*),Bash(rtk proxy test:*)\" --add-dir \"$EVAL_SKILL_DIR\" --model \"$EVAL_MODEL\" --output-format text",
+  "prompt_addendum": "Shell commands on this evaluation host run only through the pass-through wrapper `rtk proxy`, which runs a command unchanged and prints its raw output and exit status. Write every shell command that the skill names as `rtk proxy <command>`, for example `rtk proxy git diff --cached`, and add nothing else to it. The wrapper belongs to this host, not to the skill. A shell command without the prefix is refused.",
+  "timeout": 900,
+  "jobs": 3
+}

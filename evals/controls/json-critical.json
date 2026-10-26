@@ -1,0 +1,8 @@
+{
+  "name": "json-critical",
+  "description": "F15: a --format json review of the SQL injection bug is one valid document whose gate fails on the verified Critical finding.",
+  "case": "sqli-laravel/bug",
+  "arguments": "staged --format json --fail-on critical",
+  "check": "json_gate",
+  "expect": {"status": "complete", "gate_status": "fail", "gate_exit": 1, "critical_path": "app/Http/Controllers/UserSearchController.php"}
+}

@@ -1,0 +1,30 @@
+diff --git a/src/format.js b/src/format.js
+index cd1127e..fa3f84f 100644
+--- a/src/format.js
++++ b/src/format.js
+@@ -1,10 +1,9 @@
+ 'use strict';
+ 
++const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
++
+ function formatPrice(amount) {
+-  if (amount == null) {
+-    return '—';
+-  }
+-  return `$${amount.toFixed(2)}`;
++  return usd.format(amount);
+ }
+ 
+ module.exports = { formatPrice };
+diff --git a/test/format.test.js b/test/format.test.js
+index 851ae5d..40862f1 100644
+--- a/test/format.test.js
++++ b/test/format.test.js
+@@ -7,3 +7,7 @@ const { formatPrice } = require('../src/format');
+ test('formats dollars with two decimals', () => {
+   assert.strictEqual(formatPrice(4.5), '$4.50');
+ });
++
++test('formats thousands with a separator', () => {
++  assert.strictEqual(formatPrice(1234.5), '$1,234.50');
++});

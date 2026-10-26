@@ -1,0 +1,18 @@
+{
+  "topic": "removed-validation",
+  "stack": "node",
+  "description": "Moves price formatting to Intl.NumberFormat; the bug drops the null guard that an earlier fix added, so items that are not on sale show $0.00, the clean diff drops it too but the only caller now handles a missing sale price.",
+  "history": [
+    {"dir": "history/01", "message": "feat: show list and sale prices in the cart", "date": "2026-01-12T09:00:00Z"},
+    {"dir": "history/02", "message": "fix: show a dash for items that are not on sale (#64)\n\nformatPrice(null) threw a TypeError and broke the cart for any item without a sale price.", "date": "2026-01-26T16:45:00Z"}
+  ],
+  "bug": {
+    "min_severity": "Warning",
+    "patterns": ["\\bnull\\b|salePrice|sale price|not on sale|no sale", "\\$?0\\.00|\\bzero\\b|\\bdash\\b|\\bguard\\b|TypeError"],
+    "location": {"path": "src/format.js", "side": "old"},
+    "scenario": "The Pencil case has salePrice null in src/catalog.js; cartRows calls formatPrice(null), and Intl.NumberFormat formats null as 0, so the cart shows a sale price of $0.00 instead of the dash the guard returned."
+  },
+  "clean": {
+    "why_safe": "src/cart.js, the only caller that can pass null, now writes the dash itself when salePrice is null and calls formatPrice only with a number; item.price is always set."
+  }
+}

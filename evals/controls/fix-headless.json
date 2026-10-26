@@ -1,0 +1,8 @@
+{
+  "name": "fix-headless",
+  "description": "F16: a headless --fix run with no approval proposes its fixes, applies none, changes no file and asks nothing.",
+  "case": "null-node/bug",
+  "arguments": "staged --fix",
+  "check": "fix_headless",
+  "expect": {"stop_line": "Fix not applied: no fix was approved before this headless run; no file was changed. The report above is complete."}
+}

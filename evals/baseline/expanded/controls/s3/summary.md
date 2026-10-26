@@ -1,0 +1,13 @@
+# Code review behavior controls
+
+- Generated: 2026-10-26T20:06:03Z
+- Agent: claude (model: claude-sonnet-5-5)
+- Controls: 3/4 passed
+- Errors: 1
+
+| Control | Case | Status | Result | Failed checks |
+| --- | --- | --- | --- | --- |
+| control/fix-headless | null-node/bug | ok | PASS | none |
+| control/json-clean | null-node/clean | ok | PASS | none |
+| control/json-critical | sqli-laravel/bug | error | FAIL | error: report not in the skill's Output Format |
+| control/second-opinion-unavailable | off-by-one-python/bug | ok | PASS | none |
