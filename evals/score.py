@@ -38,6 +38,9 @@ INCOMPLETE_LINE = re.compile(
 # Discovery-only recognizers: a blockquote marker or literal quote makes the line template data, not metadata.
 _READY_LINE_RE = re.compile(r"^[\s*_]*ready to merge:[\s*_]*(yes|no|with fixes)\b", re.I)
 _AUDIT_LINE_RE = re.compile(r"^(?:#{1,6}\s*audit\s*#*\s*$|[\s*_]*audit:)", re.I)
+_FILE_LOCATION_RE = re.compile(r"^\W*(?:file|location)s?\W*:[\s*_]*(?P<value>.*)$", re.I)
+_LOCATION_TOKEN_RE = re.compile(r"`([^`]+)`|([^\s`:|]+)")
+_LINE_SUFFIX_RE = re.compile(r":\d+(?:-\d+)?$")
 
 _NORMALIZED_SEVERITY = {
     "critical": "Critical",
@@ -183,10 +186,34 @@ def parse_findings(report: str) -> list[dict]:
     return findings
 
 
+def _location_path(value: str) -> str | None:
+    """Return the path at the start of ``value``, without its line or range suffix."""
+    match = _LOCATION_TOKEN_RE.match(value)
+    if match is None:
+        return None
+    return _LINE_SUFFIX_RE.sub("", match.group(1) or match.group(2))
+
+
+def _actual_locations(finding: dict) -> list[str | None]:
+    """Return the paths that name where ``finding`` is located.
+
+    A compact finding is located by its leading path. A block finding is located by its
+    File or Location field outside code fences, so a path in Issue, Evidence, Fix or History does not count.
+    """
+    if finding["compact"]:
+        return [_location_path(finding["text"])]
+    locations = []
+    for line in _outside_fences(finding["text"]):
+        match = _FILE_LOCATION_RE.match(line)
+        if match is not None:
+            locations.append(_location_path(match.group("value")))
+    return locations
+
+
 def score_bug(report: str, patterns: list[str], min_severity: str, location_path: str | None = None) -> dict:
     """Report whether one main-list finding at ``min_severity`` or above matches every pattern.
 
-    When ``location_path`` is given, the matching finding must also name that path.
+    When ``location_path`` is given, the matching finding must also be located at that path.
     """
     minimum = SEVERITIES.index(min_severity)
     for finding in parse_findings(report):
@@ -194,7 +221,7 @@ def score_bug(report: str, patterns: list[str], min_severity: str, location_path
             continue
         if SEVERITIES.index(finding["severity"]) < minimum:
             continue
-        if location_path is not None and location_path not in finding["text"]:
+        if location_path is not None and location_path not in _actual_locations(finding):
             continue
         if all(re.search(pattern, finding["text"], re.I) for pattern in patterns):
             return {"detected": True, "matched_finding": finding["heading"]}

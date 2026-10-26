@@ -1,6 +1,8 @@
+import json
 import os
 import sys
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
@@ -641,6 +643,19 @@ class LocationScoringTest(unittest.TestCase):
     def test_compact_finding_matches_its_location(self):
         report = "- shop/refunds.py:12: Warning: window counted from created_at → use delivered_at\n"
         self.assertTrue(score_bug(report, ["created_at"], "Warning", "shop/refunds.py")["detected"])
+
+
+class LocationProbeCorpusTest(unittest.TestCase):
+    def test_frozen_location_probes(self):
+        corpus = json.loads((Path(__file__).with_name("fixtures") / "location_probes.json").read_text(encoding="utf-8"))
+        self.assertEqual(corpus["schema_version"], 1)
+        probes = corpus["probes"]
+        self.assertEqual(len(probes), 24)
+        self.assertEqual(len({probe["id"] for probe in probes}), 24)
+        for probe in probes:
+            with self.subTest(probe=probe["id"]):
+                result = score_bug(probe["report"], probe["patterns"], probe["min_severity"], probe["location_path"])
+                self.assertEqual(result["detected"], probe["expected_detected"], probe["reason"])
 
 
 class ObservationsTest(unittest.TestCase):
