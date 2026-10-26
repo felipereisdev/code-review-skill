@@ -146,10 +146,11 @@ def size_of(changed_lines):
 
 
 def risk_count(text):
-    """0 for `no risk area`, else the number of RISK_AREAS the text names; None when it names none."""
-    if "no risk area" in text:
-        return 0
-    return sum(area in text for area in RISK_AREAS) or None
+    """The number of RISK_AREAS the text names; 0 for the whole sentinel `no risk area`; None for other wording."""
+    named = sum(area in text for area in RISK_AREAS)
+    if named:
+        return named
+    return 0 if " ".join(text.lower().split()) == "no risk area" else None
 
 
 def diff_line_count(diff, excluded=()):
@@ -317,7 +318,7 @@ def _check_files(audit, excluded, excluded_paths=()):
         errors.append(f"Files reviewed lists {len(paths)} paths but counts {reviewed}")
     if paths != sorted(set(paths)):
         errors.append("Files reviewed paths must be unique and in alphabetical order")
-    unread =[item for item in audit["items"] if item[1] == "not read" and item[0].endswith(" (whole file)")]
+    unread = [item for item in audit["items"] if item[1] == "not read" and item[0].endswith(" (whole file)")]
     binary = [item for item in audit["items"] if item[1] == "binary"]
     for what, tag, _weight, _detail in unread + binary:
         m = re.search(r"`([^`]+)`", what)
@@ -430,9 +431,9 @@ def _check_effort(line, changed_lines=None):
         errors.append(f"Review effort gives {size} changed lines, but says the total could not be measured")
     elif why and not at_least:
         errors.append(f"Review effort counts exactly {counted} changed lines, but says the total could not be measured")
-    if full and at_least and level != 5:
+    if at_least and level != 5:
         errors.append(f"Review effort counts at least {counted} changed lines, so its level must be 5/5")
-    if full and at_least and changed_lines is not None:
+    if at_least and changed_lines is not None:
         errors.append(f"Review effort counts at least {counted} changed lines, but the diff has {changed_lines}, "
                       "a complete measured total")
     if counted is not None and not at_least and changed_lines is not None and counted != changed_lines:
@@ -1237,11 +1238,14 @@ class RepairProbeTests(Base):
                 ("**Review effort:** 4/5 — 51 to 200 changed lines in 2 files; payments.",
                  "Review effort is 4/5, but 51 to 200 changed lines with 1 risk area give 3/5"),
                 ("**Review effort:** 2/5 — 300 changed lines in 2 files; no risk area.",
-                 "Review effort is 2/5, but 300 changed lines with 0 risk areas give 3/5")):
+                 "Review effort is 2/5, but 300 changed lines with 0 risk areas give 3/5"),
+                ("**Review effort:** 3/5 — 300 changed lines in 2 files; payments, no risk area otherwise.",
+                 "Review effort is 3/5, but 300 changed lines with 1 risk area give 4/5")):
             with self.subTest(line=line):
                 self.assertError(check_report(set_line(FIXTURE, "Review effort", line)), want)
         for line in ("**Review effort:** 3/5 — up to 50 changed lines in 2 files; authorization, personal data, payments.",
-                     "**Review effort:** 4/5 — 51 to 200 changed lines in 2 files; the billing flow."):
+                     "**Review effort:** 4/5 — 51 to 200 changed lines in 2 files; the billing flow.",
+                     "**Review effort:** 4/5 — 300 changed lines in 2 files; payments, no risk area otherwise."):
             with self.subTest(line=line):
                 self.assertEqual(check_report(set_line(FIXTURE, "Review effort", line)), [])
 
@@ -1251,6 +1255,13 @@ class RepairProbeTests(Base):
         errors = check_report(set_line(FIXTURE, "Review effort", line), changed_lines=16)
         self.assertError(errors, "**Review effort:** line does not match its form")
         self.assertError(errors, "Review effort counts 8 changed lines, but the diff has 16")
+        cut = ("**Review effort:** 3/5 — at least 668 changed lines in 2 files (the total could not be measured: output "
+               "cut (gh)); payments.")
+        errors = check_report(set_line(FIXTURE, "Review effort", cut), changed_lines=711)
+        self.assertError(errors, "**Review effort:** line does not match its form")
+        self.assertError(errors, "Review effort counts at least 668 changed lines, so its level must be 5/5")
+        self.assertError(errors, "Review effort counts at least 668 changed lines, but the diff has 711, a complete "
+                                 "measured total")
 
     def test_semantic_checks_survive_a_malformed_audit(self):
         text = set_line(FIXTURE, "Review effort", "**Review effort:** 4/5 — 668 changed lines in 2 files; no risk area.")
