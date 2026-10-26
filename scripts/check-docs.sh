@@ -2726,7 +2726,17 @@ REQUIRED = (
     "`**Second opinion:** <cli> failed: <reason>.`",
     "The CLI reads nothing but the prompt that this guide writes.",
     "they do not limit what it reads",
-    "This guide establishes no limit on what `codex` or `gemini` reads",
+    "A CLI runs only when all of these hold for it",
+    "The CLI starts in a new empty directory, `<dir>/run`, made for this run, never in the reviewed repository or "
+    "below it.",
+    "with options that only remove tools, for that call only, and the installed CLI confirms before the call that "
+    "each of them is off",
+    "Those options never add a tool, a directory, a model, a provider, a credential or trust",
+    "For `gemini`, this guide names no command that meets them",
+    "but this guide cannot limit what they read",
+    "`codex features list --disable shell_tool --disable view_image --disable apps --disable memories` must exit 0",
+    "`git init -q '<dir>/run'` must exit 0",
+    "call no tool, and read nothing else",
     "`<cli> cannot be limited to the supplied content`",
     "Context absent from this prompt is unavailable to the second reviewer",
     "A file whose diff is in the prompt is not thereby open for reading in full",
@@ -2736,19 +2746,23 @@ REQUIRED = (
     "each context file of the bundle is read again and compared with the text that the review read",
     "Record the SHA-256 of `<dir>/prompt.md` before the call, and compare it after the call",
     "A change to the bundle, to the diff or to the refs while it ran invalidates the answer",
-    "no channel reads a live file while it runs",
+    "no tool of the call reads a live file while it runs",
     "`the supplied content changed while it ran`",
     "`the reviewed snapshot is not the current one`",
 )
 # Text that the guide must never contain again: the reads that the bundle replaces.
-FORBIDDEN_TEXT = ("the files themselves", "git show", "git ls-tree", "Read code outside the diff only from the snapshot")
+FORBIDDEN_TEXT = ("the files themselves", "git show", "git ls-tree", "Read code outside the diff only from the snapshot",
+                  "A later revision of this guide may run", "--cd '<root>'")
 # Each command must keep these flags, and never add a flag that widens access, trusts the repository or sets it up.
-REQUIRED_FLAGS = {"codex": ("codex exec ", "--sandbox read-only", "--ephemeral", "--output-last-message", " - < "),
-                  "gemini": ("gemini ", "--approval-mode plan", "--prompt ", " < ")}
+REQUIRED_FLAGS = {"codex": ("codex exec ", "--cd '<dir>/run'", "--sandbox read-only", "--disable shell_tool",
+                            "--disable view_image", "--disable apps", "--disable memories", "--ephemeral",
+                            "--output-last-message", " - < ")}
+# The only features that the codex command may turn off: each removes tools or context for that call only.
+ALLOWED_DISABLE = {"shell_tool", "view_image", "apps", "memories"}
 FORBIDDEN_FLAGS = ("--dangerously", "--yolo", " -y ", "yolo", "auto_edit", "workspace-write", "danger-full-access",
                    "--add-dir", "--approve-for-me", "--full-auto", "--worktree", " -w ", "--skip-trust", "--config",
-                   " -c ", "--profile", " -p ", "--model", " -m ", "--include-directories", "--enable", "--disable",
-                   "login")
+                   " -c ", "--profile", " -p ", "--model", " -m ", "--include-directories", "--enable",
+                   "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--search", "--oss", "login")
 FORMS = {
     "returned": re.compile(r"^\*\*Second opinion:\*\* (codex|gemini) returned (\d+) (candidates?); each was checked "
                            r"like the review's own, and (\d+) (is|are) in this report\.$"),
@@ -2815,6 +2829,13 @@ if ref:
         for flag in FORBIDDEN_FLAGS:
             if flag in found[0]:
                 errors.append(f"{PATH}: the {cli} command uses a forbidden flag: {flag.strip()}")
+        for feature in re.findall(r"--disable (\S+)", found[0]):
+            if feature not in ALLOWED_DISABLE:
+                errors.append(f"{PATH}: the {cli} command turns off a feature that Boundary does not name: "
+                              f"{feature}")
+    gemini = [c for c in commands if c.startswith("gemini ")]
+    if gemini:
+        errors.append(f"{PATH} must show no gemini command, found {len(gemini)}")
     m = re.search(r"^## Examples\n.*?^```\n(.*?)^```$", ref, re.M | re.S)
     examples = m.group(1).splitlines() if m else []
     if not examples:
@@ -2869,10 +2890,11 @@ README_REQUIRED = (
     "a headless run stops after one round",
     "a run never has more than 2 rounds",
     "a second round may correct lines that the first round wrote, but two fixes of one round never overlap",
-    "The skill would send it only a bundle of the change and the code around it, with secrets replaced by `[REDACTED]`",
+    "The skill sends it only a bundle of the change and the code around it, with secrets replaced by `[REDACTED]`",
     "The read-only flags limit writes and shell commands, not what a CLI reads",
-    "the skill establishes no limit on what `codex` or `gemini` reads",
-    "`codex cannot be limited to the supplied content`",
+    "the skill runs `codex` only from a new empty directory outside the repository, with its tools that run "
+    "commands or open local files",
+    "`gemini cannot be limited to the supplied content`",
     "It never stages, commits, pushes or publishes, and never rewrites the report above it",
     "Agreement between the two reviews is never a vote, a candidate outside the diff never becomes a finding",
     "they cannot promise anything about other tools you configured for it",

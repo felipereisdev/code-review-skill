@@ -2278,20 +2278,20 @@ replace_first "$work/socoverage/references/second-opinion.md" 'What the second o
 expect_fail "counting the second opinion as coverage fails" "$work/socoverage" "references/second-opinion.md is missing: What the second opinion says that it read or checked is never coverage"
 
 make_copy "$work/sobypass"
-replace_first "$work/sobypass/references/second-opinion.md" 'codex exec --sandbox read-only' 'codex exec --dangerously-bypass-approvals-and-sandbox --sandbox read-only'
+replace_first "$work/sobypass/references/second-opinion.md" "--cd '<dir>/run' --sandbox read-only" "--cd '<dir>/run' --dangerously-bypass-approvals-and-sandbox --sandbox read-only"
 expect_fail "a codex command that bypasses the sandbox fails" "$work/sobypass" "references/second-opinion.md: the codex command uses a forbidden flag: --dangerously"
 
 make_copy "$work/sowrite"
-replace_first "$work/sowrite/references/second-opinion.md" 'codex exec --sandbox read-only' 'codex exec --sandbox workspace-write'
+replace_first "$work/sowrite/references/second-opinion.md" "--cd '<dir>/run' --sandbox read-only" "--cd '<dir>/run' --sandbox workspace-write"
 expect_fail "a codex command that can write fails" "$work/sowrite" "references/second-opinion.md: the codex command is missing: --sandbox read-only"
 
 make_copy "$work/soyolo"
-replace_first "$work/soyolo/references/second-opinion.md" 'gemini --approval-mode plan' 'gemini --approval-mode yolo'
-expect_fail "a gemini command that approves every action fails" "$work/soyolo" "references/second-opinion.md: the gemini command uses a forbidden flag: yolo"
+printf '\n```\ngemini --approval-mode yolo --prompt x < y\n```\n' >> "$work/soyolo/references/second-opinion.md"
+expect_fail "a gemini command that approves every action fails" "$work/soyolo" "references/second-opinion.md must show no gemini command, found 1"
 
 make_copy "$work/sotrust"
-replace_first "$work/sotrust/references/second-opinion.md" 'gemini --approval-mode plan' 'gemini --skip-trust --approval-mode plan'
-expect_fail "a gemini command that trusts the reviewed repository fails" "$work/sotrust" "references/second-opinion.md: the gemini command uses a forbidden flag: --skip-trust"
+printf '\n```\ngemini --skip-trust --approval-mode plan --prompt x < y\n```\n' >> "$work/sotrust/references/second-opinion.md"
+expect_fail "a gemini command that trusts the reviewed repository fails" "$work/sotrust" "references/second-opinion.md must show no gemini command, found 1"
 
 make_copy "$work/socount"
 replace_first "$work/socount/references/second-opinion.md" 'returned 2 candidates; each was checked like the review'"'"'s own, and 1 is in this report.' 'returned 2 candidates; each was checked like the review'"'"'s own, and 3 are in this report.'
@@ -2339,12 +2339,56 @@ replace_first "$work/socanbeinvalid/references/second-opinion.md" 'invalidates t
 expect_fail "a changed bundle that does not invalidate the answer fails" "$work/socanbeinvalid" "references/second-opinion.md is missing: A change to the bundle, to the diff or to the refs while it ran invalidates the answer"
 
 make_copy "$work/socli"
-replace_first "$work/socli/references/second-opinion.md" 'This guide establishes no limit on what `codex` or `gemini` reads' 'This guide trusts what `codex` or `gemini` reads'
-expect_fail "a CLI that is trusted to read only the bundle without a limit fails" "$work/socli" "references/second-opinion.md is missing: This guide establishes no limit on what \`codex\` or \`gemini\` reads"
+replace_first "$work/socli/references/second-opinion.md" 'A CLI runs only when all of these hold for it' 'A CLI runs when it is installed'
+expect_fail "a CLI that is trusted to read only the bundle without a limit fails" "$work/socli" "references/second-opinion.md is missing: A CLI runs only when all of these hold for it"
 
 make_copy "$work/soreason"
 replace_first "$work/soreason/references/second-opinion.md" '**Second opinion:** codex unavailable: codex cannot be limited to the supplied content.' '**Second opinion:** codex unavailable: codex is slow.'
 expect_fail "an unavailable reason outside the defined forms fails" "$work/soreason" "references/second-opinion.md example line matches no form of The Second opinion line: **Second opinion:** codex unavailable: codex is slow."
+
+make_copy "$work/sorepo"
+replace_first "$work/sorepo/references/second-opinion.md" "--cd '<dir>/run' --sandbox" "--cd '<root>' --sandbox"
+expect_fail "a codex call from the reviewed repository fails" "$work/sorepo" "references/second-opinion.md: the codex command is missing: --cd '<dir>/run'"
+
+make_copy "$work/soshell"
+replace_first "$work/soshell/references/second-opinion.md" '--sandbox read-only --disable shell_tool' '--sandbox read-only'
+expect_fail "a codex call that keeps its command tools fails" "$work/soshell" "references/second-opinion.md: the codex command is missing: --disable shell_tool"
+
+make_copy "$work/sohooks"
+replace_first "$work/sohooks/references/second-opinion.md" '--disable memories --ephemeral' '--disable memories --disable hooks --ephemeral'
+expect_fail "a codex call that turns off a feature Boundary does not name fails" "$work/sohooks" "references/second-opinion.md: the codex command turns off a feature that Boundary does not name: hooks"
+
+make_copy "$work/sosearch"
+replace_first "$work/sosearch/references/second-opinion.md" '--disable memories --ephemeral' '--disable memories --search --ephemeral'
+expect_fail "a codex call that adds a tool fails" "$work/sosearch" "references/second-opinion.md: the codex command uses a forbidden flag: --search"
+
+make_copy "$work/soskip"
+replace_first "$work/soskip/references/second-opinion.md" "codex exec --cd '<dir>/run'" "codex exec --skip-git-repo-check --cd '<dir>/run'"
+expect_fail "a codex call that skips the repository check fails" "$work/soskip" "references/second-opinion.md: the codex command uses a forbidden flag: --skip-git-repo-check"
+
+make_copy "$work/soconfirm"
+replace_first "$work/soconfirm/references/second-opinion.md" '`codex features list --disable shell_tool --disable view_image --disable apps --disable memories` must exit 0' '`codex --version` must exit 0'
+expect_fail "a codex call without the check of its tools fails" "$work/soconfirm" "references/second-opinion.md is missing: \`codex features list --disable shell_tool --disable view_image --disable apps --disable memories\` must exit 0"
+
+make_copy "$work/sogitinit"
+replace_first "$work/sogitinit/references/second-opinion.md" "\`git init -q '<dir>/run'\` must exit 0" "\`mkdir '<dir>/run'\` must exit 0"
+expect_fail "a codex call without its own empty repository fails" "$work/sogitinit" "references/second-opinion.md is missing: \`git init -q '<dir>/run'\` must exit 0"
+
+make_copy "$work/sorevision"
+printf 'A later revision of this guide may run a CLI only with a limit that its own text establishes.\n' >> "$work/sorevision/references/second-opinion.md"
+expect_fail "a guide that leaves every CLI to a later revision fails" "$work/sorevision" "references/second-opinion.md still contains: A later revision of this guide may run"
+
+make_copy "$work/soresidual"
+replace_first "$work/soresidual/references/second-opinion.md" 'but this guide cannot limit what they read' 'and they read nothing'
+expect_fail "a guide that promises what configured tools read fails" "$work/soresidual" "references/second-opinion.md is missing: but this guide cannot limit what they read"
+
+make_copy "$work/sonotool"
+replace_first "$work/sonotool/references/second-opinion.md" 'call no tool, and read nothing else' 'read nothing else'
+expect_fail "a prompt that allows tool calls fails" "$work/sonotool" "references/second-opinion.md is missing: call no tool, and read nothing else"
+
+make_copy "$work/solive"
+replace_first "$work/solive/references/second-opinion.md" 'no tool of the call reads a live file while it runs' 'no channel reads a live file while it runs'
+expect_fail "a drift rule that claims no channel at all fails" "$work/solive" "references/second-opinion.md is missing: no tool of the call reads a live file while it runs"
 # End of second opinion tests.
 
 # README fix and second opinion (README.md).
@@ -2391,12 +2435,16 @@ make_copy "$work/rfexpected"
 replace_first "$work/rfexpected/README.md" 'compares it with the reviewed text plus its own earlier edits' 'compares it with the last commit'
 expect_fail "README that refuses the skill's own earlier edits fails" "$work/rfexpected" "README.md is missing: Right before each edit it reads the file again and compares it with the reviewed text plus its own earlier edits"
 make_copy "$work/rfboundary"
-replace_first "$work/rfboundary/README.md" 'the skill establishes no limit on what `codex` or `gemini` reads' 'the skill trusts what `codex` or `gemini` reads'
-expect_fail "README that trusts the CLI reads fails" "$work/rfboundary" "README.md is missing: the skill establishes no limit on what \`codex\` or \`gemini\` reads"
+replace_first "$work/rfboundary/README.md" 'with its tools that run commands or open local files, its app' 'with its usual tools, its app'
+expect_fail "README that trusts the CLI reads fails" "$work/rfboundary" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository, with its tools that run commands or open local files"
 
 make_copy "$work/rfsamer"
 replace_first "$work/rfsamer/README.md" 'two fixes of one round never overlap' 'two fixes never overlap'
 expect_fail "README that forbids overlap across rounds fails" "$work/rfsamer" "README.md is missing: a second round may correct lines that the first round wrote, but two fixes of one round never overlap"
+
+make_copy "$work/rsgemini"
+replace_first "$work/rsgemini/README.md" '`gemini cannot be limited to the supplied content`' '`gemini` runs in plan mode'
+expect_fail "README that runs gemini without a limit fails" "$work/rsgemini" "README.md is missing: \`gemini cannot be limited to the supplied content\`"
 # End of README fix and second opinion tests.
 
 if [ "$failures" -gt 0 ]; then
