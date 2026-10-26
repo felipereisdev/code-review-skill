@@ -83,6 +83,9 @@ EXAMPLE = read(os.path.join("..", "..", "example-output.md"))
 SKILL = read(os.path.join("..", "..", "SKILL.md"))
 DIMENSIONS = read(os.path.join("..", "..", "references", "dimensions.md"))
 DIMENSION_ITEM_RE = re.compile(r"^(bugs|security|repository rules) dimension$")
+LARGE_DIFFS = read(os.path.join("..", "..", "references", "large-diffs.md"))
+SKIP_RE = re.compile(r"^(skipped in a large diff as a (lockfile|generated file)|left unread in a large diff)\b")
+LARGE_SIZES = ("501 to 1000", "more than 1000")
 REPORT_END = "The report ends with the Audit above."
 CRITICAL_VERDICT = ("**Ready to merge:** No — 2 Critical findings must be fixed before merging. "
                     "Not fully reviewed: see the Audit.")
@@ -109,6 +112,35 @@ def dimension_owners(text):
         owner, _checklist, cats = [c.strip() for c in line.strip().strip("|").split("|")]
         owners[owner] = () if cats.startswith("none of its own") else tuple(cats.split(", "))
     return owners
+
+
+def lockfile_names(text):
+    """The file names of the **Lockfiles.** line of references/large-diffs.md."""
+    line = next((line for line in text.split("\n") if line.startswith("**Lockfiles.**")), "")
+    return tuple(re.findall(r"`([^`]+)`", line))
+
+
+def large_diff_errors(effort, items):
+    """Errors of the not read items of references/large-diffs.md: only in a diff of more than 500 changed lines or an
+    unmeasured one; a skip names a whole file, and a lockfile skip a listed lockfile."""
+    claim = EFFORT_CLAIM_RE.match(effort)
+    large = bool(claim) and bool(claim.group(2) or claim.group(4) in LARGE_SIZES
+                                 or (claim.group(3) and int(claim.group(3)) > 500))
+    errors = []
+    for what, tag, weight, detail in items:
+        m = SKIP_RE.match(detail)
+        if tag != "not read" or m is None:
+            continue
+        if not large:
+            errors.append(f"{what} is {m.group(1)}, but Review effort does not give more than 500 changed lines")
+        if m.group(2) and not what.endswith(" (whole file)"):
+            errors.append(f"{what} is skipped in a large diff, so it must name a whole file")
+        path = re.search(r"`([^`]+)`", what)
+        if m.group(2) == "lockfile" and (path is None or path.group(1).rsplit("/", 1)[-1]
+                                         not in lockfile_names(LARGE_DIFFS)):
+            errors.append(f"{what} is skipped as a lockfile, but its file name is not a lockfile of "
+                          "references/large-diffs.md")
+    return errors
 
 
 def verdict_line(*, reviewed=1, critical=0, warning=0, needs=0, raised=0, material=(),
@@ -578,6 +610,7 @@ def check_report(text, *, omitted_warning=0, omitted_needs=0, changed_lines=None
         else:
             unreviewed.update(owners[m.group(1)])
 
+    errors += large_diff_errors(triage["Review effort"], items)
     errors += _check_files(audit, excluded, excluded_paths)
     errors += _check_clean(audit, finding_categories, tests_not_verified, unreviewed)
     errors += _check_raised(audit, is_pr, lines)
@@ -1584,6 +1617,107 @@ class DimensionTests(Base):
         text = with_items(no_findings(FIXTURE), "- tests dimension — dimension not reviewed, not material: the "
                           "subagent stopped without a result.")
         self.assertError(check_report(with_verdict(text)), "it must be the bugs, security or repository rules dimension")
+
+
+LOCK = ("`package-lock.json` (whole file)", "not read")
+LOCK_ITEM = ("- `package-lock.json` (whole file) — not read, material: skipped in a large diff as a lockfile; "
+             "`package.json` in the same directory changes too, but the resolved versions were not read.")
+REMAINDER = ("`src/routes.js` lines 200-480", "not read")
+REMAINDER_ITEM = ("- `src/routes.js` lines 200-480 — not read, material: left unread in a large diff; the review "
+                  "stopped in the second batch, and these lines change the order routes.")
+CUT = ("`src/orders.js` lines 120-300", "not read")
+CUT_ITEM = ("- `src/orders.js` lines 120-300 — not read, material: the diff output was cut off at line 120 of "
+            "`src/orders.js`, and these lines change the order total.")
+LARGE_EFFORT = "**Review effort:** 5/5 — 501 to 1000 changed lines in 4 files; payments."
+UNMEASURED_EFFORT = f"**Review effort:** 5/5 — at least 400 changed lines in 4 files{UNMEASURED}; payments."
+
+
+def large(text, *items, effort=LARGE_EFFORT):
+    """The fixture as a large diff of 4 changed files with no finding, whose lockfile was skipped."""
+    text = no_findings(text)
+    text = set_line(text, "Files reviewed", "**Files reviewed:** 3 of 4 changed files: `package.json`, "
+                    "`src/orders.js`, `src/routes.js`.")
+    text = set_line(text, "Read for context", "**Read for context:** 2 files: `skill:references/large-diffs.md`, "
+                    "`tests/orders.test.js`.")
+    text = set_line(text, "Review effort", effort)
+    return with_items(text, *(items or (LOCK_ITEM,)))
+
+
+def example_block(text, heading="## Example"):
+    """The lines of the first ```markdown fenced block under the heading."""
+    lines = text.split("\n")
+    start = lines.index("```markdown", lines.index(heading))
+    return "\n".join(lines[start + 1:lines.index("```", start + 1)])
+
+
+class LargeDiffTests(Base):
+    """The large diff items of references/large-diffs.md, as Step 3 of SKILL.md lists them."""
+
+    def test_lockfile_list_has_no_manifest(self):
+        names = lockfile_names(LARGE_DIFFS)
+        for name in ("package-lock.json", "yarn.lock", "composer.lock", "go.sum"):
+            self.assertIn(name, names)
+        for name in ("package.json", "composer.json", "go.mod"):
+            self.assertNotIn(name, names)
+
+    def test_skipped_lockfile_is_material_and_blocks(self):
+        self.assertEqual(check_report(with_verdict(large(FIXTURE), material=[LOCK])), [])
+        self.assertError(check_report(with_verdict(large(FIXTURE))), "Ready to merge line is")
+
+    def test_skip_needs_more_than_500_changed_lines(self):
+        text = large(FIXTURE, effort="**Review effort:** 4/5 — 201 to 500 changed lines in 4 files; payments.")
+        self.assertError(check_report(with_verdict(text, material=[LOCK])),
+                         "but Review effort does not give more than 500 changed lines")
+
+    def test_unmeasured_total_allows_a_skip(self):
+        self.assertEqual(check_report(with_verdict(large(FIXTURE, effort=UNMEASURED_EFFORT), material=[LOCK])), [])
+
+    def test_skipped_file_is_never_reviewed(self):
+        text = set_line(large(FIXTURE), "Files reviewed", "**Files reviewed:** 4 of 4 changed files: `package-lock.json`, "
+                        "`package.json`, `src/orders.js`, `src/routes.js`.")
+        self.assertError(check_report(with_verdict(text, reviewed=4, material=[LOCK])),
+                         "Files reviewed lists `package-lock.json`, which the Audit also lists as not read")
+
+    def test_skipped_file_is_never_context(self):
+        text = set_line(large(FIXTURE), "Read for context", "**Read for context:** 3 files: `package-lock.json`, "
+                        "`skill:references/large-diffs.md`, `tests/orders.test.js`.")
+        self.assertError(check_report(with_verdict(text, material=[LOCK])),
+                         "Read for context names `package-lock.json`, which is a changed file")
+
+    def test_skip_names_a_whole_file(self):
+        item = LOCK_ITEM.replace("(whole file)", "lines 1-850")
+        self.assertError(check_report(with_verdict(large(FIXTURE, item))),
+                         "is skipped in a large diff, so it must name a whole file")
+
+    def test_lockfile_skip_names_a_lockfile(self):
+        item = LOCK_ITEM.replace("`package-lock.json`", "`src/billing.js`")
+        self.assertError(check_report(with_verdict(large(FIXTURE, item))),
+                         "is skipped as a lockfile, but its file name is not a lockfile of references/large-diffs.md")
+
+    def test_material_remainder_blocks(self):
+        text = large(FIXTURE, LOCK_ITEM, REMAINDER_ITEM)
+        self.assertEqual(check_report(with_verdict(text, material=[LOCK, REMAINDER])), [])
+        self.assertError(check_report(with_verdict(text)), "Ready to merge line is")
+
+    def test_cut_off_lines_keep_the_listed_total(self):
+        text = large(FIXTURE, LOCK_ITEM, CUT_ITEM, effort=UNMEASURED_EFFORT)
+        self.assertEqual(check_report(with_verdict(text, material=[LOCK, CUT])), [])
+        self.assertError(check_report(with_verdict(text, material=[LOCK])), "Ready to merge line is")
+
+    def test_reference_example_is_consistent(self):
+        block = example_block(LARGE_DIFFS)
+        effort = line_of(block, "Review effort")
+        audit = parse_audit(block)
+        self.assertEqual(_check_effort(effort), [])
+        self.assertEqual(_check_files(audit, 0), [])
+        self.assertEqual(large_diff_errors(effort, audit["items"]), [])
+        material = [(what, tag) for what, tag, weight, _detail in audit["items"] if weight == "material"]
+        self.assertEqual(line_of(block, "Ready to merge"), verdict_line(reviewed=audit["reviewed"], material=material))
+
+    def test_reference_example_keeps_skips_material(self):
+        items = parse_audit(example_block(LARGE_DIFFS))["items"]
+        skips = [weight for _what, _tag, weight, detail in items if detail.startswith("skipped in a large diff")]
+        self.assertEqual(skips, ["material", "material"])
 
 
 if __name__ == "__main__":
