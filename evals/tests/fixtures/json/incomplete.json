@@ -1,0 +1,39 @@
+{
+  "schema": "code-review-skill/review",
+  "version": 1,
+  "status": "complete",
+  "message": null,
+  "scope": "pr 123 (gh pr diff 123)",
+  "gate": {"fail_on": "critical", "status": "incomplete", "reason": "not fully reviewed (not read): `src/routes.js` lines 40-90."},
+  "review": {
+    "context_lines": [],
+    "intent": [
+      "**Intent:** Add a route that lists a customer's invoices (title, description).",
+      "**Requirements:** none stated.",
+      "**Scope creep:** not judged: no source states a requirement.",
+      "**Sources not read:** none."
+    ],
+    "findings": [],
+    "needs_verification": [],
+    "pre_existing": [],
+    "already_raised": [],
+    "verification": {"checked": 0, "refuted": 0},
+    "omitted_by_configuration": null,
+    "triage": {
+      "review_effort": "3/5 — 51 to 200 changed lines in 2 files; public API contracts.",
+      "relevant_tests": "changed — `tests/invoices.test.js` adds a test of the new route for one customer. Execution: not run.",
+      "look_first": "`src/routes.js` (lines 40-90 were not read).",
+      "ready_to_merge": "No — not fully reviewed (not read): `src/routes.js` lines 40-90."
+    },
+    "verdict": {"ready_to_merge": "No", "row": 3},
+    "audit": {
+      "files_reviewed": {"reviewed": 2, "changed": 2, "paths": ["src/routes.js", "tests/invoices.test.js"]},
+      "read_for_context": ["skill:references/intent.md", "skill:references/json-output.md"],
+      "checked_with_no_findings": ["Security", "Performance", "Tests/Coverage", "Architecture", "Code & File Size", "Potential Bugs", "API Design"],
+      "already_raised_not_verified": [],
+      "not_verified": [
+        {"what": "`src/routes.js` lines 40-90", "tag": "not read", "material": true, "detail": "the diff output was cut off."}
+      ]
+    }
+  }
+}
