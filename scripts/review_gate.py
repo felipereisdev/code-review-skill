@@ -32,6 +32,8 @@ FILTERS = ("min_severity", "disabled_categories", "max_findings_per_file")
 TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified", "dimension not reviewed")
 ROW_VALUES = {1: "No", 2: "No", 3: "No", 4: "With fixes", 5: "With fixes", 6: "With fixes", 7: "Yes"}
 GUIDE = "skill:references/json-output.md"
+SURROGATE_RE = re.compile("[\ud800-\udfff]")
+UNPAIRED = "a string holds an unpaired UTF-16 surrogate, which is not valid text"
 LOCATION_RE = re.compile(r"^.+:\d+(?:-\d+)?$")
 RULE_RE = re.compile(r"^\S+:L\d+(?:-L\d+)?$")
 EXCLUDED_RE = re.compile(r"^\*\*Excluded by configuration:\*\* (\d+) changed files? match(?:es)? ignore_paths and "
@@ -48,9 +50,16 @@ class GateInputError(Exception):
     """The input is not one JSON document of the contract."""
 
 
+def _check_text(text: str):
+    """Refuses a lone surrogate before any diagnostic can print it; a valid pair was already one character."""
+    if SURROGATE_RE.search(text):
+        raise GateInputError(UNPAIRED)
+
+
 def _no_duplicates(pairs):
     seen = {}
     for key, value in pairs:
+        _check_text(key)
         if key in seen:
             raise GateInputError(f'duplicate key "{key}"')
         seen[key] = value
@@ -59,6 +68,19 @@ def _no_duplicates(pairs):
 
 def _no_constant(name):
     raise GateInputError(f"{name} is not valid JSON")
+
+
+def _check_values(doc: dict):
+    """Checks every string value (keys are checked as parsed); iterative, so deep nesting cannot overflow."""
+    pending = [doc]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            _check_text(item)
+        elif isinstance(item, list):
+            pending.extend(item)
+        elif isinstance(item, dict):
+            pending.extend(item.values())
 
 
 def load(data: bytes) -> dict:
@@ -78,6 +100,7 @@ def load(data: bytes) -> dict:
             from None
     if not isinstance(doc, dict):
         raise GateInputError("the document is not a JSON object")
+    _check_values(doc)
     return doc
 
 

@@ -30,10 +30,15 @@ def fixture(name):
     return json.loads(fixture_bytes(name))
 
 
-def run_gate(*args, stdin=b""):
+def run_gate_all(*args, stdin=b""):
     proc = subprocess.run([sys.executable, SCRIPT, *args], input=stdin, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE)
-    return proc.returncode, proc.stdout.decode("utf-8")
+    return proc.returncode, proc.stdout.decode("utf-8"), proc.stderr.decode("utf-8", "replace")
+
+
+def run_gate(*args, stdin=b""):
+    code, out, _ = run_gate_all(*args, stdin=stdin)
+    return code, out
 
 
 class LoadTest(unittest.TestCase):
@@ -389,6 +394,42 @@ class MalformedInputTest(unittest.TestCase):
                     with self.subTest(name=name, path=path, wrong=wrong):
                         if not review_gate.contract_errors(doc):
                             review_gate.expected_gate(doc)
+
+
+class UnpairedSurrogateTest(unittest.TestCase):
+    """A lone UTF-16 surrogate is invalid input (exit 3): the diagnostic stays ASCII and no traceback is printed."""
+
+    MESSAGE = "review-gate: invalid: a string holds an unpaired UTF-16 surrogate, which is not valid text\n"
+
+    def assert_invalid_safely(self, stdin):
+        code, out, err = run_gate_all("-", stdin=stdin)
+        self.assertEqual((code, out), (3, self.MESSAGE))
+        self.assertTrue(out.isascii(), out)
+        self.assertEqual(err, "")
+
+    def test_lone_surrogate_in_gate_reason_exits_3(self):
+        doc = fixture("pass")
+        doc["gate"]["reason"] = "complete review \ud800 with no verified Critical finding"
+        self.assert_invalid_safely(json.dumps(doc).encode())
+
+    def test_duplicate_surrogate_key_exits_3(self):
+        self.assert_invalid_safely(b'{"\\ud800": 1, "\\ud800": 2}')
+
+    def test_lone_surrogate_in_finding_path_exits_3(self):
+        doc = fixture("critical")
+        doc["review"]["findings"][0]["path"] = "src/\ud800orders.js"
+        self.assert_invalid_safely(json.dumps(doc).encode())
+
+    def test_lone_surrogate_in_a_list_exits_3(self):
+        doc = fixture("pass")
+        doc["review"]["intent"][1] = "**Requirements:** \ud800"
+        self.assert_invalid_safely(json.dumps(doc).encode())
+
+    def test_paired_surrogates_and_non_ascii_stay_a_passing_document(self):
+        doc = fixture("pass")
+        doc["gate"]["reason"] = "complete review \ud83d\ude00 caf\u00e9"
+        self.assertEqual(run_gate_all("-", stdin=json.dumps(doc).encode()),
+                         (0, "review-gate: pass: complete review \U0001F600 caf\u00e9\n", ""))
 
 
 if __name__ == "__main__":
