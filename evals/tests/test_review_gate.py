@@ -432,5 +432,19 @@ class UnpairedSurrogateTest(unittest.TestCase):
                          (0, "review-gate: pass: complete review \U0001F600 caf\u00e9\n", ""))
 
 
+class JsonOutputGuideTest(unittest.TestCase):
+    """The examples of references/json-output.md keep the contract and are the fixtures the consumer is tested on."""
+
+    def test_guide_examples_are_the_fixtures(self):
+        with open(os.path.join(ROOT, "references", "json-output.md"), encoding="utf-8") as f:
+            blocks = re.findall(r"^```json\n(.*?)^```$", f.read(), re.M | re.S)
+        self.assertEqual(len(blocks), 3)
+        for block, name in zip(blocks, ("critical", "error", "nothing-to-review")):
+            with self.subTest(name=name):
+                doc = review_gate.load(block.encode("utf-8"))
+                self.assertEqual(review_gate.contract_errors(doc), [])
+                self.assertEqual(doc, fixture(name))
+
+
 if __name__ == "__main__":
     unittest.main()

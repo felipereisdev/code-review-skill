@@ -360,6 +360,7 @@ code-review-skill/
 │   ├── dimensions.md    # Dimension review with subagents (not a review category)
 │   ├── i18n.md
 │   ├── intent.md        # Intent and requirements of every review (not a review category)
+│   ├── json-output.md   # JSON document and merge gate for --format json (not a review category)
 │   ├── large-diffs.md   # Strategy for diffs over 500 changed lines (not a review category)
 │   ├── observability.md
 │   ├── privacy.md
