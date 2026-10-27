@@ -4,12 +4,12 @@
 
 ## Promises and Errors
 
-- **Unhandled rejections**: since Node.js 15, an unhandled promise rejection ends the process by default (`--unhandled-rejections=throw`). A promise started without `await` or `.catch()`, such as `sendWelcomeEmail(user)` in a request handler, crashes the server on its first failure; on Node.js 14 and older it only logs a warning and the error is lost.
-- **Express 4 async handlers**: Express 4 does not catch a rejected promise from an `async` route handler or middleware, so the error never reaches the error-handling middleware, the request hangs until the client times out, and the rejection is unhandled. **Not a finding:** Express 5, which passes a rejected promise to `next(err)`, and handlers that catch their errors and call `next(err)` themselves.
+- **Unhandled rejections**: since Node.js 15, an unhandled promise rejection ends the process by default (`--unhandled-rejections=throw`), unless an `unhandledRejection` listener is installed, which receives the rejection instead. A promise started without `await` or `.catch()`, such as `sendWelcomeEmail(user)` in a request handler, crashes the server on its first failure; on Node.js 14 and older it only logs a warning and the error is lost.
+- **Express 4 async handlers**: Express 4 does not catch a rejected promise from an `async` route handler or middleware, so the error never reaches the error-handling middleware and the rejection is unhandled. Its effect depends on the Node.js version and on process-level rejection handling. On Node.js 15 and later with the default `--unhandled-rejections=throw`, the rejection is raised as an uncaught exception and the process exits, unless an `unhandledRejection` or `uncaughtException` listener handles it. On Node.js 14 and older, or under `--unhandled-rejections=warn` or `none`, the process keeps running, and the request hangs until the client times out if no code responds to it. **Not a finding:** Express 5, which passes a rejected promise to `next(err)`, and handlers that catch their errors and call `next(err)` themselves.
 - **`forEach` with `async` callbacks**: `items.forEach(async (item) => ...)` does not wait for the callbacks, so the function returns before the work ends and their errors are unhandled. Use `for...of` with `await`, or `await Promise.all(items.map(...))`.
 - **`error` events**: an `EventEmitter` that emits `'error'` with no `'error'` listener throws, which crashes the process; streams, sockets and child processes emit it.
 
-**Bad** — with Express 4, a rejected query never reaches the error handler and the request hangs:
+**Bad** — with Express 4, a rejected query never reaches the error handler: the rejection is unhandled, so on Node.js 15 and later the process exits, and on Node.js 14 and older the request hangs:
 
 ```js
 app.get('/orders/:id', async (req, res) => {
@@ -74,7 +74,7 @@ async function transfer(pool, from, to, amount) {
 ## Security
 
 - **Paths from input**: `path.join(base, name)` normalizes `..` but does not keep the result inside `base` (`path.join('/srv/files', '../../etc/passwd')` is `/etc/passwd`), and `path.resolve(base, name)` returns an absolute `name` as it is. Resolve the path, then check that it starts with `base` followed by `path.sep` (and use `fs.realpath` first when the directory can contain symbolic links). **Not a finding:** `res.sendFile(name, { root })` and `express.static(root)`, which check that the path stays inside `root`.
-- **Prototype pollution**: a recursive merge, or a set-by-path helper, that copies keys from request data lets a `__proto__` or `constructor.prototype` key modify `Object.prototype` for the whole process. Skip those keys, or build lookups with `Object.create(null)` or a `Map`. **Not a finding:** a one-level `Object.assign()` or object spread of a parsed body, which does not modify `Object.prototype`.
+- **Prototype pollution**: a recursive merge, or a set-by-path helper, that copies keys from request data lets a `__proto__` or `constructor.prototype` key modify `Object.prototype` for the whole process. Skip those keys, or build lookups with `Object.create(null)` or a `Map`. `Object.assign(target, body)` is a separate case: with a parsed body, a `__proto__` key runs the prototype setter and replaces `target`'s prototype. `Object.prototype` is untouched, but `target` then inherits attacker-chosen properties or loses `Object.prototype` methods such as `hasOwnProperty`. Report it when the body's keys are attacker-controlled and the target is later read for a decision, and no schema that rejects dangerous or unknown keys validated the body before the assignment. **Not a finding:** object spread (`{ ...req.body }`), which creates an own `__proto__` key and does not invoke the setter, for that operation only, and a body that such a schema validated first. A schema that accepts extra keys does not validate the body by its presence alone.
 - **Comparing secrets**: comparing an API key, token or HMAC with `===` takes time that depends on how much of it matches. Use `crypto.timingSafeEqual()`, which throws when the two buffers have different lengths, so compare the lengths first or compare fixed-length digests.
 - **Random values for secrets**: `Math.random()` is predictable; tokens, reset codes and IDs that must not be guessed come from `crypto.randomBytes()`, `crypto.randomUUID()` or `crypto.randomInt()`.
 - **Environment values are strings**: `process.env.X` is a string or `undefined`, so `if (process.env.FEATURE_ENABLED)` is true for `"false"`, and `process.env.PORT + 1` concatenates. Parse values explicitly.
@@ -120,7 +120,7 @@ async function readUpload(name) {
 ## Sources
 
 - `--unhandled-rejections`: https://nodejs.org/api/cli.html#--unhandled-rejectionsmode
-- Express error handling in Express 4 and 5: https://expressjs.com/en/guide/error-handling.html
+- Express error handling in Express 4: https://expressjs.com/en/4x/guide/error-handling.html; in Express 5: https://expressjs.com/en/guide/error-handling.html
 - `express.json()`, `express.urlencoded()`, `express.static()`: https://expressjs.com/en/5x/api/express/; `res.sendFile()`: https://expressjs.com/en/5x/api/response
 - `'error'` events: https://nodejs.org/api/events.html#error-events
 - Blocking the event loop: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
