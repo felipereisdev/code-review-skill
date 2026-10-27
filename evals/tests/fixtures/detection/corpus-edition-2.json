@@ -667,6 +667,45 @@
     "anchor": "- **Plugin aliases.**"
    },
    "why": "The alias is named like an Android plugin, but the catalog gives its id as a plugin that is neither Android nor Kotlin, so the name proves nothing."
+  },
+  {
+   "id": "android-alias-settings-version-catalogs",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "rootProject.name = \"shop\"\ninclude(\":app\")\n\ndependencyResolutionManagement {\n    versionCatalogs {\n        create(\"libs\") { from(files(\"gradle/libs.versions.toml\")) }\n    }\n}\n",
+    "gradle/libs.versions.toml": "[versions]\nagp = \"8.7.0\"\nkotlin = \"2.1.0\"\n\n[plugins]\nandroid-application = { id = \"com.android.application\", version.ref = \"agp\" }\nkotlin-android = { id = \"org.jetbrains.kotlin.android\", version.ref = \"kotlin\" }\n",
+    "app/build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application)\n    alias(libs.plugins.kotlin.android)\n}\n",
+    "app/src/main/java/com/acme/MainActivity.kt": "class MainActivity\n"
+   },
+   "changed": [
+    {
+     "status": "M",
+     "path": "app/src/main/java/com/acme/MainActivity.kt"
+    }
+   ],
+   "expect": {
+    "packages": {
+     "app/src/main/java/com/acme/MainActivity.kt": "app"
+    },
+    "guides": {},
+    "no_guide": {},
+    "never": [
+     "stacks/kotlin-android.md",
+     "stacks/java-spring.md"
+    ],
+    "not_proven": [
+     "Android",
+     "Spring Boot"
+    ],
+    "not_read": []
+   },
+   "rule": {
+    "file": "references/stack-detection.md",
+    "anchor": "A settings file in that root that mentions `versionCatalogs` leaves the stack open."
+   },
+   "why": "The app module applies the aliases that the default catalog gives as Android and Kotlin ids, but the settings file of the build root mentions versionCatalogs, which leaves the stack open, so neither the Android nor the Kotlin guide is proven."
   }
  ]
 }

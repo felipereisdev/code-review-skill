@@ -77,8 +77,14 @@ def build_root(case, package):
 
 
 def catalog_ids(case, package):
-    """The plugin ids that the default catalog of the build root gives, by accessor; a repeated accessor gives none."""
+    """The plugin ids that the default catalog of the build root gives, by accessor; a repeated accessor gives none.
+
+    A settings file of the build root that mentions versionCatalogs leaves every accessor open."""
     root = build_root(case, package)
+    settings = [case["files"].get(posixpath.normpath(posixpath.join(root, name)), "")
+                for name in ("settings.gradle", "settings.gradle.kts")]
+    if any("versionCatalogs" in text for text in settings):
+        return {}
     text = case["files"].get(posixpath.normpath(posixpath.join(root, "gradle", "libs.versions.toml")), "")
     ids, section = {}, None
     for line in text.splitlines():
