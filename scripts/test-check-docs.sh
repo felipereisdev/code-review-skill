@@ -2560,6 +2560,10 @@ make_copy "$work/sdchartlock"
 replace_first "$work/sdchartlock/references/large-diffs.md" ', `Chart.lock`.' '.'
 expect_fail "dropping Chart.lock from the lockfiles fails" "$work/sdchartlock" "references/large-diffs.md: Lockfiles is missing: Chart.lock"
 
+make_copy "$work/sdedition"
+replace_first "$work/sdedition/evals/README.md" 'and they show nothing about what an agent selects' 'and they show which guides an agent selects'
+expect_fail "evals README that claims agent selection from edition 2 fails" "$work/sdedition" "evals/README.md is missing: Its tests check the new guides and their platform sections against the written signal rules, and they show nothing about what an agent selects."
+
 make_copy "$work/sdroot"
 drop_lines "$work/sdroot/SKILL.md" '- `go.mod` → Go'
 expect_fail "dropping an existing root signal fails" "$work/sdroot" "SKILL.md Step 1 is missing: - \`go.mod\` → Go"

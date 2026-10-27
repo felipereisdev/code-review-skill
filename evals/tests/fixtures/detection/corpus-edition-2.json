@@ -1,0 +1,672 @@
+{
+ "note": "Stack detection coverage edition 2, written when the guides for Rust, Ruby / Ruby on Rails, Kotlin / Android, Swift / iOS, Next.js, Kubernetes / Helm, GitHub Actions and SQL were added. Its labels come from the fixture facts and the contract in SKILL.md Step 1, references/stack-detection.md and the guides listed in `guides`, the guide inventory of this edition, never from an observed result and never copied from edition 1 (corpus.json, frozen with the guides of its time). Never change a label to fit a result. An offline test of this file cannot show which package, signal file or guide a real agent picks.",
+ "edition": 2,
+ "guides": ["stacks/angular.md", "stacks/docker.md", "stacks/dotnet.md", "stacks/flutter.md", "stacks/github-actions.md", "stacks/go.md", "stacks/inertia.md", "stacks/java-spring.md", "stacks/kafka.md", "stacks/kotlin-android.md", "stacks/kubernetes-helm.md", "stacks/laravel.md", "stacks/nextjs.md", "stacks/node.md", "stacks/nuxt.md", "stacks/pest.md", "stacks/python.md", "stacks/react-native.md", "stacks/react.md", "stacks/ruby-rails.md", "stacks/rust.md", "stacks/sql.md", "stacks/svelte.md", "stacks/swift-ios.md", "stacks/tailwind.md", "stacks/terraform.md", "stacks/typescript.md", "stacks/vue.md"],
+ "cases": [
+  {
+   "id": "rust-crate",
+   "guide": "stacks/rust.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "Cargo.toml": "[package]\nname = \"parser\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    "src/lib.rs": "pub fn parse() {}\n"
+   },
+   "changed": [{"status": "M", "path": "src/lib.rs"}],
+   "expect": {
+    "packages": {"src/lib.rs": "."},
+    "guides": {".": ["stacks/rust.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "- `Cargo.toml` → Rust: load `./stacks/rust.md`."},
+   "why": "Cargo.toml shows Rust, so the Rust guide applies to the changed Rust file."
+  },
+  {
+   "id": "rust-member-next-unrelated",
+   "guide": "stacks/rust.md",
+   "kind": "positive",
+   "scope": "branch",
+   "files": {
+    "Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n",
+    "crates/parser/Cargo.toml": "[package]\nname = \"parser\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    "crates/parser/src/lib.rs": "pub fn parse() {}\n",
+    "apps/web/package.json": "{\"dependencies\": {\"next\": \"15.1.0\", \"react\": \"19.0.0\"}}\n",
+    "apps/web/next.config.mjs": "export default {};\n"
+   },
+   "changed": [{"status": "M", "path": "crates/parser/src/lib.rs"}],
+   "expect": {
+    "packages": {"crates/parser/src/lib.rs": "crates/parser"},
+    "guides": {"crates/parser": ["stacks/rust.md"]},
+    "no_guide": {},
+    "never": ["stacks/nextjs.md", "stacks/react.md"],
+    "not_proven": [],
+    "not_read": ["apps/web/next.config.mjs", "apps/web/package.json"]
+   },
+   "rule": {"file": "references/stack-detection.md", "anchor": "## Package of a changed file"},
+   "why": "The changed file belongs to crates/parser; apps/web is never listed, so the Next.js and React guides stay unloaded."
+  },
+  {
+   "id": "rust-unrelated-crate",
+   "guide": "stacks/rust.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "crates/core/Cargo.toml": "[package]\nname = \"core\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    "services/api/pyproject.toml": "[project]\nname = \"api\"\ndependencies = [\"fastapi\"]\n",
+    "services/api/app.py": "from fastapi import FastAPI\n"
+   },
+   "changed": [{"status": "M", "path": "services/api/app.py"}],
+   "expect": {
+    "packages": {"services/api/app.py": "services/api"},
+    "guides": {"services/api": ["stacks/python.md"]},
+    "no_guide": {},
+    "never": ["stacks/rust.md"],
+    "not_proven": ["Rust"],
+    "not_read": ["crates/core/Cargo.toml"]
+   },
+   "rule": {"file": "references/stack-detection.md", "anchor": "## Package of a changed file"},
+   "why": "The Cargo.toml of another package is never listed and proves nothing for the Python package."
+  },
+  {
+   "id": "rails-app",
+   "guide": "stacks/ruby-rails.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "Gemfile": "source \"https://rubygems.org\"\ngem \"rails\", \"~> 8.0\"\n",
+    "app/controllers/invoices_controller.rb": "class InvoicesController < ApplicationController\nend\n"
+   },
+   "changed": [{"status": "M", "path": "app/controllers/invoices_controller.rb"}],
+   "expect": {
+    "packages": {"app/controllers/invoices_controller.rb": "."},
+    "guides": {".": ["stacks/ruby-rails.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "whose Rails sections apply only when the package's own `Gemfile` declares `rails`."},
+   "why": "The Gemfile declares rails directly, so the Ruby and the Rails sections apply."
+  },
+  {
+   "id": "ruby-without-rails",
+   "guide": "stacks/ruby-rails.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "Gemfile": "source \"https://rubygems.org\"\ngem \"sinatra\"\n",
+    "Gemfile.lock": "GEM\n  specs:\n    railties (8.0.1)\n    sinatra (4.1.1)\n",
+    "app.rb": "require \"sinatra\"\n"
+   },
+   "changed": [{"status": "M", "path": "app.rb"}],
+   "expect": {
+    "packages": {"app.rb": "."},
+    "guides": {".": ["stacks/ruby-rails.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": ["Ruby on Rails"],
+    "not_read": []
+   },
+   "rule": {"file": "references/stack-detection.md", "anchor": "## Evidence that proves nothing"},
+   "why": "The Gemfile shows Ruby without the rails gem; railties in Gemfile.lock never proves Rails, so only the Ruby section applies."
+  },
+  {
+   "id": "kotlin-jvm-not-android",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "rootProject.name = \"billing\"\n",
+    "build.gradle.kts": "plugins {\n    kotlin(\"jvm\") version \"2.1.0\"\n}\n",
+    "src/main/kotlin/Billing.kt": "class Billing\n"
+   },
+   "changed": [{"status": "M", "path": "src/main/kotlin/Billing.kt"}],
+   "expect": {
+    "packages": {"src/main/kotlin/Billing.kt": "."},
+    "guides": {".": ["stacks/kotlin-android.md"]},
+    "no_guide": {},
+    "never": ["stacks/java-spring.md"],
+    "not_proven": ["Android", "Spring Boot"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "load `./stacks/kotlin-android.md`, whose Android sections apply only to a module whose own build applies one of the two Android plugins"},
+   "why": "The kotlin(\"jvm\") plugin shows Kotlin without Android or Spring Boot, so only the Kotlin sections apply."
+  },
+  {
+   "id": "android-app-kts",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "include(\":app\")\n",
+    "build.gradle.kts": "plugins {\n    id(\"com.android.application\") version \"8.7.0\" apply false\n}\n",
+    "app/build.gradle.kts": "plugins {\n    id(\"com.android.application\")\n    kotlin(\"android\")\n}\n",
+    "app/src/main/java/com/acme/MainActivity.kt": "class MainActivity\n"
+   },
+   "changed": [{"status": "M", "path": "app/src/main/java/com/acme/MainActivity.kt"}],
+   "expect": {
+    "packages": {"app/src/main/java/com/acme/MainActivity.kt": "app"},
+    "guides": {"app": ["stacks/kotlin-android.md"]},
+    "no_guide": {},
+    "never": ["stacks/java-spring.md"],
+    "not_proven": ["Spring Boot"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+   "why": "The app module's own build applies com.android.application and the Kotlin plugin."
+  },
+  {
+   "id": "android-app-groovy",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle": "include ':app'\n",
+    "app/build.gradle": "plugins {\n    id 'com.android.application'\n}\n",
+    "app/src/main/java/com/acme/LoginActivity.java": "public class LoginActivity {}\n"
+   },
+   "changed": [{"status": "M", "path": "app/src/main/java/com/acme/LoginActivity.java"}],
+   "expect": {
+    "packages": {"app/src/main/java/com/acme/LoginActivity.java": "app"},
+    "guides": {"app": ["stacks/kotlin-android.md"]},
+    "no_guide": {},
+    "never": ["stacks/java-spring.md"],
+    "not_proven": ["Spring Boot"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "The same plugins in a Groovy `build.gradle` show the same."},
+   "why": "A Groovy build that applies com.android.application shows Android, never Spring Boot."
+  },
+  {
+   "id": "gradle-convention-plugin",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "ambiguous",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "include(\":service\")\n",
+    "buildSrc/build.gradle.kts": "plugins {\n    `kotlin-dsl`\n}\n",
+    "service/build.gradle.kts": "plugins {\n    id(\"acme.service-conventions\")\n}\n",
+    "service/src/main/kotlin/Api.kt": "class Api\n"
+   },
+   "changed": [{"status": "M", "path": "service/src/main/kotlin/Api.kt"}],
+   "expect": {
+    "packages": {"service/src/main/kotlin/Api.kt": "service"},
+    "guides": {},
+    "no_guide": {"service": ["Gradle"]},
+    "never": ["stacks/kotlin-android.md", "stacks/java-spring.md"],
+    "not_proven": ["Kotlin", "Android", "Spring Boot"],
+    "not_read": []
+   },
+   "rule": {"file": "references/stack-detection.md", "anchor": "## Ambiguity and missing guides"},
+   "why": "The service build takes its plugins only from build logic elsewhere, so its Gradle stack stays open."
+  },
+  {
+   "id": "swift-package-not-ios",
+   "guide": "stacks/swift-ios.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "package.json": "{\"dependencies\": {\"react-native\": \"0.76.0\"}}\n",
+    "tools/codegen/Package.swift": "// swift-tools-version:5.10\nimport PackageDescription\n\nlet package = Package(name: \"codegen\")\n",
+    "tools/codegen/Sources/codegen/main.swift": "print(\"codegen\")\n"
+   },
+   "changed": [{"status": "M", "path": "tools/codegen/Sources/codegen/main.swift"}],
+   "expect": {
+    "packages": {"tools/codegen/Sources/codegen/main.swift": "tools/codegen"},
+    "guides": {"tools/codegen": ["stacks/swift-ios.md"]},
+    "no_guide": {},
+    "never": ["stacks/react-native.md"],
+    "not_proven": ["iOS"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "It never proves an iOS app."},
+   "why": "Package.swift shows a Swift package with no iOS platform; the root React Native app is another package."
+  },
+  {
+   "id": "xcode-ios-app",
+   "guide": "stacks/swift-ios.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "ios/Acme.xcodeproj/project.pbxproj": "buildSettings = {\n\tSDKROOT = iphoneos;\n};\n",
+    "ios/Acme/ContentView.swift": "import SwiftUI\n"
+   },
+   "changed": [{"status": "M", "path": "ios/Acme/ContentView.swift"}],
+   "expect": {
+    "packages": {"ios/Acme/ContentView.swift": "."},
+    "guides": {".": ["stacks/swift-ios.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "`SDKROOT = iphoneos` shows iOS."},
+   "why": "The Xcode project in ios/ sets SDKROOT = iphoneos, so the Swift and the iOS sections apply."
+  },
+  {
+   "id": "next-app",
+   "guide": "stacks/nextjs.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "apps/web/package.json": "{\"dependencies\": {\"next\": \"15.1.0\", \"react\": \"19.0.0\", \"react-dom\": \"19.0.0\"}}\n",
+    "apps/web/next.config.mjs": "export default {};\n",
+    "apps/web/tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+    "apps/web/app/page.tsx": "export default function Page() { return null; }\n"
+   },
+   "changed": [{"status": "M", "path": "apps/web/app/page.tsx"}],
+   "expect": {
+    "packages": {"apps/web/app/page.tsx": "apps/web"},
+    "guides": {"apps/web": ["stacks/nextjs.md", "stacks/react.md", "stacks/typescript.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "`./stacks/react.md` applies to the React code of the change, as the `react` dependency proves."},
+   "why": "next.config.mjs shows Next.js, the react dependency keeps the React guide, and tsconfig.json shows TypeScript."
+  },
+  {
+   "id": "next-dependency-without-config",
+   "guide": "stacks/nextjs.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "web/package.json": "{\"dependencies\": {\"next\": \"14.2.25\", \"react\": \"18.3.1\"}}\n",
+    "web/pages/index.jsx": "export default function Home() { return null; }\n"
+   },
+   "changed": [{"status": "M", "path": "web/pages/index.jsx"}],
+   "expect": {
+    "packages": {"web/pages/index.jsx": "web"},
+    "guides": {"web": ["stacks/nextjs.md", "stacks/react.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "- `next.config.*`, or `next` among the runtime or peer dependencies of `package.json` → Next.js: load `./stacks/nextjs.md`."},
+   "why": "The package declares next directly, which shows Next.js without a next.config file."
+  },
+  {
+   "id": "vite-react-not-next",
+   "guide": "stacks/nextjs.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "package.json": "{\"dependencies\": {\"react\": \"19.0.0\"}, \"devDependencies\": {\"vite\": \"6.0.0\"}}\n",
+    "package-lock.json": "{\"packages\": {\"node_modules/next\": {\"version\": \"15.1.0\"}}}\n",
+    "vite.config.ts": "export default {};\n",
+    "tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+    "src/App.tsx": "export function App() { return null; }\n"
+   },
+   "changed": [{"status": "M", "path": "src/App.tsx"}],
+   "expect": {
+    "packages": {"src/App.tsx": "."},
+    "guides": {".": ["stacks/react.md", "stacks/typescript.md"]},
+    "no_guide": {},
+    "never": ["stacks/nextjs.md"],
+    "not_proven": ["Next.js"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "**What proves a framework.**"},
+   "why": "A next entry in the lockfile never proves Next.js; the package declares React and Vite only."
+  },
+  {
+   "id": "helm-chart",
+   "guide": "stacks/kubernetes-helm.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "deploy/chart/Chart.yaml": "apiVersion: v2\nname: api\nversion: 1.2.0\n",
+    "deploy/chart/values.yaml": "replicaCount: 2\n",
+    "deploy/chart/templates/deployment.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}\n"
+   },
+   "changed": [{"status": "M", "path": "deploy/chart/templates/deployment.yaml"}, {"status": "M", "path": "deploy/chart/values.yaml"}],
+   "expect": {
+    "packages": {"deploy/chart/templates/deployment.yaml": ".", "deploy/chart/values.yaml": "."},
+    "guides": {".": ["stacks/kubernetes-helm.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "- `Chart.yaml` → a Helm chart: load `./stacks/kubernetes-helm.md`"},
+   "why": "Chart.yaml in deploy/chart/ makes its values and templates part of a Helm chart."
+  },
+  {
+   "id": "k8s-manifest-image-not-language",
+   "guide": "stacks/kubernetes-helm.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "k8s/deployment.yaml": "apiVersion: apps/v1\nkind: Deployment\nspec:\n  template:\n    spec:\n      containers:\n        - name: api\n          image: node:22\n"
+   },
+   "changed": [{"status": "M", "path": "k8s/deployment.yaml"}],
+   "expect": {
+    "packages": {"k8s/deployment.yaml": "."},
+    "guides": {".": ["stacks/kubernetes-helm.md"]},
+    "no_guide": {},
+    "never": ["stacks/node.md"],
+    "not_proven": ["Node.js"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "An image that a manifest names never shows the language of the application."},
+   "why": "The file has top-level apiVersion and kind keys; its node image proves nothing about application code."
+  },
+  {
+   "id": "compose-not-kubernetes",
+   "guide": "stacks/kubernetes-helm.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "docker-compose.yml": "services:\n  db:\n    image: postgres:17\n"
+   },
+   "changed": [{"status": "M", "path": "docker-compose.yml"}],
+   "expect": {
+    "packages": {"docker-compose.yml": "."},
+    "guides": {".": ["stacks/docker.md"]},
+    "no_guide": {},
+    "never": ["stacks/kubernetes-helm.md"],
+    "not_proven": ["Kubernetes"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "with top-level `apiVersion:` and `kind:` keys, or a `kustomization.yaml` → Kubernetes: load `./stacks/kubernetes-helm.md` for those files."},
+   "why": "docker-compose.yml shows Docker; a YAML file without apiVersion and kind is not a Kubernetes manifest."
+  },
+  {
+   "id": "workflow-with-go-change",
+   "guide": "stacks/github-actions.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "go.mod": "module example.com/shop\n\ngo 1.22\n",
+    "cmd/server/main.go": "package main\n",
+    ".github/workflows/ci.yml": "on: push\njobs:\n  docs:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-python@v5\n"
+   },
+   "changed": [{"status": "M", "path": ".github/workflows/ci.yml"}, {"status": "M", "path": "cmd/server/main.go"}],
+   "expect": {
+    "packages": {".github/workflows/ci.yml": ".", "cmd/server/main.go": "."},
+    "guides": {".": ["stacks/go.md", "stacks/github-actions.md"]},
+    "no_guide": {},
+    "never": ["stacks/python.md"],
+    "not_proven": ["Python"],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "at the repository root: load `./stacks/github-actions.md` for them."},
+   "why": "The root workflow loads the GitHub Actions guide; its setup-python step never makes the Go code Python."
+  },
+  {
+   "id": "workflow-below-root",
+   "guide": "stacks/github-actions.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "package.json": "{\"private\": true, \"workspaces\": [\"packages/*\"]}\n",
+    "packages/site/package.json": "{\"private\": true}\n",
+    "packages/site/.github/workflows/deploy.yml": "on: push\n"
+   },
+   "changed": [{"status": "M", "path": "packages/site/.github/workflows/deploy.yml"}],
+   "expect": {
+    "packages": {"packages/site/.github/workflows/deploy.yml": "packages/site"},
+    "guides": {},
+    "no_guide": {},
+    "never": ["stacks/github-actions.md"],
+    "not_proven": ["GitHub Actions"],
+    "not_read": []
+   },
+   "rule": {"file": "references/stack-detection.md", "anchor": "## Evidence that proves nothing"},
+   "why": "GitHub runs workflows only from .github/workflows/ at the repository root, so this file is an ordinary file of its package."
+  },
+  {
+   "id": "composite-action",
+   "guide": "stacks/github-actions.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    ".github/actions/setup/action.yml": "name: setup\nruns:\n  using: composite\n  steps:\n    - run: echo setup\n      shell: bash\n"
+   },
+   "changed": [{"status": "M", "path": ".github/actions/setup/action.yml"}],
+   "expect": {
+    "packages": {".github/actions/setup/action.yml": "."},
+    "guides": {".": ["stacks/github-actions.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "- `action.yml` / `action.yaml` with a top-level `runs:` key → the metadata of a GitHub Action"},
+   "why": "An action.yml with a top-level runs key is the metadata of a composite action."
+  },
+  {
+   "id": "sql-schema",
+   "guide": "stacks/sql.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "db/schema.sql": "CREATE TABLE invoices (id bigint PRIMARY KEY);\n"
+   },
+   "changed": [{"status": "M", "path": "db/schema.sql"}],
+   "expect": {
+    "packages": {"db/schema.sql": "."},
+    "guides": {".": ["stacks/sql.md"]},
+    "no_guide": {},
+    "never": [],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "- `*.sql` → SQL: load `./stacks/sql.md` for the changed `.sql` files only."},
+   "why": "A changed .sql file selects the SQL guide for that file."
+  },
+  {
+   "id": "sql-in-python-code",
+   "guide": "stacks/sql.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "services/api/pyproject.toml": "[project]\nname = \"api\"\ndependencies = [\"psycopg\"]\n",
+    "services/api/repo.py": "QUERY = \"SELECT id FROM invoices WHERE owner_id = %s\"\n",
+    "services/api/migrations/001_init.sql": "CREATE TABLE invoices (id bigint PRIMARY KEY);\n"
+   },
+   "changed": [{"status": "M", "path": "services/api/repo.py"}],
+   "expect": {
+    "packages": {"services/api/repo.py": "services/api"},
+    "guides": {"services/api": ["stacks/python.md"]},
+    "no_guide": {},
+    "never": ["stacks/sql.md"],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "references/stack-detection.md", "anchor": "selects its stack file for that file only, never for the rest of its package"},
+   "why": "SQL inside Python code follows the Python guide; the unchanged .sql file selects nothing."
+  },
+  {
+   "id": "sql-excluded-by-configuration",
+   "guide": "stacks/sql.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "ignore_paths": ["db/fixtures/"],
+   "files": {
+    ".code-review/config.yml": "ignore_paths:\n  - \"db/fixtures/\"\n",
+    "db/fixtures/seed.sql": "INSERT INTO users (email) VALUES ('a@example.com');\n",
+    "api/go.mod": "module example.com/api\n\ngo 1.22\n",
+    "api/main.go": "package main\n"
+   },
+   "changed": [{"status": "M", "path": "db/fixtures/seed.sql"}, {"status": "M", "path": "api/main.go"}],
+   "expect": {
+    "packages": {"api/main.go": "api"},
+    "guides": {"api": ["stacks/go.md"]},
+    "no_guide": {},
+    "never": ["stacks/sql.md"],
+    "not_proven": [],
+    "not_read": []
+   },
+   "rule": {"file": "SKILL.md", "anchor": "**Directories to list.**"},
+   "why": "The configuration excludes db/fixtures/, so its changed .sql file selects no stack."
+  },
+  {
+   "id": "android-alias-default-catalog",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "positive",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "rootProject.name = \"shop\"\ninclude(\":app\")\n",
+    "build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application) apply false\n    alias(libs.plugins.kotlin.android) apply false\n}\n",
+    "gradle/libs.versions.toml": "[versions]\nagp = \"8.7.0\"\nkotlin = \"2.1.0\"\n\n[plugins]\nandroid-application = { id = \"com.android.application\", version.ref = \"agp\" }\nkotlin-android = { id = \"org.jetbrains.kotlin.android\", version.ref = \"kotlin\" }\n",
+    "app/build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application)\n    alias(libs.plugins.kotlin.android)\n}\n",
+    "app/src/main/java/com/acme/MainActivity.kt": "class MainActivity\n"
+   },
+   "changed": [
+    {
+     "status": "M",
+     "path": "app/src/main/java/com/acme/MainActivity.kt"
+    }
+   ],
+   "expect": {
+    "packages": {
+     "app/src/main/java/com/acme/MainActivity.kt": "app"
+    },
+    "guides": {
+     "app": [
+      "stacks/kotlin-android.md"
+     ]
+    },
+    "no_guide": {},
+    "never": [
+     "stacks/java-spring.md"
+    ],
+    "not_proven": [
+     "Spring Boot"
+    ],
+    "not_read": []
+   },
+   "rule": {
+    "file": "references/stack-detection.md",
+    "anchor": "- **Plugin aliases.**"
+   },
+   "why": "The app module's own build applies two aliases that the default catalog gives as com.android.application and org.jetbrains.kotlin.android, so the Android sections apply; the root declares the same aliases with apply false, which applies to no module."
+  },
+  {
+   "id": "android-alias-not-applied",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "include(\":api\")\n",
+    "build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application) apply false\n}\n",
+    "gradle/libs.versions.toml": "[plugins]\nandroid-application = { id = \"com.android.application\", version = \"8.7.0\" }\nkotlin-jvm = { id = \"org.jetbrains.kotlin.jvm\", version = \"2.1.0\" }\n",
+    "api/build.gradle.kts": "plugins {\n    alias(libs.plugins.kotlin.jvm)\n}\n",
+    "api/src/main/kotlin/Billing.kt": "class Billing\n"
+   },
+   "changed": [
+    {
+     "status": "M",
+     "path": "api/src/main/kotlin/Billing.kt"
+    }
+   ],
+   "expect": {
+    "packages": {
+     "api/src/main/kotlin/Billing.kt": "api"
+    },
+    "guides": {
+     "api": [
+      "stacks/kotlin-android.md"
+     ]
+    },
+    "no_guide": {},
+    "never": [
+     "stacks/java-spring.md"
+    ],
+    "not_proven": [
+     "Android",
+     "Spring Boot"
+    ],
+    "not_read": []
+   },
+   "rule": {
+    "file": "SKILL.md",
+    "anchor": "A declaration with `apply false` applies to no module"
+   },
+   "why": "The root catalog gives an Android plugin, but the root declares it with apply false, which applies to no module; the api module applies only the Kotlin JVM alias, so only the Kotlin sections apply."
+  },
+  {
+   "id": "android-alias-without-catalog",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "rootProject.name = \"shop\"\ninclude(\":app\")\n",
+    "app/build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application)\n}\n",
+    "app/src/main/java/com/acme/MainActivity.kt": "class MainActivity\n"
+   },
+   "changed": [
+    {
+     "status": "M",
+     "path": "app/src/main/java/com/acme/MainActivity.kt"
+    }
+   ],
+   "expect": {
+    "packages": {
+     "app/src/main/java/com/acme/MainActivity.kt": "app"
+    },
+    "guides": {},
+    "no_guide": {},
+    "never": [
+     "stacks/kotlin-android.md",
+     "stacks/java-spring.md"
+    ],
+    "not_proven": [
+     "Android",
+     "Spring Boot"
+    ],
+    "not_read": []
+   },
+   "rule": {
+    "file": "references/stack-detection.md",
+    "anchor": "a catalog missing from the build root leaves the stack open"
+   },
+   "why": "The alias name suggests Android, but the snapshot has no version catalog in the build root, so the alias proves nothing and the stack stays open."
+  },
+  {
+   "id": "android-alias-name-not-id",
+   "guide": "stacks/kotlin-android.md",
+   "kind": "negative",
+   "scope": "uncommitted",
+   "files": {
+    "settings.gradle.kts": "rootProject.name = \"shop\"\ninclude(\":app\")\n",
+    "gradle/libs.versions.toml": "[plugins]\nandroid-application = { id = \"com.acme.build.application\", version = \"1.0.0\" }\n",
+    "app/build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application)\n}\n",
+    "app/src/main/java/com/acme/MainActivity.kt": "class MainActivity\n"
+   },
+   "changed": [
+    {
+     "status": "M",
+     "path": "app/src/main/java/com/acme/MainActivity.kt"
+    }
+   ],
+   "expect": {
+    "packages": {
+     "app/src/main/java/com/acme/MainActivity.kt": "app"
+    },
+    "guides": {},
+    "no_guide": {},
+    "never": [
+     "stacks/kotlin-android.md",
+     "stacks/java-spring.md"
+    ],
+    "not_proven": [
+     "Android",
+     "Spring Boot"
+    ],
+    "not_read": []
+   },
+   "rule": {
+    "file": "references/stack-detection.md",
+    "anchor": "- **Plugin aliases.**"
+   },
+   "why": "The alias is named like an Android plugin, but the catalog gives its id as a plugin that is neither Android nor Kotlin, so the name proves nothing."
+  }
+ ]
+}

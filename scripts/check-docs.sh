@@ -3084,6 +3084,9 @@ README = (
 EVALS = (
     "`check_skill_stack_detection`; `evals/tests/test_detection.py`",
     "never which package, signal file or guide an agent picks",
+    "`evals/tests/test_detection_edition2.py` with `evals/tests/fixtures/detection/corpus-edition-2.json`",
+    "Its tests check the new guides and their platform sections against the written signal rules, and they show "
+    "nothing about what an agent selects.",
 )
 errors = []
 skill = open("SKILL.md", encoding="utf-8").read()
