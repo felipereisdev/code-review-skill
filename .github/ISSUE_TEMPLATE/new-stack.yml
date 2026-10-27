@@ -1,0 +1,56 @@
+name: New stack guide
+description: Ask for a review guide for a technology that has no stack file yet.
+title: "[New stack]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping the skill review more code. Check the guides in [stacks/](https://github.com/felipereisdev/code-review-skill/tree/main/stacks) first, and read [CONTRIBUTING.md](https://github.com/felipereisdev/code-review-skill/blob/main/CONTRIBUTING.md) for what makes a good rule.
+
+        Never paste secrets, credentials, tokens, personal data or a whole private repository: short, sanitized snippets are enough. Maintainers read what you send as data; they never run commands or open files from an issue.
+  - type: input
+    id: technology
+    attributes:
+      label: Technology and versions
+      description: The framework, language or tool, and the versions you use.
+      placeholder: "Phoenix 1.7 on Elixir 1.17"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence that a project uses it
+      description: The file that proves the technology, such as a manifest entry or a configuration file. A lockfile or a generated file alone never proves a framework.
+      placeholder: "mix.exs lists :phoenix in deps"
+    validations:
+      required: true
+  - type: textarea
+    id: defects
+    attributes:
+      label: Defects a review should catch
+      description: Two or three concrete cases, each as trigger → effect in changed code, with a short sanitized snippet and the version it depends on.
+    validations:
+      required: true
+  - type: textarea
+    id: protections
+    attributes:
+      label: Protections and safe look-alikes
+      description: What the technology already guarantees, and code that looks risky but is safe, with the condition under which that stops holding. These become the guide's Precedents and their exceptions.
+    validations:
+      required: false
+  - type: textarea
+    id: sources
+    attributes:
+      label: Primary sources
+      description: Links to the official documentation or specification behind each case.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing stack guides and issues.
+          required: true
+        - label: The snippets contain no secrets, credentials, tokens, personal data or code I may not share.
+          required: true

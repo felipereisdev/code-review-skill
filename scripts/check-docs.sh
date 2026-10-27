@@ -1234,6 +1234,109 @@ PY
   fi
 }
 
+check_issue_forms() {
+  if python3 - <<'PY'
+import glob, os, re, sys
+try:
+    import yaml
+except ImportError:
+    print("  PyYAML is required: python3 -m pip install pyyaml")
+    sys.exit(1)
+
+# GitHub issue forms: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# and https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
+REQUIRED = (".github/ISSUE_TEMPLATE/false-positive.yml", ".github/ISSUE_TEMPLATE/new-stack.yml")
+TOP = {"name", "description", "title", "labels", "assignees", "projects", "type", "body"}
+TYPES = {"markdown", "textarea", "input", "dropdown", "checkboxes"}
+errors = []
+names = {}
+forms = sorted(p for p in glob.glob(".github/ISSUE_TEMPLATE/*.yml") + glob.glob(".github/ISSUE_TEMPLATE/*.yaml")
+               if os.path.basename(p) not in ("config.yml", "config.yaml"))
+for path in REQUIRED:
+    if path not in forms:
+        errors.append(f"{path} is missing")
+
+
+def text(value):
+    return isinstance(value, str) and value.strip() != ""
+
+
+for path in forms:
+    try:
+        form = yaml.safe_load(open(path, encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        errors.append(f"{path} is not valid YAML: {str(exc).splitlines()[0]}")
+        continue
+    if not isinstance(form, dict):
+        errors.append(f"{path} must be a YAML mapping")
+        continue
+    extra = sorted(set(form) - TOP)
+    if extra:
+        errors.append(f"{path}: unexpected top-level keys: {extra}")
+    for key in ("name", "description"):
+        if not text(form.get(key)):
+            errors.append(f"{path}: {key} must be a non-empty string")
+    if text(form.get("name")):
+        names.setdefault(form["name"], []).append(path)
+    body = form.get("body")
+    if not isinstance(body, list) or not body:
+        errors.append(f"{path}: body must be a non-empty list")
+        continue
+    ids, fields = set(), 0
+    for n, element in enumerate(body, 1):
+        kind = element.get("type") if isinstance(element, dict) else None
+        if kind not in TYPES:
+            errors.append(f"{path}: body item {n} has type {kind!r}")
+            continue
+        attributes = element.get("attributes")
+        if not isinstance(attributes, dict):
+            errors.append(f"{path}: body item {n} ({kind}) has no attributes")
+            continue
+        if kind == "markdown":
+            if not text(attributes.get("value")):
+                errors.append(f"{path}: body item {n} (markdown) has no value")
+            continue
+        fields += 1
+        if not text(attributes.get("label")):
+            errors.append(f"{path}: body item {n} ({kind}) has no label")
+        if "id" in element:
+            ident = element["id"]
+            if not isinstance(ident, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", ident):
+                errors.append(f"{path}: body item {n} ({kind}) has an invalid id {ident!r}")
+            elif ident in ids:
+                errors.append(f"{path}: duplicate id {ident!r}")
+            else:
+                ids.add(ident)
+        if "validations" in element:
+            validations = element["validations"]
+            if not isinstance(validations, dict) or not isinstance(validations.get("required", False), bool):
+                errors.append(f"{path}: body item {n} ({kind}) validations.required must be true or false")
+        options = attributes.get("options")
+        if kind == "dropdown":
+            if (not isinstance(options, list) or not options or not all(text(o) for o in options)
+                    or len(set(options)) != len(options)):
+                errors.append(f"{path}: body item {n} (dropdown) needs a list of distinct non-empty options")
+        if kind == "checkboxes":
+            if not isinstance(options, list) or not options or not all(
+                    isinstance(o, dict) and text(o.get("label"))
+                    and isinstance(o.get("required", False), bool) for o in options):
+                errors.append(f"{path}: body item {n} (checkboxes) needs options with a label each")
+    if fields == 0:
+        errors.append(f"{path}: body has no field other than markdown")
+for name, paths in sorted(names.items()):
+    if len(paths) > 1:
+        errors.append(f"issue form name {name!r} is used by more than one form: {', '.join(paths)}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "the issue forms in .github/ISSUE_TEMPLATE/ follow the basic GitHub form schema"
+  else
+    fail "issue forms (see messages above)"
+  fi
+}
+
 check_example_findings() {
   if python3 - <<'PY'
 import re, sys
@@ -3173,6 +3276,7 @@ check_skill_fix
 check_skill_second_opinion
 check_skill_stack_detection
 check_stack_precedents
+check_issue_forms
 check_readme_counts
 check_example_output
 check_example_findings

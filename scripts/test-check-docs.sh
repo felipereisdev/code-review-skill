@@ -2638,6 +2638,40 @@ printf '\n## Notes\n\n- note\n' >> "$work/ppnotlast/patterns/microservices.md"
 expect_fail "a section after a pattern's Precedents fails" "$work/ppnotlast" "patterns/microservices.md: '## Precedents' must be the last '## ' section"
 # End of pattern precedent tests.
 
+# Issue forms (.github/ISSUE_TEMPLATE/*.yml).
+make_copy "$work/ifmissing"
+rm "$work/ifmissing/.github/ISSUE_TEMPLATE/false-positive.yml"
+expect_fail "a missing false positive form fails" "$work/ifmissing" ".github/ISSUE_TEMPLATE/false-positive.yml is missing"
+
+make_copy "$work/ifyaml"
+printf 'body: [\n' >> "$work/ifyaml/.github/ISSUE_TEMPLATE/new-stack.yml"
+expect_fail "an issue form that is not YAML fails" "$work/ifyaml" ".github/ISSUE_TEMPLATE/new-stack.yml is not valid YAML"
+
+make_copy "$work/ifkey"
+printf 'about: Old Markdown template key\n' >> "$work/ifkey/.github/ISSUE_TEMPLATE/new-stack.yml"
+expect_fail "a Markdown template key in an issue form fails" "$work/ifkey" ".github/ISSUE_TEMPLATE/new-stack.yml: unexpected top-level keys: ['about']"
+
+make_copy "$work/iftype"
+replace_first "$work/iftype/.github/ISSUE_TEMPLATE/false-positive.yml" 'type: textarea' 'type: text'
+expect_fail "an unknown issue form field type fails" "$work/iftype" ".github/ISSUE_TEMPLATE/false-positive.yml: body item 3 has type 'text'"
+
+make_copy "$work/iflabel"
+replace_first "$work/iflabel/.github/ISSUE_TEMPLATE/new-stack.yml" '      label: Technology and versions' '      title: Technology and versions'
+expect_fail "an issue form field without a label fails" "$work/iflabel" ".github/ISSUE_TEMPLATE/new-stack.yml: body item 2 (input) has no label"
+
+make_copy "$work/ifid"
+replace_first "$work/ifid/.github/ISSUE_TEMPLATE/new-stack.yml" 'id: sources' 'id: evidence'
+expect_fail "a duplicate issue form field id fails" "$work/ifid" ".github/ISSUE_TEMPLATE/new-stack.yml: duplicate id 'evidence'"
+
+make_copy "$work/ifname"
+replace_first "$work/ifname/.github/ISSUE_TEMPLATE/false-positive.yml" 'name: False positive' 'name: New stack guide'
+expect_fail "two issue forms with one name fail" "$work/ifname" "issue form name 'New stack guide' is used by more than one form"
+
+make_copy "$work/ifconfig"
+printf 'blank_issues_enabled: true\n' > "$work/ifconfig/.github/ISSUE_TEMPLATE/config.yml"
+expect_pass "a template chooser config.yml next to the forms passes" "$work/ifconfig"
+# End of issue form tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
