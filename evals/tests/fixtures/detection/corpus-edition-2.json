@@ -557,7 +557,7 @@
     "settings.gradle.kts": "include(\":api\")\n",
     "build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application) apply false\n}\n",
     "gradle/libs.versions.toml": "[plugins]\nandroid-application = { id = \"com.android.application\", version = \"8.7.0\" }\nkotlin-jvm = { id = \"org.jetbrains.kotlin.jvm\", version = \"2.1.0\" }\n",
-    "api/build.gradle.kts": "plugins {\n    alias(libs.plugins.kotlin.jvm)\n}\n",
+    "api/build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application) apply false\n    alias(libs.plugins.kotlin.jvm)\n}\n",
     "api/src/main/kotlin/Billing.kt": "class Billing\n"
    },
    "changed": [
@@ -589,7 +589,7 @@
     "file": "SKILL.md",
     "anchor": "A declaration with `apply false` applies to no module"
    },
-   "why": "The root catalog gives an Android plugin, but the root declares it with apply false, which applies to no module; the api module applies only the Kotlin JVM alias, so only the Kotlin sections apply."
+   "why": "The catalog gives an Android plugin, but the api module declares it with apply false, which applies it to no module; the only alias the module applies is the Kotlin JVM one, so only the Kotlin sections apply."
   },
   {
    "id": "android-alias-without-catalog",
@@ -612,7 +612,7 @@
      "app/src/main/java/com/acme/MainActivity.kt": "app"
     },
     "guides": {},
-    "no_guide": {},
+    "no_guide": {"app": ["Gradle"]},
     "never": [
      "stacks/kotlin-android.md",
      "stacks/java-spring.md"
@@ -651,7 +651,7 @@
      "app/src/main/java/com/acme/MainActivity.kt": "app"
     },
     "guides": {},
-    "no_guide": {},
+    "no_guide": {"app": ["Gradle"]},
     "never": [
      "stacks/kotlin-android.md",
      "stacks/java-spring.md"
@@ -690,7 +690,7 @@
      "app/src/main/java/com/acme/MainActivity.kt": "app"
     },
     "guides": {},
-    "no_guide": {},
+    "no_guide": {"app": ["Gradle"]},
     "never": [
      "stacks/kotlin-android.md",
      "stacks/java-spring.md"
