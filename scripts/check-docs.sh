@@ -1196,7 +1196,7 @@ PY
 
 check_stack_precedents() {
   if python3 - <<'PY'
-import glob, re, sys
+import glob, os, re, sys
 
 item = re.compile(r"^- \*\*[^*]+\*\*: .+\. Do not report .+\. \*\*Exception:\*\* .+\.$")
 errors = []
@@ -1223,14 +1223,67 @@ def check(name, lines):
 # Pattern files end with Precedents too, applied like a stack file's (SKILL.md Step 1).
 for path in sorted(glob.glob("stacks/*.md")) + sorted(glob.glob("patterns/*.md")):
     check(path, open(path, encoding="utf-8").read().splitlines())
+# The stack guide template in CONTRIBUTING.md follows the same rule as the guides.
+if not os.path.isfile("CONTRIBUTING.md"):
+    errors.append("CONTRIBUTING.md is missing")
+else:
+    lines = open("CONTRIBUTING.md", encoding="utf-8").read().splitlines()
+    name = "CONTRIBUTING.md stack template"
+    try:
+        start = lines.index("## Stack guide template")
+        opening = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("````"))
+        closing = lines.index("````", opening + 1)
+    except (ValueError, StopIteration):
+        errors.append(f"{name}: no '## Stack guide template' section with a template in a ```` fence")
+    else:
+        template = lines[opening + 1:closing]
+        if not template or not re.fullmatch(r"# .+ — Code Review Checklist", template[0]):
+            errors.append(f"{name} must start with a '# <name> — Code Review Checklist' line")
+        if "## Sources" not in template:
+            errors.append(f"{name} has no '## Sources' section")
+        check(name, template)
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "every stacks/*.md and patterns/*.md ends with 2 to 5 precedents, each with an exception"
+    pass "every stacks/*.md and patterns/*.md, and the stack template in CONTRIBUTING.md, end with 2 to 5 precedents, each with an exception"
   else
     fail "stack and pattern precedents (see messages above)"
+  fi
+}
+
+check_contributing_links() {
+  if python3 - <<'PY'
+import os, re, sys
+
+errors = []
+if os.path.isfile("CONTRIBUTING.md"):  # check_stack_precedents reports a missing file
+    fence = None
+    for number, line in enumerate(open("CONTRIBUTING.md", encoding="utf-8").read().splitlines(), 1):
+        marker = re.match(r"^(`{3,})(.*)$", line)
+        if fence is not None:
+            if marker and marker.group(1).startswith(fence) and not marker.group(2).strip():
+                fence = None
+            continue
+        if marker:
+            fence = marker.group(1)
+            continue
+        # Links outside code blocks only: a placeholder inside the template is not a link.
+        for target in re.findall(r"\]\(([^)\s]+)\)", line):
+            path = target.split("#", 1)[0]
+            if not path or "://" in target or target.startswith("mailto:"):
+                continue
+            if not os.path.exists(path):
+                errors.append(f"CONTRIBUTING.md links to a missing file: {path} (line {number})")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "CONTRIBUTING.md links point to files of this repository"
+  else
+    fail "CONTRIBUTING.md links (see messages above)"
   fi
 }
 
@@ -3277,6 +3330,7 @@ check_skill_second_opinion
 check_skill_stack_detection
 check_stack_precedents
 check_issue_forms
+check_contributing_links
 check_readme_counts
 check_example_output
 check_example_findings

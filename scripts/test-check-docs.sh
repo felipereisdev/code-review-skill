@@ -2680,6 +2680,38 @@ YAML
 expect_pass "a documented upload field passes" "$work/ifupload"
 # End of issue form tests.
 
+# Contributing guide (CONTRIBUTING.md and its stack guide template).
+make_copy "$work/ctmissing"
+rm "$work/ctmissing/CONTRIBUTING.md"
+expect_fail "a missing contributing guide fails" "$work/ctmissing" "CONTRIBUTING.md is missing"
+
+make_copy "$work/cttitle"
+replace_first "$work/cttitle/CONTRIBUTING.md" '# <Stack name> — Code Review Checklist' '# <Stack name>'
+expect_fail "a stack template without the checklist title fails" "$work/cttitle" "CONTRIBUTING.md stack template must start with a '# <name> — Code Review Checklist' line"
+
+make_copy "$work/ctsources"
+replace_line "$work/ctsources/CONTRIBUTING.md" '## Sources' '## Further reading'
+expect_fail "a stack template without Sources fails" "$work/ctsources" "CONTRIBUTING.md stack template has no '## Sources' section"
+
+make_copy "$work/ctexception"
+replace_first "$work/ctexception/CONTRIBUTING.md" '**Exception:** <the condition' 'Except <the condition'
+expect_fail "a stack template precedent without its exception fails" "$work/ctexception" "CONTRIBUTING.md stack template: Precedents item does not match"
+
+make_copy "$work/ctnotlast"
+replace_first "$work/ctnotlast/CONTRIBUTING.md" '**Exception:** <when it stops holding>.' '**Exception:** <when it stops holding>.
+
+## Notes'
+expect_fail "a section after the template's Precedents fails" "$work/ctnotlast" "CONTRIBUTING.md stack template: '## Precedents' must be the last '## ' section"
+
+make_copy "$work/ctlink"
+printf '\nSee [the Elixir guide](stacks/elixir.md).\n' >> "$work/ctlink/CONTRIBUTING.md"
+expect_fail "a contributing link to a missing file fails" "$work/ctlink" "CONTRIBUTING.md links to a missing file: stacks/elixir.md"
+
+make_copy "$work/ctplaceholder"
+printf '\n```markdown\n[example](stacks/<name>.md)\n```\n' >> "$work/ctplaceholder/CONTRIBUTING.md"
+expect_pass "a placeholder link inside a code block passes" "$work/ctplaceholder"
+# End of contributing guide tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
