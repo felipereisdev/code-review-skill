@@ -46,8 +46,8 @@ export async function deleteInvoice(id) {
 
 ## Redirects and Images
 
-- **Open redirects**: `redirect(searchParams.next)` or `NextResponse.redirect(new URL(next, request.url))` with a value from the request sends the user to any site, because `new URL()` ignores the base URL when the value is absolute (`https://evil.example`) or protocol-relative (`//evil.example`). Accept only paths that start with a single `/`, or check the resulting origin.
-- **Image optimizer for any host**: `images.remotePatterns` with `hostname: '**'` (or the deprecated `images.domains` widened the same way) lets anyone make the server fetch and resize images from any host through `/_next/image`, which costs bandwidth and compute and reaches hosts the server can see. Limit the patterns to the hosts the app uses.
+- **Open redirects**: `redirect(searchParams.next)` or `NextResponse.redirect(new URL(next, request.url))` with a value from the request sends the user to any site, because `new URL()` ignores the base URL when the value is absolute (`https://evil.example`) or protocol-relative (`//evil.example`). A check on the raw text is not enough: the URL parser removes ASCII tab and newline characters before it reads the value, so the encoded value `%2F%09%2Fevil.example` (decoded: `/`, a tab, `/evil.example`) becomes the protocol-relative `//evil.example`. Parse the value against the request URL, and redirect only when the parsed origin is the request's own origin; send anything else, including a value that does not parse, to `/`.
+- **Image optimizer for broad remote patterns**: an `images.remotePatterns` entry with a wildcard `hostname`, such as `'**'`, lets the default optimizer at `/_next/image` fetch and resize images from any host that the `src` names, which costs the server bandwidth and compute. Report it when the default optimizer serves the pattern (not `unoptimized` or a custom `loader`) and a request can supply the `src`, for example a user-supplied image URL; a remote host that the app uses by name is not a finding by itself. Next.js 16 blocks local-network addresses unless `dangerouslyAllowLocalIP` is set (default `false`), so a wildcard hostname alone does not show that the server can reach a private network; report that only where the version or configuration turns that protection off. `images.domains` is deprecated and does not support wildcard matching, so it does not widen in this way.
 
 **Bad** — `next=https://evil.example` sends the user to another site:
 
@@ -60,15 +60,21 @@ export function GET(request) {
 }
 ```
 
-**Good** — only a local path is accepted:
+**Good** — the value is parsed against the request URL, and the redirect goes there only when its origin is the request's own origin; anything else, including a value that does not parse, goes to `/`:
 
 ```js
 import { NextResponse } from 'next/server'
 
 export function GET(request) {
   const next = request.nextUrl.searchParams.get('next') ?? '/'
-  const path = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/'
-  return NextResponse.redirect(new URL(path, request.url))
+  let target
+  try {
+    target = new URL(next, request.url)
+  } catch {
+    target = null
+  }
+  const local = target?.origin === request.nextUrl.origin
+  return NextResponse.redirect(local ? target : new URL('/', request.url))
 }
 ```
 
@@ -85,8 +91,8 @@ export function GET(request) {
 - Server and Client Components and `server-only`: https://nextjs.org/docs/app/getting-started/server-and-client-components
 - Environment variables: https://nextjs.org/docs/app/guides/environment-variables
 - Caching and revalidation: https://nextjs.org/docs/app/guides/caching, https://nextjs.org/docs/app/getting-started/caching-and-revalidating; Next.js 15 changes: https://nextjs.org/docs/app/guides/upgrading/version-15
-- `redirect` and `NextResponse`: https://nextjs.org/docs/app/api-reference/functions/redirect, https://nextjs.org/docs/app/api-reference/functions/next-response; `URL` constructor: https://developer.mozilla.org/en-US/docs/Web/API/URL/URL
-- Images: https://nextjs.org/docs/app/api-reference/components/image#remotepatterns
+- `redirect` and `NextResponse`: https://nextjs.org/docs/app/api-reference/functions/redirect, https://nextjs.org/docs/app/api-reference/functions/next-response; `URL` parsing: https://url.spec.whatwg.org/#concept-basic-url-parser; `URL` constructor: https://developer.mozilla.org/en-US/docs/Web/API/URL/URL
+- Images (`remotePatterns`, `domains`, `dangerouslyAllowLocalIP`, version history): https://nextjs.org/docs/app/api-reference/components/image
 
 ## Precedents
 
