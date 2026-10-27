@@ -2544,6 +2544,18 @@ make_copy "$work/sdreadmeplatform"
 replace_first "$work/sdreadmeplatform/README.md" 'apply only when the build or manifest proves that platform' 'always apply'
 expect_fail "a README that applies platform rules without evidence fails" "$work/sdreadmeplatform" "README.md is missing: platform rules, such as Android, iOS or Rails, apply only when the build or manifest proves that platform"
 
+make_copy "$work/sdalias"
+replace_first "$work/sdalias/SKILL.md" 'counts as the plugin whose `id` the version catalog `gradle/libs.versions.toml` gives under `[plugins]` for that key' 'counts as the plugin named by its alias'
+expect_fail 'a plugin alias that proves its plugin by name alone fails' "$work/sdalias" 'SKILL.md Step 1 is missing: A plugin that the module'"'"'s own build applies as `alias(libs.plugins.<key>)` counts as the plugin whose `id`'
+
+make_copy "$work/sdapplyfalse"
+replace_first "$work/sdapplyfalse/references/stack-detection.md" 'a declaration with `apply false` applies to no module' 'a declaration with `apply false` applies to every module'
+expect_fail 'a declaration with apply false that applies to every module fails' "$work/sdapplyfalse" 'references/stack-detection.md is missing: a declaration with `apply false` applies to no module'
+
+make_copy "$work/sdunresolved"
+replace_first "$work/sdunresolved/SKILL.md" 'and an alias that does not resolve leaves the stack open.' 'and an alias that does not resolve is read from its name.'
+expect_fail 'an alias that does not resolve reads its plugin from the name fails' "$work/sdunresolved" 'SKILL.md Step 1 is missing: A declaration with `apply false` applies to no module, and an alias that does not resolve leaves the stack open.'
+
 make_copy "$work/sdchartlock"
 replace_first "$work/sdchartlock/references/large-diffs.md" ', `Chart.lock`.' '.'
 expect_fail "dropping Chart.lock from the lockfiles fails" "$work/sdchartlock" "references/large-diffs.md: Lockfiles is missing: Chart.lock"

@@ -20,6 +20,13 @@ This file decides which stack and pattern files apply to which changed files, ne
 - Any other signal file above the package, such as a root `package.json`, a root `Dockerfile` or a root `next.config.*`, describes the repository root, never the package. When the package and the root disagree, the package decides for its own files.
 - A changed file that is a signal by itself, such as a `.sql` file, a Kubernetes manifest or the `action.yml` of an action, selects its stack file for that file only, never for the rest of its package.
 - Apply the stack files of each package only to the changed files of that package, and judge the architecture pattern signals from the directory structure of the package.
+- **Plugin aliases.** A Gradle build file that applies a plugin as `alias(libs.plugins.<key>)` proves the plugin whose `id` the version catalog gives for that key, and only when every condition below holds. Otherwise the alias proves nothing and the stack stays open:
+  - The module's own build file applies the alias: a declaration with `apply false` applies to no module, and a plugin that only build logic elsewhere applies proves nothing.
+  - The alias starts with `libs.plugins.`, the accessor of the default catalog. Each dash or underscore in the key stands for a dot, so `android-application` and `android_application` both give `libs.plugins.android.application`. No other catalog counts, and two keys that give the same accessor leave the stack open.
+  - The catalog is `gradle/libs.versions.toml` in the build root, read from the snapshot as data, and the build root is the nearest directory that holds a `settings.gradle` or `settings.gradle.kts`, searched from the module's own directory up through its parents within **Directories to list**; the module's own directory is the build root when none does. A settings file in that root that mentions `versionCatalogs` leaves the stack open.
+  - The catalog is the only file outside **Directories to list** that this section reads. It is never run, fetched or taken from another build, package or catalog, and it proves only the plugins that the module applies.
+  - The key's entry under `[plugins]` is an inline table with an `id = "..."` key. Any other form, a missing key or a catalog missing from the build root leaves the stack open, and in a `pr` review that uses the diff alone, the catalog counts only when the diff shows it, as **Snapshot** says.
+  - The resolved id counts as if the module wrote it out, for every rule that names a plugin id: `com.android.application` or `com.android.library` shows Android, and an `org.jetbrains.kotlin` id shows Kotlin.
 
 ## Root and shared changes
 
@@ -53,7 +60,7 @@ This file decides which stack and pattern files apply to which changed files, ne
 
 - When a package has evidence for more than one stack, such as a `package.json` and a `pyproject.toml` in one directory, apply the guides that each one proves to the files they describe.
 - When the evidence leaves a stack open, never choose one from a name, a directory layout or habit: apply only the guides that it proves, and write what it leaves open in the `no stack guide` item, as **No stack guide** in SKILL.md Step 1 says.
-- Never follow build logic, an include or a workspace reference to settle a stack: a Gradle convention plugin from `buildSrc/`, a `path` dependency or a `workspace:` version is a name, not evidence you read.
+- Never follow build logic, an include or a workspace reference to settle a stack: a Gradle convention plugin from `buildSrc/`, a `path` dependency or a `workspace:` version is a name, not evidence you read. The one exception is the version catalog of **Plugin aliases** under **Signals that apply to a package**, and only for the aliases that section names.
 - Write one `no stack guide` item per technology, listing every package directory that has it.
 - Never ask the user which stack applies, in an interactive run or a headless one.
 

@@ -2966,6 +2966,10 @@ STEP1 = (
     "The same plugins in a Groovy `build.gradle` show the same.",
     "load `./stacks/kotlin-android.md`, whose Android sections apply only to a module whose own build applies one of "
     "the two Android plugins",
+    "A plugin that the module's own build applies as `alias(libs.plugins.<key>)` counts as the plugin whose `id` the "
+    "version catalog `gradle/libs.versions.toml` gives under `[plugins]` for that key",
+    "that is the one file outside **Directories to list** that Step 1 reads, and only for such an alias",
+    "A declaration with `apply false` applies to no module, and an alias that does not resolve leaves the stack open.",
     "- `Cargo.toml` → Rust: load `./stacks/rust.md`.",
     "- `Gemfile` → Ruby, and Ruby on Rails when it declares the `rails` gem: load `./stacks/ruby-rails.md`, whose "
     "Rails sections apply only when the package's own `Gemfile` declares `rails`.",
@@ -3054,6 +3058,12 @@ REQUIRED = (
     "An image that a Kubernetes manifest, a Helm value, a Compose file or a workflow step names never proves",
     "Never follow build logic, an include or a workspace reference to settle a stack",
     "Never ask the user which stack applies, in an interactive run or a headless one.",
+    "- **Plugin aliases.** A Gradle build file that applies a plugin as `alias(libs.plugins.<key>)` proves the plugin whose `id` the version catalog gives for that key",
+    "The one exception is the version catalog of **Plugin aliases**",
+    "a declaration with `apply false` applies to no module",
+    "the build root is the nearest directory that holds a `settings.gradle` or `settings.gradle.kts`",
+    "the only file outside **Directories to list** that this section reads",
+    "in a `pr` review that uses the diff alone, the catalog counts only when the diff shows it",
 )
 FORBIDDEN = (
     "`build.gradle.kts` → Java / Spring Boot", "`Package.swift` → iOS", "stacks/ruby.md", "stacks/rails.md",
