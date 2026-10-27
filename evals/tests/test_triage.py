@@ -17,7 +17,8 @@ CATEGORIES = ("Security", "Performance", "Tests/Coverage", "Architecture", "Code
               "Accessibility", "Observability", "API Design", "Resilience", "DB Migrations", "Concurrency", "i18n",
               "Privacy/Compliance", "Architecture Patterns", "Stack-Specific")
 TRIAGE = ("Review effort", "Relevant tests", "Look first", "Ready to merge")
-TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified", "dimension not reviewed")
+TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified", "dimension not reviewed",
+        "no stack guide")
 WEIGHTS = ("material", "not material")
 SIZES = ("up to 50", "51 to 200", "201 to 500", "501 to 1000", "more than 1000")
 RISK_AREAS = ("authentication", "authorization", "payments", "personal data", "database schema or migrations",
@@ -37,7 +38,7 @@ LINE_RES = {
     "Ready to merge": re.compile(r"^\*\*Ready to merge:\*\* (?:Yes|No|With fixes) — \S.*\.$"),
 }
 RESULT_RE = re.compile(r"(?i)(?:\b(?:tests?|suites?|specs?)\b|`[^`]*(?:test|spec)[^`]*`)\s+(?:all\s+)?(?:pass(?:es|ed)?|fail(?:s|ed)?)\b")
-ITEM_RE = re.compile(r"^- (.+?) — (not read|binary|context not read|API not validated|tests not verified|dimension not reviewed), (material|not material): (\S.*)$")
+ITEM_RE = re.compile(r"^- (.+?) — (not read|binary|context not read|API not validated|tests not verified|dimension not reviewed|no stack guide), (material|not material): (\S.*)$")
 COMPACT_AUDIT = re.compile(r"^\*\*Audit:\*\* (\d+) of (\d+) changed files? reviewed; (\d+) files? read for context; no findings in (.+?); (?:already raised, not verified: (\d+) Warning candidates?; )?not verified: (.+)\.$")
 FILES_RE = re.compile(r"^\*\*Files reviewed:\*\* (\d+) of (\d+) changed files?(?:: (.+))?\.$")
 CONTEXT_RE = re.compile(r"^\*\*Read for context:\*\* (?:none|(\d+) files?: (.+)|(`.+))\.$")
@@ -1781,6 +1782,15 @@ class DimensionTests(Base):
         text = with_items(no_findings(FIXTURE), "- tests dimension — dimension not reviewed, not material: the "
                           "subagent stopped without a result.")
         self.assertError(check_report(with_verdict(text)), "it must be the bugs, security or repository rules dimension")
+
+
+class StackGuideTests(Base):
+    """The no stack guide limit of SKILL.md Step 1, as Step 3 lists it."""
+
+    def test_nonmaterial_no_stack_guide_item_does_not_block(self):
+        text = with_items(no_findings(FIXTURE), "- Rust in `crates/parser/` — no stack guide, not material: "
+                          "`crates/parser/Cargo.toml` shows Rust; sections 1 to 5 judged every changed line.")
+        self.assertEqual(check_report(with_verdict(text)), [])
 
 
 LOCK = ("`package-lock.json` (whole file)", "not read")

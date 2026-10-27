@@ -29,7 +29,8 @@ CATEGORIES = ("Security", "Performance", "Tests/Coverage", "Architecture", "Code
               "Privacy/Compliance", "Architecture Patterns", "Stack-Specific")
 SEVERITIES = ("Critical", "Warning", "Suggestion")
 FILTERS = ("min_severity", "disabled_categories", "max_findings_per_file")
-TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified", "dimension not reviewed")
+TAGS = ("not read", "binary", "context not read", "API not validated", "tests not verified", "dimension not reviewed",
+        "no stack guide")
 ROW_VALUES = {1: "No", 2: "No", 3: "No", 4: "With fixes", 5: "With fixes", 6: "With fixes", 7: "Yes"}
 GUIDE = "skill:references/json-output.md"
 SURROGATE_RE = re.compile("[\ud800-\udfff]")

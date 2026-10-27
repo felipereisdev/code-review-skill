@@ -2467,6 +2467,90 @@ replace_first "$work/rsreadlimits/README.md" 'its tools that run commands, its t
 expect_fail "README that omits the command and local-image limit fails" "$work/rsreadlimits" "README.md is missing: the skill runs \`codex\` only from a new empty directory outside the repository, with its tools that run commands, its tool that opens local images"
 # End of README fix and second opinion tests.
 
+# Stack detection (SKILL.md Step 1, references/stack-detection.md, README.md and evals/README.md).
+make_copy "$work/sdkts"
+replace_first "$work/sdkts/SKILL.md" '- `build.gradle.kts` → a Gradle build written in Kotlin.' '- `build.gradle.kts` → Java / Spring Boot.'
+expect_fail "build.gradle.kts as proof of Spring fails" "$work/sdkts" "SKILL.md says: \`build.gradle.kts\` → Java / Spring Boot"
+
+make_copy "$work/sdmaven"
+replace_first "$work/sdmaven/SKILL.md" 'are candidates for Java / Spring Boot, never proof by their name' 'prove Java / Spring Boot by their name'
+expect_fail "a Maven or Gradle build name as proof of Spring fails" "$work/sdmaven" "SKILL.md Step 1 is missing: \`pom.xml\`, \`build.gradle\` and \`build.gradle.kts\` are candidates for Java / Spring Boot, never proof by their name"
+
+make_copy "$work/sdios"
+replace_first "$work/sdios/SKILL.md" ' It never proves an iOS app.' ''
+expect_fail "Package.swift as proof of an iOS app fails" "$work/sdios" "SKILL.md Step 1 is missing: - \`Package.swift\` → a Swift package; this skill has no Swift guide. It never proves an iOS app."
+
+make_copy "$work/sdworkflow"
+replace_first "$work/sdworkflow/SKILL.md" 'A workflow never shows the language of the application' 'A workflow shows the language of the application'
+expect_fail "a workflow as proof of the application language fails" "$work/sdworkflow" "SKILL.md Step 1 is missing: A workflow never shows the language of the application"
+
+make_copy "$work/sdlock"
+replace_first "$work/sdlock/SKILL.md" 'never proves it, because it may be a dependency of a dependency or belong to another package' 'proves it'
+expect_fail "a lockfile as proof of a framework fails" "$work/sdlock" "SKILL.md Step 1 is missing: never proves it, because it may be a dependency of a dependency or belong to another package"
+
+make_copy "$work/sdwide"
+replace_first "$work/sdwide/SKILL.md" 'up to the repository root, never in other directories, and never under' 'up to the repository root, and in every other package, but never under'
+expect_fail "listing unrelated packages fails" "$work/sdwide" "SKILL.md Step 1 is missing: Look for signal files only in its directory and in each parent directory up to the repository root, never in other directories"
+
+make_copy "$work/sddiffalone"
+replace_first "$work/sddiffalone/SKILL.md" 'When that section says to review the diff alone, use only the signal files that the diff itself shows.' 'When that section says to review the diff alone, read the signal files from the local checkout.'
+expect_fail "detecting from the local checkout in a review of the diff alone fails" "$work/sddiffalone" "SKILL.md Step 1 is missing: When that section says to review the diff alone, use only the signal files that the diff itself shows."
+
+make_copy "$work/sdinvent"
+printf -- '- `./stacks/rust.md`\n' >> "$work/sdinvent/SKILL.md"
+expect_fail "citing a stack guide that does not exist fails" "$work/sdinvent" "SKILL.md says: stacks/rust.md"
+
+make_copy "$work/sdroot"
+drop_lines "$work/sdroot/SKILL.md" '- `go.mod` → Go'
+expect_fail "dropping an existing root signal fails" "$work/sdroot" "SKILL.md Step 1 is missing: - \`go.mod\` → Go"
+
+make_copy "$work/sdask"
+replace_first "$work/sdask/SKILL.md" 'Never ask the user which stack applies, in an interactive run or a headless one' 'Ask the user which stack applies'
+expect_fail "asking the user which stack applies fails" "$work/sdask" "SKILL.md Step 1 is missing: Never ask the user which stack applies, in an interactive run or a headless one"
+
+make_copy "$work/sdtag"
+drop_lines "$work/sdtag/SKILL.md" '  - `no stack guide`: '
+expect_fail "removing the no stack guide tag fails" "$work/sdtag" "SKILL.md is missing:   - \`no stack guide\`: a technology that a signal file shows"
+
+make_copy "$work/sdsection"
+replace_first "$work/sdsection/references/stack-detection.md" '## Snapshot' '## Where to read'
+expect_fail "a reference without its snapshot rules fails" "$work/sdsection" "references/stack-detection.md is missing the section: ## Snapshot"
+
+make_copy "$work/sdshared"
+replace_first "$work/sdshared/references/stack-detection.md" 'A shared change never loads the guides of every package.' 'A shared change loads the guides of every package.'
+expect_fail "a shared change that loads every package fails" "$work/sdshared" "references/stack-detection.md is missing: A shared change never loads the guides of every package."
+
+make_copy "$work/sdrename"
+replace_first "$work/sdrename/references/stack-detection.md" 'and to the package of its old path for its removed lines' 'for all of its lines'
+expect_fail "a rename judged by its new package only fails" "$work/sdrename" "references/stack-detection.md is missing: belongs to the package of its new path for its added lines, and to the package of its old path for its removed lines"
+
+make_copy "$work/sdcheckout"
+replace_first "$work/sdcheckout/references/stack-detection.md" 'never from a checkout that differs from it, and never check out, fetch or switch branches to detect a stack' 'or from the local checkout'
+expect_fail "detecting from a checkout that differs from the snapshot fails" "$work/sdcheckout" "references/stack-detection.md is missing: never from a checkout that differs from it"
+
+make_copy "$work/sdreadme"
+replace_first "$work/sdreadme/README.md" 'a lockfile, a transitive dependency or a generated file never proves a framework' 'lockfiles prove frameworks'
+expect_fail "README that counts a lockfile as proof fails" "$work/sdreadme" "README.md is missing: a lockfile, a transitive dependency or a generated file never proves a framework"
+
+make_copy "$work/sdevals"
+replace_first "$work/sdevals/evals/README.md" 'never which package, signal file or guide an agent picks' 'which guide an agent picks'
+expect_fail "evals README that claims agent behavior from the corpus fails" "$work/sdevals" "evals/README.md is missing: never which package, signal file or guide an agent picks"
+
+# replace_line <file> <line prefix> <new line>: replaces the one line that starts with <line prefix>.
+replace_line() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import sys
+path, prefix, new = sys.argv[1:]
+lines = open(path, encoding="utf-8").read().split("\n")
+open(path, "w", encoding="utf-8").write("\n".join(new if line.startswith(prefix) else line for line in lines))
+PY
+}
+
+make_copy "$work/sdreadban"
+replace_line "$work/sdreadban/references/stack-detection.md" '- Settle the package of every changed file once' '- Settle the package of every changed file once, before the checklist pass, and in a large diff before the first batch, only from the directories that **Directories to list** in SKILL.md Step 1 names. Never list or read a package that no changed file belongs to: another package of the same repository, with its own stack, is not evidence for this change.'
+expect_fail "an unqualified read ban on unrelated packages fails" "$work/sdreadban" "references/stack-detection.md says: Never list or read a package that no changed file belongs to"
+# End of stack detection tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

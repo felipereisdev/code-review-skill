@@ -295,6 +295,13 @@ class FileAccountingTest(unittest.TestCase):
              "detail": "a changed image; no changed behavior depends on it."}]
         self.assert_gate(doc, "pass", 0)
 
+    def test_nonmaterial_no_stack_guide_item_passes(self):
+        doc = fixture("pass")
+        doc["review"]["audit"]["not_verified"] = [
+            {"what": "Rust in `crates/parser/`", "tag": "no stack guide", "material": False,
+             "detail": "`crates/parser/Cargo.toml` shows Rust; sections 1 to 5 judged every changed line."}]
+        self.assert_gate(doc, "pass", 0)
+
     def test_material_unread_file_is_incomplete(self):
         doc = fixture("pass")
         review = doc["review"]
