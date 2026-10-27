@@ -2615,6 +2615,29 @@ replace_line "$work/sdreadban/references/stack-detection.md" '- Settle the packa
 expect_fail "an unqualified read ban on unrelated packages fails" "$work/sdreadban" "references/stack-detection.md says: Never list or read a package that no changed file belongs to"
 # End of stack detection tests.
 
+# Pattern precedents (every patterns/*.md ends with 2 to 5 precedents, each with an exception).
+make_copy "$work/ppnone"
+drop_from "$work/ppnone/patterns/cqrs.md" '## Precedents'
+expect_fail "a pattern without Precedents fails" "$work/ppnone" "patterns/cqrs.md has no '## Precedents' section"
+
+make_copy "$work/ppone"
+drop_lines "$work/ppone/patterns/cqrs.md" '**Commands that return an identifier or a result**'
+drop_lines "$work/ppone/patterns/cqrs.md" '**Unique constraints on the write store**'
+expect_fail "a pattern with one precedent fails" "$work/ppone" "patterns/cqrs.md: '## Precedents' has 1 item(s), need 2 to 5"
+
+make_copy "$work/pptwo"
+drop_lines "$work/pptwo/patterns/cqrs.md" '**Unique constraints on the write store**'
+expect_pass "a pattern with two precedents passes" "$work/pptwo"
+
+make_copy "$work/ppnoexception"
+replace_first "$work/ppnoexception/patterns/ddd.md" '**Exception:**' 'Except'
+expect_fail "a pattern precedent without its exception fails" "$work/ppnoexception" "patterns/ddd.md: Precedents item does not match"
+
+make_copy "$work/ppnotlast"
+printf '\n## Notes\n\n- note\n' >> "$work/ppnotlast/patterns/microservices.md"
+expect_fail "a section after a pattern's Precedents fails" "$work/ppnotlast" "patterns/microservices.md: '## Precedents' must be the last '## ' section"
+# End of pattern precedent tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1

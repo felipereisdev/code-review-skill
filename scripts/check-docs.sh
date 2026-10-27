@@ -1200,31 +1200,37 @@ import glob, re, sys
 
 item = re.compile(r"^- \*\*[^*]+\*\*: .+\. Do not report .+\. \*\*Exception:\*\* .+\.$")
 errors = []
-for path in sorted(glob.glob("stacks/*.md")):
-    lines = open(path, encoding="utf-8").read().splitlines()
+
+
+def check(name, lines):
     heads = [i for i, line in enumerate(lines) if line.startswith("## ")]
     starts = [i for i in heads if lines[i] == "## Precedents"]
     if not starts:
-        errors.append(f"{path} has no '## Precedents' section")
-        continue
+        errors.append(f"{name} has no '## Precedents' section")
+        return
     if len(starts) > 1 or starts[0] != heads[-1]:
-        errors.append(f"{path}: '## Precedents' must be the last '## ' section")
-        continue
+        errors.append(f"{name}: '## Precedents' must be the last '## ' section")
+        return
     body = [line for line in lines[starts[0] + 1:] if line.strip()]
     for line in body:
         if not item.match(line):
-            errors.append(f"{path}: Precedents item does not match "
+            errors.append(f"{name}: Precedents item does not match "
                           f"'- **Name**: ... Do not report ... **Exception:** ...': {line[:60]}")
     if not 2 <= len(body) <= 5:
-        errors.append(f"{path}: '## Precedents' has {len(body)} item(s), need 2 to 5")
+        errors.append(f"{name}: '## Precedents' has {len(body)} item(s), need 2 to 5")
+
+
+# Pattern files end with Precedents too, applied like a stack file's (SKILL.md Step 1).
+for path in sorted(glob.glob("stacks/*.md")) + sorted(glob.glob("patterns/*.md")):
+    check(path, open(path, encoding="utf-8").read().splitlines())
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "every stacks/*.md ends with 2 to 5 precedents, each with an exception"
+    pass "every stacks/*.md and patterns/*.md ends with 2 to 5 precedents, each with an exception"
   else
-    fail "stack precedents (see messages above)"
+    fail "stack and pattern precedents (see messages above)"
   fi
 }
 

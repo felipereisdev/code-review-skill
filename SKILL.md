@@ -288,7 +288,7 @@ Apply this list to every candidate before you write the report:
 - A **Suggestion** that matches is dropped without being counted.
 - Do not move a matching finding to `## Needs human verification`; drop it.
 
-Each loaded stack file's `## Precedents` section works the same way (see Step 1).
+Each loaded stack or pattern file's `## Precedents` section works the same way (see Step 1).
 
 ---
 
@@ -373,7 +373,7 @@ Read these files using the path relative to this skill file's directory. If a fi
 - `./stacks/inertia.md`
 - `./stacks/pest.md`
 
-Each stack file ends with a `## Precedents` section: protections that stack already provides, each with the **Exception:** under which it stops holding. Apply the precedents of every stack file you load together with its checklist: do not report a candidate that a precedent covers, unless that precedent's **Exception:** applies. When the exception applies, the finding stands and goes through Step 2 like any other.
+Each stack file ends with a `## Precedents` section: protections that stack already provides, each with the **Exception:** under which it stops holding. Each pattern file below ends with one too: safeguards that a pattern the code has adopted already provides, each with its **Exception:**. Apply the precedents of every stack or pattern file you load together with its checklist: do not report a candidate that a precedent covers, unless that precedent's **Exception:** applies. When the exception applies, the finding stands and goes through Step 2 like any other.
 
 **Pattern files to load if relevant:**
 
@@ -570,14 +570,14 @@ For each candidate, look for anything that makes its Evidence scenario impossibl
 - **Types**: type declarations, nullability or database constraints that rule the scenario out.
 - **Existing tests**: a test that runs the scenario and passes with the change.
 - **Framework and configuration**: framework defaults, configuration or environment settings that already prevent it (for example automatic output escaping or a global exception handler).
-- **Do Not Report and stack precedents**: the candidate matches an item in `## Do Not Report`, or a `## Precedents` entry of a loaded stack file whose **Exception:** does not apply. Such a candidate is **REFUTED** even if its scenario can happen.
+- **Do Not Report and stack precedents**: the candidate matches an item in `## Do Not Report`, or a `## Precedents` entry of a loaded stack or pattern file whose **Exception:** does not apply. Such a candidate is **REFUTED** even if its scenario can happen.
 - **Repository rule citations**: for a finding with a `**Rule:**` line, open the cited rules file at the cited lines. If the file or the lines do not exist, the lines do not state the rule, or the rule does not apply to the changed file, remove the `**Rule:**` line and judge the finding on the checklist alone; with nothing else behind it, the finding is **REFUTED**.
 
 Give each candidate exactly one result:
 
 - **CONFIRMED**: the refutation attempt failed and the scenario follows from the code you read. Keep the finding.
 - **DOWNGRADED**: the scenario still happens, but it is less severe or less certain than claimed. Lower the severity to the highest level whose definition it still meets. If the code you read neither confirms nor refutes the scenario, because it depends on a caller, configuration, data or runtime behavior you cannot see, set **Confidence:** Medium and move the finding to `## Needs human verification`.
-- **REFUTED**: the code you read shows that the scenario cannot happen, or the candidate matches `## Do Not Report` or a stack precedent (the last check above). Remove the finding from the report.
+- **REFUTED**: the code you read shows that the scenario cannot happen, or the candidate matches `## Do Not Report` or a stack or pattern precedent (the last check above). Remove the finding from the report.
 
 When a check you made here is what confirms or limits a finding, name it in the Evidence, for example: "Verification checked both callers of `findUser` and the request schema; none validates `id`."
 
