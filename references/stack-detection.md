@@ -8,7 +8,7 @@ This file decides which stack and pattern files apply to which changed files, ne
 
 - The package of a changed file is the nearest directory with a package manifest, as **Signal names** in SKILL.md Step 1 lists them: the file's own directory first, then each parent up to the repository root. A file with no package manifest above it belongs to the repository root.
 - A manifest under `node_modules/` or `vendor/` never makes a package.
-- Settle the package of every changed file once, before the checklist pass, and in a large diff before the first batch, only from the directories that **Directories to list** in SKILL.md Step 1 names. Never list or read a package that no changed file belongs to: another package of the same repository, with its own stack, is not evidence for this change.
+- Settle the package of every changed file once, before the checklist pass, and in a large diff before the first batch, only from the directories that **Directories to list** in SKILL.md Step 1 names. Never list a package that no changed file belongs to, or read its signal files, to discover its stack, and never load its stack or pattern guides: another package of the same repository, with its own stack, is not evidence for this change. These limits concern stack discovery and guide loading only; a targeted read of code in such a package that a changed contract requires, such as a caller or consumer under **Broken contracts with dependents**, stays allowed.
 
 ## Signals that apply to a package
 

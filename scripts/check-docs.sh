@@ -3011,7 +3011,11 @@ REQUIRED = (
     "The package of a changed file is the nearest directory with a package manifest",
     "A file with no package manifest above it belongs to the repository root.",
     "A manifest under `node_modules/` or `vendor/` never makes a package.",
-    "Never list or read a package that no changed file belongs to",
+    "Never list a package that no changed file belongs to, or read its signal files, to discover its stack, and never "
+    "load its stack or pattern guides: another package of the same repository, with its own stack, is not evidence for "
+    "this change. These limits concern stack discovery and guide loading only; a targeted read of code in such a package "
+    "that a changed contract requires, such as a caller or consumer under **Broken contracts with dependents**, stays "
+    "allowed.",
     "A signal file in a directory above the package applies only in these cases:",
     "`angular.json` applies to a changed file under the `root` of one of its `projects`",
     "describes the repository root, never the package",
@@ -3032,7 +3036,7 @@ REQUIRED = (
 FORBIDDEN = (
     "`build.gradle.kts` → Java / Spring Boot", "`Package.swift` → iOS", "stacks/rust.md", "stacks/ruby.md",
     "stacks/rails.md", "stacks/swift.md", "stacks/kotlin.md", "stacks/android.md", "stacks/nextjs.md",
-    "stacks/github-actions.md",
+    "stacks/github-actions.md", "Never list or read a package that no changed file belongs to",
 )
 README = (
     "per package in a monorepo (`references/stack-detection.md`)",

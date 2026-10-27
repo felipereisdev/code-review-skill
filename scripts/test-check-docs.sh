@@ -2535,6 +2535,20 @@ expect_fail "README that counts a lockfile as proof fails" "$work/sdreadme" "REA
 make_copy "$work/sdevals"
 replace_first "$work/sdevals/evals/README.md" 'never which package, signal file or guide an agent picks' 'which guide an agent picks'
 expect_fail "evals README that claims agent behavior from the corpus fails" "$work/sdevals" "evals/README.md is missing: never which package, signal file or guide an agent picks"
+
+# replace_line <file> <line prefix> <new line>: replaces the one line that starts with <line prefix>.
+replace_line() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import sys
+path, prefix, new = sys.argv[1:]
+lines = open(path, encoding="utf-8").read().split("\n")
+open(path, "w", encoding="utf-8").write("\n".join(new if line.startswith(prefix) else line for line in lines))
+PY
+}
+
+make_copy "$work/sdreadban"
+replace_line "$work/sdreadban/references/stack-detection.md" '- Settle the package of every changed file once' '- Settle the package of every changed file once, before the checklist pass, and in a large diff before the first batch, only from the directories that **Directories to list** in SKILL.md Step 1 names. Never list or read a package that no changed file belongs to: another package of the same repository, with its own stack, is not evidence for this change.'
+expect_fail "an unqualified read ban on unrelated packages fails" "$work/sdreadban" "references/stack-detection.md says: Never list or read a package that no changed file belongs to"
 # End of stack detection tests.
 
 if [ "$failures" -gt 0 ]; then
