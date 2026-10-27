@@ -5,8 +5,12 @@ guide and which files a review never reads, from the fixture facts and the contr
 references/stack-detection.md. These checks show that the labels are well formed, agree with the fixture facts and
 the nearest-manifest rule, and point at the section of that contract that decides them. They never show which
 package, signal file or guide a real agent picks: only a model run could observe that, and none is part of them.
+
+The corpus is edition 1. Its guide and no-guide labels describe the stack guides that existed when it was frozen
+(EDITION1_GUIDES), not the guides that exist now: a guide added later never relabels it.
 """
 import fnmatch
+import hashlib
 import json
 import os
 import posixpath
@@ -28,9 +32,15 @@ STATUSES = ("A", "M", "D", "R")
 MANIFESTS = ("package.json", "composer.json", "pyproject.toml", "requirements.txt", "setup.py", "go.mod", "pom.xml",
              "build.gradle", "build.gradle.kts", "pubspec.yaml", "Cargo.toml", "Gemfile", "Package.swift")
 INSTALLED = ("node_modules", "vendor")
-# Technologies that no stack file covers yet, with the file name a guide for them would have.
+# Technologies that no stack file covered when the corpus was frozen, with the file name a guide for them would have.
 NO_GUIDE = {"Rust": "rust", "Ruby": "ruby", "Ruby on Rails": "rails", "Swift": "swift", "Android": "android",
             "Kotlin": "kotlin", "Gradle": "gradle", "GitHub Actions": "github-actions"}
+# The stack guides that existed when the corpus was frozen.
+EDITION1_GUIDES = frozenset(f"stacks/{name}.md" for name in (
+    "angular", "docker", "dotnet", "flutter", "go", "inertia", "java-spring", "kafka", "laravel", "node", "nuxt",
+    "pest", "python", "react-native", "react", "svelte", "tailwind", "terraform", "typescript", "vue"))
+# The sha256 of corpus.json when it was frozen: the file and its labels never change.
+CORPUS_SHA256 = "ef7ed4dabe999720d4e657f15338bdf01d05fc373f3d6b86a50da9b59eb762cc"
 RULE_FILES = ("SKILL.md", "references/stack-detection.md")
 CASE_KEYS = {"id", "signal", "kind", "contrasts", "scope", "files", "changed", "expect", "rule", "why"}
 OPTIONAL_KEYS = {"checkout", "ignore_paths"}
@@ -112,6 +122,10 @@ class CorpusShapeTest(unittest.TestCase):
     def setUp(self):
         self.cases = load_cases()
 
+    def test_corpus_is_frozen(self):
+        with open(CORPUS, "rb") as f:
+            self.assertEqual(hashlib.sha256(f.read()).hexdigest(), CORPUS_SHA256)
+
     def test_cases_have_the_frozen_keys(self):
         ids = [case["id"] for case in self.cases]
         self.assertEqual(len(ids), len(set(ids)), "case ids must be unique")
@@ -186,16 +200,17 @@ class CorpusFactsTest(unittest.TestCase):
             with self.subTest(case=case["id"]):
                 self.assertFalse(loaded & never)
                 for guide in loaded | never:
+                    self.assertIn(guide, EDITION1_GUIDES)
                     self.assertTrue(guide.startswith("stacks/") and os.path.isfile(os.path.join(ROOT, guide)), guide)
                     self.assertTrue(f"`./{guide}`" in skill, f"SKILL.md does not cite `./{guide}`")
 
-    def test_technologies_without_a_guide_have_no_stack_file(self):
+    def test_technologies_without_a_guide_had_no_stack_file_when_frozen(self):
         for case in self.cases:
             for technologies in case["expect"]["no_guide"].values():
                 for technology in technologies:
                     with self.subTest(case=case["id"], technology=technology):
                         self.assertIn(technology, NO_GUIDE)
-                        self.assertFalse(os.path.exists(os.path.join(ROOT, "stacks", NO_GUIDE[technology] + ".md")))
+                        self.assertNotIn(f"stacks/{NO_GUIDE[technology]}.md", EDITION1_GUIDES)
 
     def test_unread_files_lie_outside_the_listed_directories(self):
         for case in self.cases:

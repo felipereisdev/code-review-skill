@@ -298,8 +298,9 @@ class FileAccountingTest(unittest.TestCase):
     def test_nonmaterial_no_stack_guide_item_passes(self):
         doc = fixture("pass")
         doc["review"]["audit"]["not_verified"] = [
-            {"what": "Rust in `crates/parser/`", "tag": "no stack guide", "material": False,
-             "detail": "`crates/parser/Cargo.toml` shows Rust; sections 1 to 5 judged every changed line."}]
+            {"what": "Java in `services/billing/`", "tag": "no stack guide", "material": False,
+             "detail": "`services/billing/pom.xml` shows Java without Spring Boot; sections 1 to 5 judged every "
+                       "changed line."}]
         self.assert_gate(doc, "pass", 0)
 
     def test_material_unread_file_is_incomplete(self):

@@ -123,9 +123,9 @@ check_readme_counts() {
   else
     fail "README lists ${listed_patterns} architectural patterns, patterns/ has ${patterns}"
   fi
-  git grep -nE '15 Review (Scopes|Categories)|19 (technology )?stacks' -- '*.md'; rc=$?
+  git grep -nE '15 Review (Scopes|Categories)|(19|20) (technology )?stacks' -- '*.md'; rc=$?
   if [ "$rc" -eq 1 ]; then
-    pass "no stale '15 Review Scopes' / '15 Review Categories' / '19 stacks'"
+    pass "no stale '15 Review Scopes' / '15 Review Categories' / '19 stacks' / '20 stacks'"
   elif [ "$rc" -eq 0 ]; then
     fail "stale counts found (lines above)"
   else
@@ -1779,7 +1779,7 @@ PATH = "references/large-diffs.md"
 AGENT_NAMES = ("Task tool", "Agent tool", "subagent_type", "spawn_agent", "Claude", "Codex", "Cursor", "Copilot", "mcp__")
 # Lockfiles of the stacks this skill covers; the Lockfiles list must keep them.
 LOCKFILES = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "composer.lock", "Gemfile.lock", "poetry.lock",
-             "Cargo.lock", "go.sum", "pubspec.lock")
+             "Cargo.lock", "go.sum", "pubspec.lock", "Package.resolved", "Chart.lock")
 # Manifests hold the dependency decisions a review must read; they are never lockfiles.
 MANIFESTS = ("package.json", "composer.json", "Gemfile", "pyproject.toml", "Pipfile", "Cargo.toml", "go.mod",
              "pubspec.yaml", "Podfile", "mix.exs", "build.gradle", "deno.json")
@@ -2963,16 +2963,37 @@ STEP1 = (
     "plugin, has `spring-boot-starter-parent` as its parent, imports the `spring-boot-dependencies` BOM or declares a "
     "Spring Boot dependency",
     "The same rule holds for Maven, Groovy Gradle and Kotlin Gradle",
-    "- `Cargo.toml` → Rust; this skill has no Rust guide.",
-    "- `Gemfile` → Ruby, and Ruby on Rails when it declares the `rails` gem; this skill has no Ruby or Ruby on Rails "
-    "guide.",
-    "- `Package.swift` → a Swift package; this skill has no Swift guide. It never proves an iOS app.",
-    "- `next.config.*` → Next.js, which renders with React: load `./stacks/react.md`, whose Next.js items apply.",
+    "The same plugins in a Groovy `build.gradle` show the same.",
+    "load `./stacks/kotlin-android.md`, whose Android sections apply only to a module whose own build applies one of "
+    "the two Android plugins",
+    "A plugin that the module's own build applies as `alias(libs.plugins.<key>)` counts as the plugin whose `id` the "
+    "version catalog `gradle/libs.versions.toml` gives under `[plugins]` for that key",
+    "that is the one file outside **Directories to list** that Step 1 reads, and only for such an alias",
+    "A declaration with `apply false` applies to no module, and an alias that does not resolve leaves the stack open.",
+    "- `Cargo.toml` → Rust: load `./stacks/rust.md`.",
+    "- `Gemfile` → Ruby, and Ruby on Rails when it declares the `rails` gem: load `./stacks/ruby-rails.md`, whose "
+    "Rails sections apply only when the package's own `Gemfile` declares `rails`.",
+    "- `Package.swift` → a Swift package: load `./stacks/swift-ios.md`, whose iOS sections apply only with the iOS "
+    "evidence that it names. It never proves an iOS app.",
+    "- `*.xcodeproj` → an Xcode project, the one signal that is a directory",
+    "`SDKROOT = iphoneos` shows iOS.",
+    "- `next.config.*`, or `next` among the runtime or peer dependencies of `package.json` → Next.js: load "
+    "`./stacks/nextjs.md`.",
+    "`./stacks/react.md` applies to the React code of the change, as the `react` dependency proves.",
     "- `angular.json` → an Angular workspace: load `./stacks/angular.md` for the changed files under the `root` of "
     "one of its `projects`.",
+    "- `Chart.yaml` → a Helm chart: load `./stacks/kubernetes-helm.md`",
+    "with top-level `apiVersion:` and `kind:` keys, or a `kustomization.yaml` → Kubernetes: load "
+    "`./stacks/kubernetes-helm.md` for those files.",
+    "An image that a manifest names never shows the language of the application.",
+    "- `*.sql` → SQL: load `./stacks/sql.md` for the changed `.sql` files only.",
+    "SQL inside the code of another language follows that language's stack file",
     "- `.github/workflows/` → GitHub Actions, only for the `.yml` and `.yaml` files directly in `.github/workflows/` "
-    "at the repository root",
+    "at the repository root: load `./stacks/github-actions.md` for them.",
     "A workflow never shows the language of the application",
+    "- `action.yml` / `action.yaml` with a top-level `runs:` key → the metadata of a GitHub Action",
+    "applies only with the evidence that its line above names; without that evidence, apply only the language "
+    "sections of that file and add no `no stack guide` item for the platform.",
     "**Signal names.** A `*` in a name above matches any characters inside one file name and never a `/`",
     "**Directories to list.**",
     "Look for signal files only in its directory and in each parent directory up to the repository root, never in "
@@ -3030,22 +3051,42 @@ REQUIRED = (
     "A generated file, such as a minified bundle",
     "GitHub runs workflows only from `.github/workflows/` at the repository root",
     "never choose one from a name, a directory layout or habit",
+    "selects its stack file for that file only, never for the rest of its package",
+    "`Package.resolved` or `Chart.lock`, never proves a framework of a package",
+    "A Kotlin build never proves Android without one of the Android plugins, a `Gemfile` never proves Ruby on Rails "
+    "without the `rails` gem, and a Swift package never proves iOS without the iOS evidence",
+    "An image that a Kubernetes manifest, a Helm value, a Compose file or a workflow step names never proves",
     "Never follow build logic, an include or a workspace reference to settle a stack",
     "Never ask the user which stack applies, in an interactive run or a headless one.",
+    "- **Plugin aliases.** A Gradle build file that applies a plugin as `alias(libs.plugins.<key>)` proves the plugin whose `id` the version catalog gives for that key",
+    "The one exception is the version catalog of **Plugin aliases**",
+    "a declaration with `apply false` applies to no module",
+    "the build root is the nearest directory that holds a `settings.gradle` or `settings.gradle.kts`",
+    "the only file outside **Directories to list** that this section reads",
+    "in a `pr` review that uses the diff alone, the catalog counts only when the diff shows it",
 )
 FORBIDDEN = (
-    "`build.gradle.kts` → Java / Spring Boot", "`Package.swift` → iOS", "stacks/rust.md", "stacks/ruby.md",
-    "stacks/rails.md", "stacks/swift.md", "stacks/kotlin.md", "stacks/android.md", "stacks/nextjs.md",
-    "stacks/github-actions.md", "Never list or read a package that no changed file belongs to",
+    "`build.gradle.kts` → Java / Spring Boot", "`Package.swift` → iOS", "stacks/ruby.md", "stacks/rails.md",
+    "stacks/swift.md", "stacks/kotlin.md", "stacks/android.md",
+    "Never list or read a package that no changed file belongs to",
+    # Claims of the guide inventory before U25, when these technologies had no stack file.
+    "this skill has no Rust guide", "this skill has no Ruby or Ruby on Rails guide", "this skill has no Swift guide",
+    "this skill has no Android or Kotlin guide", "this skill has no GitHub Actions guide", "whose Next.js items apply",
+    "such as Rust, Ruby, Swift, Android, Kotlin or GitHub Actions", "It shows Rust, which has no stack guide",
+    "shows GitHub Actions, which has no stack guide",
 )
 README = (
     "per package in a monorepo (`references/stack-detection.md`)",
     "a lockfile, a transitive dependency or a generated file never proves a framework",
     "gets the generic checks and a `no stack guide` item in the Audit",
+    "platform rules, such as Android, iOS or Rails, apply only when the build or manifest proves that platform",
 )
 EVALS = (
     "`check_skill_stack_detection`; `evals/tests/test_detection.py`",
     "never which package, signal file or guide an agent picks",
+    "`evals/tests/test_detection_edition2.py` with `evals/tests/fixtures/detection/corpus-edition-2.json`",
+    "Its tests check the new guides and their platform sections against the written signal rules, and they show "
+    "nothing about what an agent selects.",
 )
 errors = []
 skill = open("SKILL.md", encoding="utf-8").read()

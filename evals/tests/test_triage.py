@@ -1788,8 +1788,9 @@ class StackGuideTests(Base):
     """The no stack guide limit of SKILL.md Step 1, as Step 3 lists it."""
 
     def test_nonmaterial_no_stack_guide_item_does_not_block(self):
-        text = with_items(no_findings(FIXTURE), "- Rust in `crates/parser/` — no stack guide, not material: "
-                          "`crates/parser/Cargo.toml` shows Rust; sections 1 to 5 judged every changed line.")
+        text = with_items(no_findings(FIXTURE), "- Java in `services/billing/` — no stack guide, not material: "
+                          "`services/billing/pom.xml` shows Java without Spring Boot; sections 1 to 5 judged "
+                          "every changed line.")
         self.assertEqual(check_report(with_verdict(text)), [])
 
 
