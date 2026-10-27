@@ -68,7 +68,7 @@ consumer.on("message", async (message) => {
 
 ## Sources
 
-- Kinds of event-driven designs: Martin Fowler, "What do you mean by Event-Driven?", https://martinfowler.com/articles/201701/event-driven.html
+- Kinds of event-driven designs: Martin Fowler, "What do you mean by Event-Driven?", https://martinfowler.com/articles/201701-event-driven.html
 - Transactional outbox and idempotent consumers: Chris Richardson, microservices.io, https://microservices.io/patterns/data/transactional-outbox.html and https://microservices.io/patterns/communication-style/idempotent-consumer.html
 - Delivery semantics and what Kafka's exactly-once covers: Apache Kafka documentation, https://kafka.apache.org/documentation/#semantics
 - At-least-once delivery and best-effort ordering, and dead-letter redrive: Amazon SQS Developer Guide, https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html and https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
