@@ -2478,7 +2478,7 @@ expect_fail "a Maven or Gradle build name as proof of Spring fails" "$work/sdmav
 
 make_copy "$work/sdios"
 replace_first "$work/sdios/SKILL.md" ' It never proves an iOS app.' ''
-expect_fail "Package.swift as proof of an iOS app fails" "$work/sdios" "SKILL.md Step 1 is missing: - \`Package.swift\` → a Swift package; this skill has no Swift guide. It never proves an iOS app."
+expect_fail "Package.swift as proof of an iOS app fails" "$work/sdios" "SKILL.md Step 1 is missing: - \`Package.swift\` → a Swift package: load \`./stacks/swift-ios.md\`, whose iOS sections apply only with the iOS evidence that it names. It never proves an iOS app."
 
 make_copy "$work/sdworkflow"
 replace_first "$work/sdworkflow/SKILL.md" 'A workflow never shows the language of the application' 'A workflow shows the language of the application'
@@ -2503,6 +2503,50 @@ expect_fail "citing a stack guide that does not exist fails" "$work/sdinvent" "S
 make_copy "$work/sdstale20"
 printf '\nThe skill covers 20 technology stacks.\n' >> "$work/sdstale20/evals/README.md"
 expect_fail "a stale count of 20 stacks fails" "$work/sdstale20" "stale counts found"
+
+make_copy "$work/sdnorust"
+replace_first "$work/sdnorust/SKILL.md" '- `Cargo.toml` → Rust: load `./stacks/rust.md`.' '- `Cargo.toml` → Rust; this skill has no Rust guide.'
+expect_fail "claiming that Rust has no guide fails" "$work/sdnorust" "SKILL.md says: this skill has no Rust guide"
+
+make_copy "$work/sdnextreact"
+replace_first "$work/sdnextreact/SKILL.md" '→ Next.js: load `./stacks/nextjs.md`.' '→ Next.js, which renders with React: load `./stacks/react.md`, whose Next.js items apply.'
+expect_fail "mapping Next.js to the React guide alone fails" "$work/sdnextreact" "SKILL.md says: whose Next.js items apply"
+
+make_copy "$work/sdandroid"
+replace_first "$work/sdandroid/SKILL.md" ', whose Android sections apply only to a module whose own build applies one of the two Android plugins' ''
+expect_fail "Android rules without Android evidence fail" "$work/sdandroid" "SKILL.md Step 1 is missing: load \`./stacks/kotlin-android.md\`, whose Android sections apply only to a module whose own build applies one of the two Android plugins"
+
+make_copy "$work/sdrails"
+replace_first "$work/sdrails/SKILL.md" 'whose Rails sections apply only when' 'whose Rails sections apply whenever'
+expect_fail "Rails rules for every Ruby package fail" "$work/sdrails" "SKILL.md Step 1 is missing: - \`Gemfile\` → Ruby, and Ruby on Rails when it declares the \`rails\` gem: load \`./stacks/ruby-rails.md\`, whose Rails sections apply only when"
+
+make_copy "$work/sdplatform"
+replace_first "$work/sdplatform/SKILL.md" 'without that evidence, apply only the language sections of that file' 'apply the whole file'
+expect_fail "platform sections without platform evidence fail" "$work/sdplatform" "SKILL.md Step 1 is missing: applies only with the evidence that its line above names; without that evidence, apply only the language sections of that file"
+
+make_copy "$work/sdsql"
+replace_first "$work/sdsql/SKILL.md" 'for the changed `.sql` files only' 'for every file of the package'
+expect_fail "the SQL guide for a whole package fails" "$work/sdsql" "SKILL.md Step 1 is missing: - \`*.sql\` → SQL: load \`./stacks/sql.md\` for the changed \`.sql\` files only."
+
+make_copy "$work/sdimage"
+drop_lines "$work/sdimage/SKILL.md" '- A changed `.yaml` or `.yml` file with top-level'
+expect_fail "dropping the Kubernetes signal fails" "$work/sdimage" "SKILL.md Step 1 is missing: An image that a manifest names never shows the language of the application."
+
+make_copy "$work/sdexample"
+replace_first "$work/sdexample/references/stack-detection.md" 'It shows Rust: load `./stacks/rust.md` for it.' 'It shows Rust, which has no stack guide.'
+expect_fail "an example that says Rust has no guide fails" "$work/sdexample" "references/stack-detection.md says: It shows Rust, which has no stack guide"
+
+make_copy "$work/sdfileonly"
+replace_first "$work/sdfileonly/references/stack-detection.md" 'selects its stack file for that file only, never for the rest of its package' 'selects its stack file for the whole package'
+expect_fail "a file signal that selects a guide for its whole package fails" "$work/sdfileonly" "references/stack-detection.md is missing: selects its stack file for that file only, never for the rest of its package"
+
+make_copy "$work/sdreadmeplatform"
+replace_first "$work/sdreadmeplatform/README.md" 'apply only when the build or manifest proves that platform' 'always apply'
+expect_fail "a README that applies platform rules without evidence fails" "$work/sdreadmeplatform" "README.md is missing: platform rules, such as Android, iOS or Rails, apply only when the build or manifest proves that platform"
+
+make_copy "$work/sdchartlock"
+replace_first "$work/sdchartlock/references/large-diffs.md" ', `Chart.lock`.' '.'
+expect_fail "dropping Chart.lock from the lockfiles fails" "$work/sdchartlock" "references/large-diffs.md: Lockfiles is missing: Chart.lock"
 
 make_copy "$work/sdroot"
 drop_lines "$work/sdroot/SKILL.md" '- `go.mod` → Go'

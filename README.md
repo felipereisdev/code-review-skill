@@ -12,7 +12,7 @@
 
 ## 🌟 Features
 
-- **Automatic Stack Detection** - Identifies the technology of the code the change touches from config files and directly declared dependencies, per package in a monorepo (`references/stack-detection.md`); a lockfile, a transitive dependency or a generated file never proves a framework, and a technology with no stack guide, such as Rust, Ruby, Swift, Android, Kotlin or GitHub Actions, gets the generic checks and a `no stack guide` item in the Audit
+- **Automatic Stack Detection** - Identifies the technology of the code the change touches from config files and directly declared dependencies, per package in a monorepo (`references/stack-detection.md`); a lockfile, a transitive dependency or a generated file never proves a framework, and a technology with no stack guide, such as Java without Spring Boot, gets the generic checks and a `no stack guide` item in the Audit; platform rules, such as Android, iOS or Rails, apply only when the build or manifest proves that platform
 - **Consistency-First Review** - Checks existing project conventions before flagging violations (Step 1.5)
 - **API Validation** - Checks a version-specific or uncertain claim about a library API against the documentation of the version in use, with any documentation tool the agent has (for example the Context7 MCP server) or the official documentation; stable behavior that a loaded stack file documents needs no lookup. A claim it cannot check is never reported and is listed as `API not validated` in the Audit, marked `material` only when a changed behavior or a contract the change relies on depends on it, and `not material` otherwise
 - **Multi-Stack Support** - 28 technology stacks covered
