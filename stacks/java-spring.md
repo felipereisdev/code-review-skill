@@ -88,7 +88,7 @@ public UserView update(@AuthenticationPrincipal AppUser me, @Valid @RequestBody 
 
 - **Rule order**: `authorizeHttpRequests` checks its rules in order and applies the first one that matches, so a broad `permitAll()` placed before a narrower rule, such as `/api/**` before `/api/admin/**`, opens the narrower paths. `anyRequest()` comes last.
 - **Method security not enabled**: `@PreAuthorize` and `@PostAuthorize` have no effect unless method security is enabled, with `@EnableMethodSecurity` (Spring Security 5.6+) or, before it, `@EnableGlobalMethodSecurity(prePostEnabled = true)`; `@Secured` also needs `securedEnabled = true`.
-- **Actuator exposure**: Spring Boot exposes only the `health` endpoint over HTTP by default. A change that sets `management.endpoints.web.exposure.include=*`, or adds `heapdump`, without securing the endpoints lets anyone download a heap dump, which holds secrets and session data from memory. **Not a finding:** exposing `env` or `configprops` alone on Spring Boot 3.0+, whose values are sanitized by default unless `show-values` is changed.
+- **Actuator exposure**: Spring Boot exposes only the `health` endpoint over HTTP by default. A heap dump, which holds secrets and session data from memory, is available only when `heapdump` is exposed (`management.endpoints.web.exposure.include` lists it, or `*`) and its access is not `none`. Before Spring Boot 3.5, exposure is enough because access defaults to unrestricted. From 3.5, `heapdump` defaults to `access=NONE`, so the change must also set `management.endpoint.heapdump.access` (for example `unrestricted`); report it only when that effective configuration lets an unauthenticated caller reach the endpoint over the network. A wildcard exposure alone is not a finding. **Not a finding:** an actuator path that an active Spring Security chain requires authentication for, including the auto-configured chain, which secures every actuator endpoint except `/health` when Spring Security is on the classpath and no other `SecurityFilterChain` bean exists; and exposing `env` or `configprops` alone on Spring Boot 3.0+, whose values are sanitized by default unless `show-values` is changed.
 
 ## Concurrency
 
@@ -113,7 +113,7 @@ public UserView update(@AuthenticationPrincipal AppUser me, @Valid @RequestBody 
 - Validation: https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html; Spring Boot 2.3 release notes: https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.3-Release-Notes
 - Binding and model design: https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-initbinder.html
 - `authorizeHttpRequests` and method security: https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html, https://docs.spring.io/spring-security/reference/servlet/authorization/method-security.html
-- Actuator endpoints: https://docs.spring.io/spring-boot/reference/actuator/endpoints.html
+- Actuator endpoints: https://docs.spring.io/spring-boot/reference/actuator/endpoints.html; `heapdump` default access (Spring Boot 3.5): https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.5-Release-Notes
 - Virtual threads and pinning: https://openjdk.org/jeps/444, https://openjdk.org/jeps/491
 
 ## Precedents
