@@ -4,7 +4,7 @@
 
 ## Security
 
-- **Trust bypasses with untrusted values**: `DomSanitizer.bypassSecurityTrustHtml`, `bypassSecurityTrustUrl`, `bypassSecurityTrustResourceUrl`, `bypassSecurityTrustScript` and `bypassSecurityTrustStyle` turn off Angular's sanitization for the value they wrap. Passing a value that a user or another tenant controls, such as a comment body, a profile link or a CMS field, to one of them is XSS. **Not a finding:** a bypass of a constant or of a value that the code builds only from constants, and HTML that `sanitizer.sanitize(SecurityContext.HTML, value)` returned from a plain string when nothing changed it afterwards. `sanitize` unwraps a value that is already a trusted `SafeHtml` without sanitizing it, so a `SafeValue` that arrives from an earlier bypass is not exempt, and a bypass wrapped around the result is a changed value.
+- **Trust bypasses with untrusted values**: `DomSanitizer.bypassSecurityTrustHtml`, `bypassSecurityTrustUrl`, `bypassSecurityTrustResourceUrl`, `bypassSecurityTrustScript` and `bypassSecurityTrustStyle` turn off Angular's sanitization for the value they wrap. Passing a value that a user or another tenant controls, such as a comment body, a profile link or a CMS field, to one of them is XSS. **Not a finding:** a bypass of a constant or of a value that the code builds only from constants, and HTML that `sanitizer.sanitize(SecurityContext.HTML, value)` returned from a plain string, even when a trust bypass then wraps that result, because the sanitizer has already removed the unsafe markup and the wrapper does not restore it. `sanitize` returns a value that is already a trusted `SafeHtml` unchanged, without sanitizing it, so a `SafeValue` that arrives from an earlier bypass is not exempt, and neither is a `sanitize` call on it.
 - **Direct DOM writes**: `nativeElement.innerHTML`, `outerHTML`, `insertAdjacentHTML` and `document.write` are browser APIs, not Angular templates, and do not sanitize; user data written through them is XSS unless the app enforces Trusted Types.
 - **Route guards as access control**: a `canActivate`, `canMatch` or `canLoad` guard only decides whether the browser shows a route, and anyone can call the API behind it directly. Report data that the change protects only with a guard when the change adds or edits the API endpoint without a server-side check, or the endpoint is in the repository and does not check the user.
 
@@ -117,7 +117,7 @@ addItem(item: CartItem) {
 
 ## Sources
 
-- Security, sanitization, Trusted Types: https://angular.dev/best-practices/security; `DomSanitizer`: https://angular.dev/api/platform-browser/DomSanitizer
+- Security, sanitization, Trusted Types: https://angular.dev/best-practices/security; `DomSanitizer`: https://angular.dev/api/platform-browser/DomSanitizer; sanitizer implementation (plain strings are sanitized, already-trusted values are returned unchanged): https://github.com/angular/angular/blob/main/packages/platform-browser/src/security/dom_sanitization_service.ts
 - Route guards and server-side authorization: https://angular.dev/guide/routing/route-guards
 - `takeUntilDestroyed`: https://angular.dev/api/core/rxjs-interop/takeUntilDestroyed; `NG0203`: https://angular.dev/errors/NG0203; `toSignal`: https://angular.dev/api/core/rxjs-interop/toSignal; `DestroyRef` and `ngOnDestroy`: https://angular.dev/guide/components/lifecycle
 - Aborting `HttpClient` requests: https://angular.dev/guide/http/making-requests; `switchMap`: https://rxjs.dev/api/operators/switchMap
