@@ -1247,7 +1247,7 @@ except ImportError:
 # and https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
 REQUIRED = (".github/ISSUE_TEMPLATE/false-positive.yml", ".github/ISSUE_TEMPLATE/new-stack.yml")
 TOP = {"name", "description", "title", "labels", "assignees", "projects", "type", "body"}
-TYPES = {"markdown", "textarea", "input", "dropdown", "checkboxes"}
+TYPES = {"markdown", "textarea", "input", "dropdown", "checkboxes", "upload"}
 errors = []
 names = {}
 forms = sorted(p for p in glob.glob(".github/ISSUE_TEMPLATE/*.yml") + glob.glob(".github/ISSUE_TEMPLATE/*.yaml")

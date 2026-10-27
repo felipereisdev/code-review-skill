@@ -2670,6 +2670,14 @@ expect_fail "two issue forms with one name fail" "$work/ifname" "issue form name
 make_copy "$work/ifconfig"
 printf 'blank_issues_enabled: true\n' > "$work/ifconfig/.github/ISSUE_TEMPLATE/config.yml"
 expect_pass "a template chooser config.yml next to the forms passes" "$work/ifconfig"
+make_copy "$work/ifupload"
+cat >> "$work/ifupload/.github/ISSUE_TEMPLATE/new-stack.yml" <<'YAML'
+  - type: upload
+    id: attachment
+    attributes:
+      label: Optional sanitized screenshot
+YAML
+expect_pass "a documented upload field passes" "$work/ifupload"
 # End of issue form tests.
 
 if [ "$failures" -gt 0 ]; then
