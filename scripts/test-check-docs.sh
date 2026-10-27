@@ -2712,6 +2712,20 @@ printf '\n```markdown\n[example](stacks/<name>.md)\n```\n' >> "$work/ctplacehold
 expect_pass "a placeholder link inside a code block passes" "$work/ctplaceholder"
 # End of contributing guide tests.
 
+# Navigation (README.md Project Structure lists CONTRIBUTING.md, CHANGELOG.md and the issue forms).
+make_copy "$work/navcontributing"
+drop_lines "$work/navcontributing/README.md" '── CONTRIBUTING.md'
+expect_fail "a README tree without CONTRIBUTING.md fails" "$work/navcontributing" "README Project Structure is missing: CONTRIBUTING.md"
+
+make_copy "$work/navchangelog"
+drop_lines "$work/navchangelog/README.md" '── CHANGELOG.md'
+expect_fail "a README tree without CHANGELOG.md fails" "$work/navchangelog" "README Project Structure is missing: CHANGELOG.md"
+
+make_copy "$work/navform"
+drop_lines "$work/navform/README.md" '── false-positive.yml'
+expect_fail "a README tree without an issue form fails" "$work/navform" "README Project Structure is missing: .github/ISSUE_TEMPLATE/false-positive.yml"
+# End of navigation tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
