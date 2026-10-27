@@ -123,9 +123,9 @@ check_readme_counts() {
   else
     fail "README lists ${listed_patterns} architectural patterns, patterns/ has ${patterns}"
   fi
-  git grep -nE '15 Review (Scopes|Categories)|19 (technology )?stacks' -- '*.md'; rc=$?
+  git grep -nE '15 Review (Scopes|Categories)|(19|20) (technology )?stacks' -- '*.md'; rc=$?
   if [ "$rc" -eq 1 ]; then
-    pass "no stale '15 Review Scopes' / '15 Review Categories' / '19 stacks'"
+    pass "no stale '15 Review Scopes' / '15 Review Categories' / '19 stacks' / '20 stacks'"
   elif [ "$rc" -eq 0 ]; then
     fail "stale counts found (lines above)"
   else
@@ -3034,9 +3034,9 @@ REQUIRED = (
     "Never ask the user which stack applies, in an interactive run or a headless one.",
 )
 FORBIDDEN = (
-    "`build.gradle.kts` → Java / Spring Boot", "`Package.swift` → iOS", "stacks/rust.md", "stacks/ruby.md",
-    "stacks/rails.md", "stacks/swift.md", "stacks/kotlin.md", "stacks/android.md", "stacks/nextjs.md",
-    "stacks/github-actions.md", "Never list or read a package that no changed file belongs to",
+    "`build.gradle.kts` → Java / Spring Boot", "`Package.swift` → iOS", "stacks/ruby.md", "stacks/rails.md",
+    "stacks/swift.md", "stacks/kotlin.md", "stacks/android.md",
+    "Never list or read a package that no changed file belongs to",
 )
 README = (
     "per package in a monorepo (`references/stack-detection.md`)",

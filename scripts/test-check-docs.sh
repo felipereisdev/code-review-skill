@@ -2497,8 +2497,12 @@ replace_first "$work/sddiffalone/SKILL.md" 'When that section says to review the
 expect_fail "detecting from the local checkout in a review of the diff alone fails" "$work/sddiffalone" "SKILL.md Step 1 is missing: When that section says to review the diff alone, use only the signal files that the diff itself shows."
 
 make_copy "$work/sdinvent"
-printf -- '- `./stacks/rust.md`\n' >> "$work/sdinvent/SKILL.md"
-expect_fail "citing a stack guide that does not exist fails" "$work/sdinvent" "SKILL.md says: stacks/rust.md"
+printf -- '- `./stacks/ruby.md`\n' >> "$work/sdinvent/SKILL.md"
+expect_fail "citing a stack guide that does not exist fails" "$work/sdinvent" "SKILL.md says: stacks/ruby.md"
+
+make_copy "$work/sdstale20"
+printf '\nThe skill covers 20 technology stacks.\n' >> "$work/sdstale20/evals/README.md"
+expect_fail "a stale count of 20 stacks fails" "$work/sdstale20" "stale counts found"
 
 make_copy "$work/sdroot"
 drop_lines "$work/sdroot/SKILL.md" '- `go.mod` → Go'

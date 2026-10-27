@@ -15,7 +15,7 @@
 - **Automatic Stack Detection** - Identifies the technology of the code the change touches from config files and directly declared dependencies, per package in a monorepo (`references/stack-detection.md`); a lockfile, a transitive dependency or a generated file never proves a framework, and a technology with no stack guide, such as Rust, Ruby, Swift, Android, Kotlin or GitHub Actions, gets the generic checks and a `no stack guide` item in the Audit
 - **Consistency-First Review** - Checks existing project conventions before flagging violations (Step 1.5)
 - **API Validation** - Checks a version-specific or uncertain claim about a library API against the documentation of the version in use, with any documentation tool the agent has (for example the Context7 MCP server) or the official documentation; stable behavior that a loaded stack file documents needs no lookup. A claim it cannot check is never reported and is listed as `API not validated` in the Audit, marked `material` only when a changed behavior or a contract the change relies on depends on it, and `not material` otherwise
-- **Multi-Stack Support** - 20 technology stacks covered
+- **Multi-Stack Support** - 28 technology stacks covered
 - **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
 - **Triage, Verdict and Audit** - Every report rates the review effort from 1 to 5, says which tests cover the change and what it ran without claiming a result it did not see, names up to 3 files to look at first, and gives a `**Ready to merge:** Yes / No / With fixes` verdict from a fixed table over the findings, the Warning candidates already raised in open threads (pending verification, never confirmed) and the coverage and verification limits, before any configuration filter; a closing `## Audit` lists every file reviewed and read for context, the categories checked with no findings, and each limit with its reason, marked material or not
@@ -331,6 +331,7 @@ The five **Always** categories live in `SKILL.md`. Each of the others lives in i
 
 ### Frontend
 - React
+- Next.js
 - Vue.js (+ Inertia.js)
 - Angular
 - Svelte
@@ -340,7 +341,9 @@ The five **Always** categories live in `SKILL.md`. Each of the others lives in i
 - Node.js
 - Python
 - Laravel (PHP)
+- Ruby / Ruby on Rails
 - Go
+- Rust
 - Java Spring
 - .NET
 
@@ -350,11 +353,18 @@ The five **Always** categories live in `SKILL.md`. Each of the others lives in i
 ### Mobile
 - React Native
 - Flutter
+- Kotlin / Android
+- Swift / iOS
 
 ### DevOps & Infrastructure
 - Docker
 - Terraform
+- Kubernetes / Helm
+- GitHub Actions
 - Kafka
+
+### Databases
+- SQL
 
 ### Styling & Languages
 - TypeScript
@@ -477,18 +487,26 @@ code-review-skill/
     ├── docker.md
     ├── dotnet.md
     ├── flutter.md
+    ├── github-actions.md
     ├── go.md
     ├── inertia.md
     ├── java-spring.md
     ├── kafka.md
+    ├── kotlin-android.md
+    ├── kubernetes-helm.md
     ├── laravel.md
+    ├── nextjs.md
     ├── node.md
     ├── nuxt.md
     ├── pest.md
     ├── python.md
     ├── react-native.md
     ├── react.md
+    ├── ruby-rails.md
+    ├── rust.md
+    ├── sql.md
     ├── svelte.md
+    ├── swift-ios.md
     ├── tailwind.md
     ├── terraform.md
     ├── typescript.md
