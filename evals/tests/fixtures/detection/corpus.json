@@ -1,0 +1,688 @@
+{
+  "note": "Frozen stack detection corpus. Labels come from the fixture facts and the contract in SKILL.md Step 1 and references/stack-detection.md, never from an observed result. Never change a label to fit a result. An offline test of this file cannot show which package, signal file or guide a real agent picks.",
+  "cases": [
+    {
+      "id": "cargo-root",
+      "signal": "Cargo.toml",
+      "kind": "positive",
+      "contrasts": ["fallback", "direct"],
+      "scope": "uncommitted",
+      "files": {
+        "Cargo.toml": "[package]\nname = \"parser\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        "src/lib.rs": "pub fn parse() {}\n"
+      },
+      "changed": [{"status": "M", "path": "src/lib.rs"}],
+      "expect": {
+        "packages": {"src/lib.rs": "."},
+        "guides": {},
+        "no_guide": {".": ["Rust"]},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**No stack guide.**"},
+      "why": "Cargo.toml shows Rust and no stack file covers Rust, so the generic checks apply and the Audit says so."
+    },
+    {
+      "id": "cargo-workspace-member",
+      "signal": "Cargo.toml",
+      "kind": "positive",
+      "contrasts": ["monorepo-nested", "unrelated-package", "fallback"],
+      "scope": "branch",
+      "files": {
+        "Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n",
+        "crates/parser/Cargo.toml": "[package]\nname = \"parser\"\nversion = \"0.1.0\"\n",
+        "crates/parser/src/lib.rs": "pub fn parse() {}\n",
+        "apps/web/package.json": "{\"dependencies\": {\"next\": \"14.2.3\", \"react\": \"18.3.1\"}}\n",
+        "apps/web/next.config.mjs": "export default {};\n"
+      },
+      "changed": [{"status": "M", "path": "crates/parser/src/lib.rs"}],
+      "expect": {
+        "packages": {"crates/parser/src/lib.rs": "crates/parser"},
+        "guides": {},
+        "no_guide": {"crates/parser": ["Rust"]},
+        "never": ["stacks/react.md"],
+        "not_proven": ["Next.js"],
+        "not_read": ["apps/web/next.config.mjs", "apps/web/package.json"]
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Package of a changed file"},
+      "why": "The nearest manifest of the changed file is crates/parser/Cargo.toml; the Next.js app is a package that no changed file belongs to."
+    },
+    {
+      "id": "cargo-out-of-scope",
+      "signal": "Cargo.toml",
+      "kind": "negative",
+      "contrasts": ["unrelated-package", "monorepo-nested"],
+      "scope": "uncommitted",
+      "files": {
+        "services/api/pyproject.toml": "[project]\nname = \"api\"\ndependencies = [\"fastapi>=0.110\"]\n",
+        "services/api/app/main.py": "app = None\n",
+        "services/native/Cargo.toml": "[package]\nname = \"native\"\nversion = \"0.1.0\"\n",
+        "services/native/src/lib.rs": "pub fn run() {}\n"
+      },
+      "changed": [{"status": "M", "path": "services/api/app/main.py"}],
+      "expect": {
+        "packages": {"services/api/app/main.py": "services/api"},
+        "guides": {"services/api": ["stacks/python.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": ["Rust"],
+        "not_read": ["services/native/Cargo.toml"]
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Directories to list.**"},
+      "why": "A Cargo.toml in a sibling package is outside the directories of the changed file, so it is never listed and Rust is not part of this review."
+    },
+    {
+      "id": "gemfile-rails",
+      "signal": "Gemfile",
+      "kind": "positive",
+      "contrasts": ["direct", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "Gemfile": "source \"https://rubygems.org\"\ngem \"rails\", \"~> 7.1\"\n",
+        "app/models/user.rb": "class User < ApplicationRecord\nend\n"
+      },
+      "changed": [{"status": "M", "path": "app/models/user.rb"}],
+      "expect": {
+        "packages": {"app/models/user.rb": "."},
+        "guides": {},
+        "no_guide": {".": ["Ruby on Rails"]},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "The Gemfile declares the rails gem directly, and no stack file covers Ruby on Rails."
+    },
+    {
+      "id": "gemfile-lockfile-only-rails",
+      "signal": "Gemfile",
+      "kind": "negative",
+      "contrasts": ["transitive-lockfile", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "Gemfile": "source \"https://rubygems.org\"\ngem \"sinatra\"\ngem \"acme-admin\"\n",
+        "Gemfile.lock": "GEM\n  specs:\n    acme-admin (2.0.0)\n      rails (>= 7.0)\n    rails (7.1.3)\n    sinatra (4.0.0)\n",
+        "lib/app.rb": "require \"sinatra\"\n"
+      },
+      "changed": [{"status": "M", "path": "lib/app.rb"}],
+      "expect": {
+        "packages": {"lib/app.rb": "."},
+        "guides": {},
+        "no_guide": {".": ["Ruby"]},
+        "never": [],
+        "not_proven": ["Ruby on Rails"],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**What proves a framework.**"},
+      "why": "rails appears only in Gemfile.lock as a dependency of another gem, so it does not prove Rails; the Gemfile proves Ruby."
+    },
+    {
+      "id": "gradle-kts-spring",
+      "signal": "build.gradle.kts",
+      "kind": "positive",
+      "contrasts": ["direct", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "build.gradle.kts": "plugins {\n    id(\"org.springframework.boot\") version \"3.3.0\"\n    kotlin(\"jvm\") version \"2.0.0\"\n    kotlin(\"plugin.spring\") version \"2.0.0\"\n}\n",
+        "src/main/kotlin/com/acme/OrderService.kt": "class OrderService\n"
+      },
+      "changed": [{"status": "M", "path": "src/main/kotlin/com/acme/OrderService.kt"}],
+      "expect": {
+        "packages": {"src/main/kotlin/com/acme/OrderService.kt": "."},
+        "guides": {".": ["stacks/java-spring.md"]},
+        "no_guide": {".": ["Kotlin"]},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "The build applies the org.springframework.boot plugin, so the Spring guide applies; the kotlin plugin shows Kotlin, which has no guide."
+    },
+    {
+      "id": "gradle-kts-android",
+      "signal": "build.gradle.kts",
+      "kind": "negative",
+      "contrasts": ["monorepo-nested", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "settings.gradle.kts": "include(\":app\")\n",
+        "build.gradle.kts": "plugins {\n    id(\"com.android.application\") version \"8.5.0\" apply false\n}\n",
+        "app/build.gradle.kts": "plugins {\n    id(\"com.android.application\")\n    kotlin(\"android\")\n}\n",
+        "app/src/main/java/com/acme/MainActivity.kt": "class MainActivity\n"
+      },
+      "changed": [{"status": "M", "path": "app/src/main/java/com/acme/MainActivity.kt"}],
+      "expect": {
+        "packages": {"app/src/main/java/com/acme/MainActivity.kt": "app"},
+        "guides": {},
+        "no_guide": {"app": ["Android", "Kotlin"]},
+        "never": ["stacks/java-spring.md"],
+        "not_proven": ["Spring Boot"],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "build.gradle.kts with the com.android.application plugin shows Android, never Spring, and no stack file covers Android or Kotlin."
+    },
+    {
+      "id": "gradle-kts-convention-plugin",
+      "signal": "build.gradle.kts",
+      "kind": "ambiguous",
+      "contrasts": ["monorepo-nested", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "settings.gradle.kts": "include(\":service\")\n",
+        "service/build.gradle.kts": "plugins {\n    id(\"buildlogic.service-conventions\")\n}\n",
+        "service/src/main/kotlin/App.kt": "fun main() {}\n",
+        "buildSrc/src/main/kotlin/buildlogic.service-conventions.gradle.kts": "plugins {\n    id(\"org.springframework.boot\")\n}\n"
+      },
+      "changed": [{"status": "M", "path": "service/src/main/kotlin/App.kt"}],
+      "expect": {
+        "packages": {"service/src/main/kotlin/App.kt": "service"},
+        "guides": {},
+        "no_guide": {"service": ["Gradle"]},
+        "never": ["stacks/java-spring.md"],
+        "not_proven": ["Spring Boot"],
+        "not_read": ["buildSrc/src/main/kotlin/buildlogic.service-conventions.gradle.kts"]
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Ambiguity and missing guides"},
+      "why": "The build names only a convention plugin from build logic that detection never follows, so the framework stays open and the Audit says so."
+    },
+    {
+      "id": "swift-package",
+      "signal": "Package.swift",
+      "kind": "positive",
+      "contrasts": ["fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "Package.swift": "// swift-tools-version:5.9\nimport PackageDescription\nlet package = Package(name: \"Parser\", products: [.library(name: \"Parser\", targets: [\"Parser\"])], targets: [.target(name: \"Parser\")])\n",
+        "Sources/Parser/Lexer.swift": "struct Lexer {}\n"
+      },
+      "changed": [{"status": "M", "path": "Sources/Parser/Lexer.swift"}],
+      "expect": {
+        "packages": {"Sources/Parser/Lexer.swift": "."},
+        "guides": {},
+        "no_guide": {".": ["Swift"]},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**No stack guide.**"},
+      "why": "Package.swift shows a Swift package and no stack file covers Swift."
+    },
+    {
+      "id": "swift-package-not-ios",
+      "signal": "Package.swift",
+      "kind": "negative",
+      "contrasts": ["monorepo-nested", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"dependencies\": {\"react-native\": \"0.74.0\", \"react\": \"18.2.0\"}}\n",
+        "tools/codegen/Package.swift": "// swift-tools-version:5.9\nimport PackageDescription\nlet package = Package(name: \"codegen\", platforms: [.macOS(.v13)], targets: [.executableTarget(name: \"codegen\")])\n",
+        "tools/codegen/Sources/codegen/main.swift": "print(\"codegen\")\n"
+      },
+      "changed": [{"status": "M", "path": "tools/codegen/Sources/codegen/main.swift"}],
+      "expect": {
+        "packages": {"tools/codegen/Sources/codegen/main.swift": "tools/codegen"},
+        "guides": {},
+        "no_guide": {"tools/codegen": ["Swift"]},
+        "never": ["stacks/react-native.md", "stacks/react.md"],
+        "not_proven": ["iOS"],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Signals that apply to a package"},
+      "why": "The Swift package is a macOS command line tool: Package.swift never proves an iOS app, and the React Native manifest at the root describes the root, not this package."
+    },
+    {
+      "id": "next-app",
+      "signal": "next.config.*",
+      "kind": "positive",
+      "contrasts": ["monorepo-nested", "direct"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true, \"workspaces\": [\"apps/*\", \"services/*\"]}\n",
+        "apps/web/package.json": "{\"dependencies\": {\"next\": \"15.0.0\", \"react\": \"19.0.0\", \"react-dom\": \"19.0.0\"}, \"devDependencies\": {\"typescript\": \"5.6.0\"}}\n",
+        "apps/web/next.config.ts": "export default {};\n",
+        "apps/web/tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "apps/web/app/page.tsx": "export default function Page() { return null; }\n"
+      },
+      "changed": [{"status": "M", "path": "apps/web/app/page.tsx"}],
+      "expect": {
+        "packages": {"apps/web/app/page.tsx": "apps/web"},
+        "guides": {"apps/web": ["stacks/react.md", "stacks/typescript.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "next.config.ts in the package directory shows Next.js, which renders with React, and the package's tsconfig.json shows TypeScript."
+    },
+    {
+      "id": "next-unrelated-package",
+      "signal": "next.config.*",
+      "kind": "negative",
+      "contrasts": ["unrelated-package", "monorepo-nested"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true, \"workspaces\": [\"apps/*\", \"services/*\"]}\n",
+        "apps/web/package.json": "{\"dependencies\": {\"next\": \"15.0.0\", \"react\": \"19.0.0\"}}\n",
+        "apps/web/next.config.ts": "export default {};\n",
+        "services/api/package.json": "{\"dependencies\": {\"express\": \"4.19.2\"}}\n",
+        "services/api/src/server.js": "const express = require(\"express\");\n"
+      },
+      "changed": [{"status": "M", "path": "services/api/src/server.js"}],
+      "expect": {
+        "packages": {"services/api/src/server.js": "services/api"},
+        "guides": {"services/api": ["stacks/node.md"]},
+        "no_guide": {},
+        "never": ["stacks/react.md"],
+        "not_proven": ["Next.js"],
+        "not_read": ["apps/web/next.config.ts", "apps/web/package.json"]
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Package of a changed file"},
+      "why": "The change is in the Express package; the Next.js config belongs to a package that no changed file belongs to."
+    },
+    {
+      "id": "next-lockfile-only",
+      "signal": "next.config.*",
+      "kind": "negative",
+      "contrasts": ["transitive-lockfile", "unrelated-package"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true}\n",
+        "pnpm-workspace.yaml": "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n",
+        "pnpm-lock.yaml": "lockfileVersion: '9.0'\npackages:\n  next@14.2.3:\n    resolution: {integrity: sha512-x}\n",
+        "apps/web/package.json": "{\"dependencies\": {\"next\": \"14.2.3\"}}\n",
+        "apps/web/next.config.mjs": "export default {};\n",
+        "packages/ui/package.json": "{\"dependencies\": {\"lit\": \"3.1.0\"}}\n",
+        "packages/ui/tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "packages/ui/src/button.ts": "export class Button {}\n"
+      },
+      "changed": [{"status": "M", "path": "packages/ui/src/button.ts"}],
+      "expect": {
+        "packages": {"packages/ui/src/button.ts": "packages/ui"},
+        "guides": {"packages/ui": ["stacks/typescript.md"]},
+        "no_guide": {},
+        "never": ["stacks/react.md"],
+        "not_proven": ["Next.js"],
+        "not_read": ["apps/web/next.config.mjs"]
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Evidence that proves nothing"},
+      "why": "next appears in the root lockfile only because another package uses it; the touched package declares lit, not Next.js."
+    },
+    {
+      "id": "angular-workspace-app",
+      "signal": "angular.json",
+      "kind": "positive",
+      "contrasts": ["direct"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"dependencies\": {\"@angular/core\": \"18.0.0\"}, \"devDependencies\": {\"typescript\": \"5.4.0\"}}\n",
+        "angular.json": "{\"projects\": {\"admin\": {\"root\": \"projects/admin\", \"sourceRoot\": \"projects/admin/src\"}}}\n",
+        "tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "projects/admin/src/app/app.component.ts": "export class AppComponent {}\n"
+      },
+      "changed": [{"status": "M", "path": "projects/admin/src/app/app.component.ts"}],
+      "expect": {
+        "packages": {"projects/admin/src/app/app.component.ts": "."},
+        "guides": {".": ["stacks/angular.md", "stacks/typescript.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "The changed file is under the root of the admin project of angular.json, and the root tsconfig.json shows TypeScript."
+    },
+    {
+      "id": "angular-library-inherits-workspace",
+      "signal": "angular.json",
+      "kind": "positive",
+      "contrasts": ["monorepo-nested", "inherited"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"dependencies\": {\"@angular/core\": \"18.0.0\"}}\n",
+        "angular.json": "{\"projects\": {\"ui-kit\": {\"root\": \"projects/ui-kit\", \"projectType\": \"library\"}}}\n",
+        "tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "projects/ui-kit/package.json": "{\"name\": \"@acme/ui-kit\", \"version\": \"1.0.0\"}\n",
+        "projects/ui-kit/src/lib/button.component.ts": "export class ButtonComponent {}\n"
+      },
+      "changed": [{"status": "M", "path": "projects/ui-kit/src/lib/button.component.ts"}],
+      "expect": {
+        "packages": {"projects/ui-kit/src/lib/button.component.ts": "projects/ui-kit"},
+        "guides": {"projects/ui-kit": ["stacks/angular.md", "stacks/typescript.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Signals that apply to a package"},
+      "why": "The library has its own package.json, but angular.json above it names projects/ui-kit as a project root and the root tsconfig.json applies to a changed .ts file."
+    },
+    {
+      "id": "angular-json-outside-project",
+      "signal": "angular.json",
+      "kind": "negative",
+      "contrasts": ["monorepo-nested", "inherited"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"dependencies\": {\"@angular/core\": \"18.0.0\"}}\n",
+        "angular.json": "{\"projects\": {\"admin\": {\"root\": \"projects/admin\"}}}\n",
+        "tools/release/package.json": "{\"dependencies\": {\"commander\": \"12.0.0\"}}\n",
+        "tools/release/index.js": "const { program } = require(\"commander\");\n"
+      },
+      "changed": [{"status": "M", "path": "tools/release/index.js"}],
+      "expect": {
+        "packages": {"tools/release/index.js": "tools/release"},
+        "guides": {"tools/release": ["stacks/node.md"]},
+        "no_guide": {},
+        "never": ["stacks/angular.md"],
+        "not_proven": ["Angular"],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Signals that apply to a package"},
+      "why": "angular.json names no project whose root contains tools/release, and the root manifest describes the root, not this Node.js package."
+    },
+    {
+      "id": "workflow-with-go-change",
+      "signal": ".github/workflows/",
+      "kind": "positive",
+      "contrasts": ["root-shared", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "go.mod": "module example.com/shop\n\ngo 1.22\n",
+        "cmd/server/main.go": "package main\n",
+        ".github/workflows/ci.yml": "on: push\njobs:\n  docs:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-python@v5\n"
+      },
+      "changed": [
+        {"status": "M", "path": ".github/workflows/ci.yml"},
+        {"status": "M", "path": "cmd/server/main.go"}
+      ],
+      "expect": {
+        "packages": {".github/workflows/ci.yml": ".", "cmd/server/main.go": "."},
+        "guides": {".": ["stacks/go.md"]},
+        "no_guide": {".": ["GitHub Actions"]},
+        "never": ["stacks/python.md"],
+        "not_proven": ["Python"],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "The workflow shows GitHub Actions, which has no guide; its setup-python step never makes the Go code Python."
+    },
+    {
+      "id": "workflow-below-root",
+      "signal": ".github/workflows/",
+      "kind": "negative",
+      "contrasts": ["monorepo-nested", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true, \"workspaces\": [\"packages/*\"]}\n",
+        "packages/site/Gemfile": "source \"https://rubygems.org\"\ngem \"jekyll\"\n",
+        "packages/site/.github/workflows/deploy.yml": "on: push\n"
+      },
+      "changed": [{"status": "M", "path": "packages/site/.github/workflows/deploy.yml"}],
+      "expect": {
+        "packages": {"packages/site/.github/workflows/deploy.yml": "packages/site"},
+        "guides": {},
+        "no_guide": {"packages/site": ["Ruby"]},
+        "never": [],
+        "not_proven": ["GitHub Actions"],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Evidence that proves nothing"},
+      "why": "GitHub runs workflows only from .github/workflows/ at the repository root, so this file is an ordinary file of the Ruby site package."
+    },
+    {
+      "id": "workflow-only-shared-change",
+      "signal": ".github/workflows/",
+      "kind": "positive",
+      "contrasts": ["root-shared", "unrelated-package", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true, \"workspaces\": [\"apps/*\"], \"devDependencies\": {\"turbo\": \"2.0.0\"}}\n",
+        "apps/web/package.json": "{\"dependencies\": {\"next\": \"15.0.0\", \"react\": \"19.0.0\"}}\n",
+        "apps/web/next.config.mjs": "export default {};\n",
+        "services/api/go.mod": "module example.com/api\n\ngo 1.22\n",
+        ".github/workflows/release.yml": "on:\n  push:\n    tags: [\"v*\"]\n"
+      },
+      "changed": [{"status": "M", "path": ".github/workflows/release.yml"}],
+      "expect": {
+        "packages": {".github/workflows/release.yml": "."},
+        "guides": {},
+        "no_guide": {".": ["GitHub Actions"]},
+        "never": ["stacks/react.md", "stacks/go.md"],
+        "not_proven": [],
+        "not_read": ["apps/web/next.config.mjs", "apps/web/package.json", "services/api/go.mod"]
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Root and shared changes"},
+      "why": "A workflow change belongs to the repository root; it never loads the guides of every package of the workspace."
+    },
+    {
+      "id": "laravel-with-pest-dev",
+      "signal": "existing",
+      "kind": "positive",
+      "contrasts": ["existing-signal", "direct", "dev"],
+      "scope": "uncommitted",
+      "files": {
+        "composer.json": "{\"require\": {\"laravel/framework\": \"^11.0\"}, \"require-dev\": {\"pestphp/pest\": \"^3.0\"}}\n",
+        "app/Http/Controllers/OrderController.php": "<?php\n",
+        "tests/Feature/OrderTest.php": "<?php\n"
+      },
+      "changed": [
+        {"status": "M", "path": "app/Http/Controllers/OrderController.php"},
+        {"status": "M", "path": "tests/Feature/OrderTest.php"}
+      ],
+      "expect": {
+        "packages": {"app/Http/Controllers/OrderController.php": ".", "tests/Feature/OrderTest.php": "."},
+        "guides": {".": ["stacks/laravel.md", "stacks/pest.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**What proves a framework.**"},
+      "why": "composer.json declares Laravel directly and Pest as a development dependency, which proves the test runner for the changed test file."
+    },
+    {
+      "id": "vue-with-tailwind-dev",
+      "signal": "existing",
+      "kind": "positive",
+      "contrasts": ["existing-signal", "dev"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"dependencies\": {\"vue\": \"3.4.0\"}, \"devDependencies\": {\"tailwindcss\": \"3.4.0\", \"vite\": \"5.2.0\"}}\n",
+        "tailwind.config.js": "export default {};\n",
+        "vite.config.js": "export default {};\n",
+        "src/App.vue": "<template><div class=\"p-4\"></div></template>\n"
+      },
+      "changed": [{"status": "M", "path": "src/App.vue"}],
+      "expect": {
+        "packages": {"src/App.vue": "."},
+        "guides": {".": ["stacks/vue.md", "stacks/tailwind.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "The root signals of earlier versions still select Vue and Tailwind CSS for a single-package repository."
+    },
+    {
+      "id": "pom-spring",
+      "signal": "existing",
+      "kind": "positive",
+      "contrasts": ["existing-signal", "direct"],
+      "scope": "uncommitted",
+      "files": {
+        "pom.xml": "<project><parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.3.0</version></parent></project>\n",
+        "src/main/java/com/acme/OrderService.java": "class OrderService {}\n"
+      },
+      "changed": [{"status": "M", "path": "src/main/java/com/acme/OrderService.java"}],
+      "expect": {
+        "packages": {"src/main/java/com/acme/OrderService.java": "."},
+        "guides": {".": ["stacks/java-spring.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Signal files.**"},
+      "why": "pom.xml still selects the Java / Spring Boot guide, as before this change."
+    },
+    {
+      "id": "rename-across-packages",
+      "signal": "next.config.*",
+      "kind": "positive",
+      "contrasts": ["rename", "monorepo-nested"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true, \"workspaces\": [\"apps/*\", \"packages/*\"]}\n",
+        "apps/web/package.json": "{\"dependencies\": {\"next\": \"15.0.0\", \"react\": \"19.0.0\"}}\n",
+        "apps/web/next.config.ts": "export default {};\n",
+        "apps/web/tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "packages/shared/package.json": "{\"name\": \"@acme/shared\", \"devDependencies\": {\"typescript\": \"5.6.0\"}}\n",
+        "packages/shared/tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "packages/shared/src/format.ts": "export const format = (n: number) => n.toFixed(2);\n"
+      },
+      "changed": [{"status": "R", "path": "packages/shared/src/format.ts", "old_path": "apps/web/lib/format.ts"}],
+      "expect": {
+        "packages": {"packages/shared/src/format.ts": "packages/shared", "apps/web/lib/format.ts": "apps/web"},
+        "guides": {"apps/web": ["stacks/react.md", "stacks/typescript.md"], "packages/shared": ["stacks/typescript.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Renamed and deleted files"},
+      "why": "The removed lines belong to the Next.js app at the old path and the added lines to the shared TypeScript package at the new path."
+    },
+    {
+      "id": "deleted-rails-package",
+      "signal": "Gemfile",
+      "kind": "positive",
+      "contrasts": ["delete", "snapshot", "fallback"],
+      "scope": "uncommitted",
+      "files": {
+        "package.json": "{\"private\": true}\n"
+      },
+      "changed": [
+        {"status": "D", "path": "services/legacy/Gemfile", "manifest_lines": "-source \"https://rubygems.org\"\n-gem \"rails\", \"~> 6.1\"\n"},
+        {"status": "D", "path": "services/legacy/app/models/user.rb"}
+      ],
+      "expect": {
+        "packages": {"services/legacy/Gemfile": "services/legacy", "services/legacy/app/models/user.rb": "services/legacy"},
+        "guides": {},
+        "no_guide": {"services/legacy": ["Ruby on Rails"]},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Renamed and deleted files"},
+      "why": "The snapshot no longer has the package, so the removed lines of its Gemfile in the diff are the evidence of Rails."
+    },
+    {
+      "id": "pr-head-snapshot",
+      "signal": "Cargo.toml",
+      "kind": "positive",
+      "contrasts": ["snapshot", "fallback"],
+      "scope": "pr",
+      "files": {
+        "package.json": "{\"private\": true, \"workspaces\": [\"packages/*\"]}\n",
+        "packages/api/Cargo.toml": "[package]\nname = \"api\"\nversion = \"0.2.0\"\n",
+        "packages/api/src/lib.rs": "pub fn handler() {}\n"
+      },
+      "checkout": {
+        "packages/api/package.json": "{\"dependencies\": {\"express\": \"4.19.2\"}}\n"
+      },
+      "changed": [{"status": "M", "path": "packages/api/src/lib.rs"}],
+      "expect": {
+        "packages": {"packages/api/src/lib.rs": "packages/api"},
+        "guides": {},
+        "no_guide": {"packages/api": ["Rust"]},
+        "never": ["stacks/node.md"],
+        "not_proven": [],
+        "not_read": ["packages/api/package.json"]
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Snapshot"},
+      "why": "Signal files come from the head commit of the pull request; the local checkout, on another branch, still has an Express manifest that is never read."
+    },
+    {
+      "id": "pr-diff-alone",
+      "signal": "existing",
+      "kind": "ambiguous",
+      "contrasts": ["snapshot", "diff-alone", "existing-signal"],
+      "scope": "pr-diff-alone",
+      "files": {},
+      "changed": [
+        {"status": "M", "path": "web/package.json", "manifest_lines": "   \"dependencies\": {\n+    \"react\": \"18.3.1\",\n"},
+        {"status": "M", "path": "web/src/App.jsx"}
+      ],
+      "expect": {
+        "packages": {"web/package.json": "web", "web/src/App.jsx": "web"},
+        "guides": {"web": ["stacks/react.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": [],
+        "not_read": []
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Directories to list.**"},
+      "why": "The head commit is not in this repository, so only the manifest lines that the diff shows are evidence: they add react to the dependencies of web."
+    },
+    {
+      "id": "configuration-excluded-package",
+      "signal": "Gemfile",
+      "kind": "negative",
+      "contrasts": ["configuration"],
+      "scope": "uncommitted",
+      "ignore_paths": ["legacy/"],
+      "files": {
+        ".code-review/config.yml": "ignore_paths:\n  - \"legacy/\"\n",
+        "legacy/Gemfile": "source \"https://rubygems.org\"\ngem \"rails\", \"~> 6.1\"\n",
+        "legacy/app/models/user.rb": "class User\nend\n",
+        "api/go.mod": "module example.com/api\n\ngo 1.22\n",
+        "api/main.go": "package main\n"
+      },
+      "changed": [
+        {"status": "M", "path": "legacy/app/models/user.rb"},
+        {"status": "M", "path": "api/main.go"}
+      ],
+      "expect": {
+        "packages": {"api/main.go": "api"},
+        "guides": {"api": ["stacks/go.md"]},
+        "no_guide": {},
+        "never": [],
+        "not_proven": ["Ruby on Rails"],
+        "not_read": ["legacy/Gemfile"]
+      },
+      "rule": {"file": "SKILL.md", "anchor": "**Directories to list.**"},
+      "why": "The configuration excludes legacy/, so its changed file selects no stack and its Gemfile is never listed."
+    },
+    {
+      "id": "generated-bundle-not-proof",
+      "signal": "existing",
+      "kind": "negative",
+      "contrasts": ["generated", "existing-signal"],
+      "scope": "uncommitted",
+      "files": {
+        "packages/ui/package.json": "{\"dependencies\": {\"lit\": \"3.1.0\"}}\n",
+        "packages/ui/tsconfig.json": "{\"compilerOptions\": {\"strict\": true}}\n",
+        "packages/ui/src/index.ts": "export * from \"./button\";\n",
+        "packages/ui/dist/ui.min.js": "/*! bundled with react-dom */var a=1;\n"
+      },
+      "changed": [
+        {"status": "M", "path": "packages/ui/src/index.ts"},
+        {"status": "M", "path": "packages/ui/dist/ui.min.js"}
+      ],
+      "expect": {
+        "packages": {"packages/ui/src/index.ts": "packages/ui", "packages/ui/dist/ui.min.js": "packages/ui"},
+        "guides": {"packages/ui": ["stacks/typescript.md"]},
+        "no_guide": {},
+        "never": ["stacks/react.md"],
+        "not_proven": ["React"],
+        "not_read": []
+      },
+      "rule": {"file": "references/stack-detection.md", "anchor": "## Evidence that proves nothing"},
+      "why": "A minified bundle that names react-dom is generated output, never evidence; the package declares lit."
+    }
+  ]
+}
