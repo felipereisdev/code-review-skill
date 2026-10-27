@@ -7,7 +7,7 @@
 - **`BuildContext` after `await`**: using `context` after an `await` in a `State` method, for example `Navigator.of(context)` or `ScaffoldMessenger.of(context)`, can act on a widget that was removed while the future ran: it navigates from the wrong screen or throws. After the `await`, check `if (!mounted) return;` in a `State`, or `context.mounted` (Flutter 3.7+) elsewhere.
 - **`setState()` after `dispose()`**: a future, timer or stream callback that calls `setState()` after its `State` was disposed throws. Check `mounted`, or cancel the timer or subscription in `dispose()`.
 - **Resources owned by a `State`**: an `AnimationController`, `TextEditingController`, `ScrollController`, `FocusNode`, `StreamSubscription` or `Timer` that a `State` creates must be disposed or cancelled in its `dispose()`; otherwise its listeners, tickers or callbacks keep running after the screen is gone. **Not a finding:** a controller passed in by a parent that owns and disposes it.
-- **Futures created in `build()`**: `FutureBuilder(future: api.load(), ...)` creates a new future, and sends a new request, on every rebuild, such as when the keyboard opens or a parent calls `setState()`. Create the future once, in `initState()` or a `late final` field (and again in `didUpdateWidget()` when its input changes), and keep it in the `State`. The same holds for a `StreamBuilder` stream.
+- **Futures created in `build()`**: `FutureBuilder(future: api.load(), ...)` creates a new future, and sends a new request, on every rebuild, such as when the keyboard opens or a parent calls `setState()`. Create the future in `initState()` and keep it in the `State`, not in `build()`. A `late final` field is acceptable only when its input never changes, because a `late final` field cannot be reassigned. When the input can change, store the future in a non-final field, assign it in `initState()`, and assign it again in `didUpdateWidget()` when that input changes; otherwise the `State` keeps the old input's results. The same holds for a `StreamBuilder` stream.
 - **Missing error and loading states**: a `FutureBuilder` or `StreamBuilder` builder that reads `snapshot.data!` without checking `hasError` and `hasData` throws on the first frame and on every error.
 
 **Bad** — navigates after the widget may have been removed:
@@ -46,7 +46,7 @@ class OrdersPage extends StatelessWidget {
 }
 ```
 
-**Good** — creates the future once and handles the error and loading states:
+**Good** — creates the future in `initState()`, recreates it when the api changes, and handles the error and loading states:
 
 ```dart
 class OrdersPage extends StatefulWidget {
@@ -58,7 +58,21 @@ class OrdersPage extends StatefulWidget {
 }
 
 class _OrdersPageState extends State<OrdersPage> {
-  late final Future<List<Order>> _orders = widget.api.loadOrders();
+  late Future<List<Order>> _orders;
+
+  @override
+  void initState() {
+    super.initState();
+    _orders = widget.api.loadOrders();
+  }
+
+  @override
+  void didUpdateWidget(OrdersPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.api != widget.api) {
+      _orders = widget.api.loadOrders();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +92,7 @@ class _OrdersPageState extends State<OrdersPage> {
 
 - **Long lists**: `ListView(children: ...)`, or a `Column` inside a `SingleChildScrollView`, builds every item at once; for a long or unbounded list, `ListView.builder` builds only the items that are visible. **Not a finding:** a short list whose length the code bounds.
 - **Keys for stateful items**: when a list of stateful items, such as rows with text fields, checkboxes or animations, can be reordered, filtered, or have items inserted or removed, items without keys keep their `State` by position, so state moves to the wrong item. Give each item a key from its identity, such as `ValueKey(item.id)`. **Not a finding:** stateless items, and lists that only ever append.
-- **Heavy work on the UI isolate**: decoding a large JSON payload, processing images or hashing large data on the main isolate drops frames. Move it to `compute()` or `Isolate.run()` (Dart 2.19+). **Not a finding:** small payloads whose size the code bounds.
+- **Heavy work on the UI isolate**: decoding a large JSON payload, processing images or hashing large data on the main isolate drops frames. On native platforms, move it to `compute()` or `Isolate.run()` (Dart 2.19+), which run the work in a separate isolate. On Flutter web, `compute()` runs its callback on the current event loop, not in a separate isolate, so it does not take the work off the UI thread. Use a web strategy instead, such as splitting the work into chunks that yield to the event loop between steps. **Not a finding:** small payloads whose size the code bounds.
 
 ## Platform Channels and Plugins
 
@@ -89,7 +103,7 @@ class _OrdersPageState extends State<OrdersPage> {
 ## Security and Data
 
 - **Secrets in the app**: API keys, client secrets or signing keys in Dart code, in assets or in `--dart-define` values ship inside the app and can be extracted from it; `--obfuscate` only renames symbols. Keep secrets on a server. **Not a finding:** keys designed to be public whose access is enforced on the server side, such as Firebase API keys.
-- **Tokens in `shared_preferences`**: on Android, Auto Backup includes the app's shared-preferences files and files in `getFilesDir()` by default (apps targeting Android 6.0, API 23+), so a token written to app-private storage can reach a backup. Backup rules that exclude the file, and Android 9+ backups that are end-to-end encrypted with the device's screen lock, narrow that exposure. Android's documentation says that to back up credentials and authentication tokens, they must not be stored in shared preferences or a file; use Block Store APIs. **Not a finding:** non-sensitive preferences, or a token whose file the backup rules exclude.
+- **Tokens in `shared_preferences`**: a token in shared preferences or another file in app-private storage is readable in plaintext, and it can leave the device through two paths that the backup configuration controls separately: cloud backup and device-to-device transfer. On Android 6.0 (API 23) and higher, the default backup includes the shared-preferences files and files in `getFilesDir()`. Before Android 12, `android:fullBackupContent` governs the rules; from Android 12 (API 31), `android:dataExtractionRules` has separate `<cloud-backup>` and `<device-transfer>` sections, so excluding the file from cloud backup leaves device-to-device transfer open unless its section excludes it too. `android:allowBackup="false"` does not reliably disable device-to-device transfer on API 31 and higher, so check the rules rather than that flag alone. Cloud backups on Android 9 and higher are end-to-end encrypted with the device's screen lock, which narrows the cloud path only for devices with a screen lock. Name the transfer or cloud path that reaches the token; the presence of a backup file alone is not unauthorized access. Exempt a path the effective configuration disables, and a value that the app encrypts with a key that is not in the backup, because ciphertext without its key is not the same plaintext exposure. Android's documentation says that to back up credentials and authentication tokens, they must not be stored in shared preferences or a file; use Block Store APIs. **Not a finding:** non-sensitive preferences, or a token that the backup rules exclude on every path that applies.
 - **URLs from untrusted sources**: a URL from a deep link, a server response or user input that is passed to `launchUrl()` or loaded into a WebView can open any scheme or host that the platform handles; check the scheme and host first. A WebView with `JavaScriptMode.unrestricted` and a JavaScript channel (`addJavaScriptChannel`) that loads third-party or user-controlled pages lets those pages call into the app.
 - **Deep link routes**: route parameters from a deep link are attacker-controlled, because any app or web page can open the link. A route that performs an action, such as a payment or a deletion, without confirmation, or that skips the sign-in check that other routes apply, is a finding.
 

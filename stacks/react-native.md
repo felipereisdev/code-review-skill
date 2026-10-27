@@ -24,7 +24,7 @@ await SecureStore.setItemAsync('refreshToken', tokens.refresh);
 - **`fetch` resolves on HTTP errors**: `fetch` rejects only when the request cannot be made; a `401`, `404` or `500` response resolves normally, so code that reads `response.json()` without checking `response.ok` treats an error body as data.
 - **Out-of-order responses**: an effect that fetches for a changing input, such as search text or a selected id, can show the result of an older request after a newer one when the older one answers last. Ignore stale responses in the effect's cleanup, or abort them with `AbortController`.
 - **Failed requests**: a request without error handling leaves the screen in its loading state, or loses the user's change, when the device is offline. Report it with that scenario; the offline caching strategy is a product choice, not a finding.
-- **Cleartext traffic**: iOS App Transport Security, and Android for apps that target API level 28 or higher, block plain `http://` by default. A change that sets `NSAllowsArbitraryLoads` to `true`, or `android:usesCleartextTraffic="true"`, allows unencrypted traffic to every host. **Not a finding:** an exception limited to a development host, such as `localhost`, in a debug-only configuration.
+- **Cleartext traffic**: iOS App Transport Security, and Android for apps that target API level 28 or higher, block plain `http://` by default. A change that sets `NSAllowsArbitraryLoads` to `true` allows unencrypted traffic to every host in the shipped iOS build. On Android, `android:usesCleartextTraffic="true"` is ignored on Android 7.0 (API 24) and higher when a Network Security Config is present, so check that config's cleartext setting before reporting the manifest flag. Report a cleartext exception only when a release or otherwise deployed build reaches that traffic. **Not a finding:** a debug-only configuration, including the all-host debug placeholder that the React Native Gradle plugin sets for debug builds, and a development-host exception such as `localhost`.
 
 **Bad** — a `401` or `500` error body is returned as the profile:
 
@@ -60,6 +60,7 @@ useEffect(() => {
 ```js
 useEffect(() => {
   let ignore = false;
+  setError(null);
   searchProducts(query)
     .then((items) => {
       if (!ignore) setResults(items);
@@ -77,7 +78,7 @@ useEffect(() => {
 
 - **Deep links**: any app or web page can open the app's links, and another app can register the same custom scheme and receive them. Parameters from `Linking.getInitialURL()`, the `url` event or the navigation linking configuration are untrusted: a link that performs an action without the user's confirmation, such as a payment or a deletion, or that skips the sign-in check that other screens apply, is a finding, and so is a link that carries a token. OAuth redirects through a custom scheme need PKCE.
 - **WebViews**: `react-native-webview` runs JavaScript by default, and its default `originWhitelist` is `['http://*', 'https://*']`. When the WebView loads a page that the user or a server controls, `onMessage` receives messages from that page, so an `onMessage` handler that performs app actions without checking `event.nativeEvent.url` lets any loaded page trigger them. Restrict navigation with `onShouldStartLoadWithRequest` or a narrower `originWhitelist`.
-- **Android runtime permissions**: `PermissionsAndroid.request()` resolves to `granted`, `denied` or `never_ask_again`; code that ignores the result uses the feature without the permission, and the native call fails. Apps that target Android 13 (API level 33) or higher must request `POST_NOTIFICATIONS` at run time before they show notifications.
+- **Android runtime permissions**: `PermissionsAndroid.request()` resolves to `granted`, `denied` or `never_ask_again`; code that ignores the result uses the feature without the permission, and the native call fails. On Android 13 (API level 33) and higher, `POST_NOTIFICATIONS` is a run-time permission: a non-exempt notification is not shown unless the app has requested it and the user granted it, or it was already granted. Media-session notifications are exempt, and so are notifications for self-managed calls that use `Notification.CallStyle`. On Android 12 and lower the permission does not exist, so no request is needed there. A foreground service can start without the permission; if the user denies it, the service's notice still appears in Task Manager but not in the notification drawer, so a denial hides the notice without stopping the service.
 
 ## Lists, Listeners and Native Modules
 
