@@ -44,7 +44,7 @@ def cancel_order(order_id: str, user=Depends(current_user), cancel=Depends(get_c
 - **A transaction boundary that moves**: where the use case owns the unit of work and its writes commit together, a change that commits inside a repository adapter, or splits the use case's writes across two commits, leaves a partial change when a later step fails: an order saved without its stock reservation, an account debited without the matching credit. **Not a finding:** a project whose adapters commit each write by design and whose use cases compensate, or are idempotent when retried.
 - **Side effects inside entities**: an entity method that sends an email, publishes a message or calls an external API performs that effect even when the use case's transaction later rolls back, and performs it again when the use case is retried. Record the intent (a domain event or a returned value) and let the use case act on it after commit. **Not a finding:** an entity that only records an event for the use case to dispatch.
 
-**Bad** — the repository commits on every `save`, so a failure after the first `save` leaves the source account debited without the matching credit or ledger entry:
+**Bad** — the repository commits on every `save`, so a failure after the first `save` leaves both balances changed without the ledger entry:
 
 ```python
 class SqlAccountRepository:
@@ -109,7 +109,7 @@ class TransferFunds:
 - Ports and adapters: Alistair Cockburn, "Hexagonal Architecture", https://alistair.cockburn.us/hexagonal-architecture/
 - Unit of Work: Martin Fowler, Catalog of Patterns of Enterprise Application Architecture, https://martinfowler.com/eaaCatalog/unitOfWork.html
 - Composition root and dependency injection: Martin Fowler, "Inversion of Control Containers and the Dependency Injection pattern", https://martinfowler.com/articles/injection.html
-- Import rules enforced by a check: ArchUnit user guide, https://www.archunit.org/userguide/html/000_Index.html; import-linter contract types, https://import-linter.readthedocs.io/en/stable/contract_types.html
+- Import rules enforced by a check: ArchUnit user guide, https://www.archunit.org/userguide/html/000_Index.html; import-linter contract types, https://import-linter.readthedocs.io/en/stable/contract_types/
 - Detached instances and lazy loading: SQLAlchemy session state management, https://docs.sqlalchemy.org/en/20/orm/session_state_management.html; Hibernate ORM user guide, https://docs.jboss.org/hibernate/orm/6.6/userguide/html_single/Hibernate_User_Guide.html
 
 ## Precedents
