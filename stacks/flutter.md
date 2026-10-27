@@ -89,7 +89,7 @@ class _OrdersPageState extends State<OrdersPage> {
 ## Security and Data
 
 - **Secrets in the app**: API keys, client secrets or signing keys in Dart code, in assets or in `--dart-define` values ship inside the app and can be extracted from it; `--obfuscate` only renames symbols. Keep secrets on a server. **Not a finding:** keys designed to be public whose access is enforced on the server side, such as Firebase API keys.
-- **Tokens in `shared_preferences`**: `shared_preferences` wraps `NSUserDefaults` and Android `SharedPreferences`, which are not encrypted storage, and its documentation says that it must not be used for critical data. Store auth tokens and secrets in Keychain or Keystore-backed storage.
+- **Tokens in `shared_preferences`**: on Android, Auto Backup includes the app's shared-preferences files and files in `getFilesDir()` by default (apps targeting Android 6.0, API 23+), so a token written to app-private storage can reach a backup. Backup rules that exclude the file, and Android 9+ backups that are end-to-end encrypted with the device's screen lock, narrow that exposure. Android's documentation says that to back up credentials and authentication tokens, they must not be stored in shared preferences or a file; use Block Store APIs. **Not a finding:** non-sensitive preferences, or a token whose file the backup rules exclude.
 - **URLs from untrusted sources**: a URL from a deep link, a server response or user input that is passed to `launchUrl()` or loaded into a WebView can open any scheme or host that the platform handles; check the scheme and host first. A WebView with `JavaScriptMode.unrestricted` and a JavaScript channel (`addJavaScriptChannel`) that loads third-party or user-controlled pages lets those pages call into the app.
 - **Deep link routes**: route parameters from a deep link are attacker-controlled, because any app or web page can open the link. A route that performs an action, such as a payment or a deletion, without confirmation, or that skips the sign-in check that other routes apply, is a finding.
 
@@ -111,7 +111,8 @@ class _OrdersPageState extends State<OrdersPage> {
 - `WidgetsFlutterBinding.ensureInitialized()`: https://api.flutter.dev/flutter/widgets/WidgetsFlutterBinding/ensureInitialized.html
 - Obfuscation: https://docs.flutter.dev/deployment/obfuscate
 - Firebase API keys: https://firebase.google.com/docs/projects/api-keys
-- `shared_preferences`: https://pub.dev/packages/shared_preferences
+- Android Auto Backup and backup rules: https://developer.android.com/guide/topics/data/autobackup
+- Android `SharedPreferences` file access: https://developer.android.com/training/data-storage/shared-preferences
 - `url_launcher` and `webview_flutter`: https://pub.dev/packages/url_launcher, https://pub.dev/packages/webview_flutter
 
 ## Precedents
