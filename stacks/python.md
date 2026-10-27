@@ -1,12 +1,108 @@
 # Python / Django / FastAPI / Flask — Code Review Checklist
 
-- **Type hints**: all function signatures use type hints; `mypy` or `pyright` passes without errors
-- **Async correctness**: `async def` used only where truly async; blocking I/O not called from async context
-- **ORM queries**: Django ORM / SQLAlchemy used correctly; `select_related`/`prefetch_related` used to avoid N+1
-- **Pydantic / serializers**: input validated via Pydantic models (FastAPI) or DRF serializers (Django); no raw dict access from request
-- **Exception handling**: specific exceptions caught, not bare `except:`; exceptions not swallowed silently
-- **Settings management**: secrets and config loaded from environment via `django-environ`, `python-decouple`, or Pydantic `BaseSettings`; not hardcoded
-- **Migrations** *(Django)*: migrations generated and reviewed; no raw SQL in application code unless necessary
+> Check sibling modules for existing patterns before flagging a convention (see Consistency Check step). Report an item only with a concrete trigger → effect in the changed code. A problem that a type checker (mypy, pyright) or a linter (Ruff, Flake8, Pylint) configured in the repository already reports is not a finding. Apply a framework section only when the package declares that framework; the other sections apply to all Python code. An item that depends on a version names the Python or package version that it needs.
+
+## Language Pitfalls
+
+- **Mutable default arguments**: a default such as `[]`, `{}` or `set()` is created once, when the `def` statement runs, so every call that mutates it changes the same object, and data from one call or request appears in the next. Default to `None` and create the object in the body. **Not a finding:** a mutable default that the function never mutates, stores or returns, and `dataclasses.field(default_factory=list)`.
+- **Late-binding closures**: a `lambda` or nested function created in a loop reads the loop variable when it runs, not when it is created, so every callback sees the last value. Bind it as a default argument (`lambda item=item: ...`) or with `functools.partial`.
+- **Over-broad `except`**: a bare `except:` or `except BaseException:` also catches `KeyboardInterrupt`, `SystemExit` and, since Python 3.8, `asyncio.CancelledError`, so a cancelled task or a shutdown keeps running. An `except Exception:` that only logs, or passes, on a path whose failure must stop the operation reports success after a failed write. **Not a finding:** a handler that logs and re-raises, and a top-level worker loop that logs a failed job and moves on to the next by design.
+- **Naive and aware datetimes**: comparing or subtracting a naive `datetime` (`datetime.now()`, `datetime.utcnow()`) and an aware one raises `TypeError`. With Django's `USE_TZ = True`, model datetimes are aware, so use `django.utils.timezone.now()`. `datetime.utcnow()` returns a naive value that most APIs read as local time, and it is deprecated since Python 3.12.
+
+**Bad** — the list is shared by every call that omits `tags`:
+
+```python
+def add_tag(tag, tags=[]):
+    tags.append(tag)
+    return tags
+```
+
+**Good** — each call that omits `tags` gets a new list:
+
+```python
+def add_tag(tag, tags=None):
+    if tags is None:
+        tags = []
+    tags.append(tag)
+    return tags
+```
+
+## Async Code
+
+- **Blocking calls in `async def`**: `requests`, `time.sleep`, a synchronous database driver or a large file read inside an `async def` stops the event loop, so every other request on that worker waits. Use an async client, or `await asyncio.to_thread(...)` (Python 3.9+). **Not a finding:** the same call in a FastAPI path operation or dependency declared with plain `def`, which FastAPI runs in a thread pool, and blocking calls during startup.
+- **Coroutines never awaited**: calling an `async def` function without `await` only creates a coroutine object, so the work never happens (Python warns `coroutine ... was never awaited`).
+- **Unreferenced tasks**: the event loop keeps only weak references to tasks, so a task from `asyncio.create_task(...)` whose result is not stored can be garbage-collected before it finishes, and its exception is never seen. **Not a finding:** tasks that are awaited, kept in a collection until they finish, or created in an `asyncio.TaskGroup` (Python 3.11+).
+
+**Bad** — a blocking HTTP call inside `async def` stalls every request on the worker:
+
+```python
+@app.get("/rates")
+async def rates():
+    resp = requests.get(RATES_URL, timeout=5)
+    return resp.json()
+```
+
+**Good** — with plain `def`, FastAPI runs the blocking call in its thread pool:
+
+```python
+@app.get("/rates")
+def rates():
+    resp = requests.get(RATES_URL, timeout=5)
+    return resp.json()
+```
+
+## Django
+
+- **Queries in loops**: reading a foreign key or a reverse relation for each row of a queryset, in Python or in a template loop, runs one query per row. Use `select_related()` for foreign keys and one-to-one relations, and `prefetch_related()` for many-to-many and reverse relations. **Not a finding:** a loop over a small set whose size the code bounds.
+- **Lost updates**: `account.balance -= amount` followed by `account.save()` from two concurrent requests keeps only one change. Use an `F()` expression (`Account.objects.filter(pk=pk).update(balance=F("balance") - amount)`), or `select_for_update()` inside `transaction.atomic()`.
+- **Side effects inside transactions**: an email, a queued task or an external call made inside `transaction.atomic()`, or anywhere in a view when `ATOMIC_REQUESTS = True`, happens even when the transaction rolls back, and a task queued there can run before the commit and not find its row. Use `transaction.on_commit()`.
+- **Bulk operations skip model logic**: `QuerySet.update()`, `bulk_create()` and `bulk_update()` do not call `save()` or send the `pre_save` and `post_save` signals, and `update()` does not set `auto_now` fields. A change that replaces a `save()` loop with them silently drops that logic.
+- **Object-level access**: `get_object_or_404(Invoice, pk=pk)` in a view that serves a user's own data, with no filter on `request.user` and no permission check, lets any signed-in user read or change another user's record by changing the id. In Django REST Framework, `has_object_permission()` runs only when the view calls `get_object()`; list views need a `get_queryset()` filtered to the user.
+- **Production settings**: `DEBUG = True` in the settings that production uses shows tracebacks and configuration to visitors, and a `SECRET_KEY` committed to the repository lets anyone who reads it forge signed values such as password reset tokens.
+- **Missing migrations**: a model change with no matching migration, in the diff or already in the repository, fails at run time with a missing column or table. **Not a finding:** when CI runs `makemigrations --check`.
+
+## FastAPI and Flask
+
+- **Response fields**: a path operation that returns an ORM object or a dict with no `response_model` and no return type annotation serializes every field it holds, such as `password_hash`. FastAPI filters the output through the declared response model.
+- **Missing auth dependency**: a route added without the dependency that its sibling routes use for authentication, such as `Depends(get_current_user)`, is public. **Not a finding:** a route on a router or app created with `dependencies=[...]`, which applies them to every route that it includes.
+- **Flask debug mode**: `app.run(debug=True)`, `FLASK_DEBUG=1` or `flask run --debug` in a deployed configuration exposes the Werkzeug debugger, which runs arbitrary Python code from the browser.
+- **Files from user paths**: `send_file(os.path.join(UPLOADS, name))` with a user-controlled `name` can serve any file; `send_from_directory(UPLOADS, name)` refuses paths outside that directory.
+
+## Security
+
+- **Shell commands**: `subprocess` calls with `shell=True`, `os.system()` and `os.popen()` pass a command line to a shell, so input in it can run other commands. **Not a finding:** an argument list without `shell=True`, which reaches the program as separate arguments (input that picks the program, or that starts with `-`, still needs a check).
+- **Unsafe deserialization**: `pickle.loads()` and `shelve` on data from a request, a queue or a shared cache can run code; so can `yaml.load()` with `yaml.Loader` or `yaml.UnsafeLoader`, and `yaml.load(data)` without a `Loader` on PyYAML before 5.1. `yaml.safe_load()` and `json` build only plain data.
+- **Paths from input**: `os.path.join(base, name)` returns `name` when it is absolute and keeps `..`, so it does not keep the result inside `base`. Resolve with `os.path.realpath()` and check `os.path.commonpath([base, resolved]) == base`.
+- **Outbound HTTP timeouts**: `requests` has no default timeout, so a call without `timeout=` to a server that never answers hangs the worker. **Not a finding:** `httpx`, which applies a five-second default timeout.
+
+## Conventions, not defects
+
+- Type hints and a passing type checker are tooling: a missing annotation is never a finding by itself.
+- The settings library (`django-environ`, `python-decouple`, Pydantic `BaseSettings`) is the team's choice; a finding needs a committed secret or a setting that silently falls back to an unsafe value.
+- Pydantic models or DRF serializers instead of dict access, and raw SQL, are findings only when unvalidated input reaches something that needs the validation, such as a query, a privileged attribute or a file path; the precedents below say when the framework already covers it.
+
+## Sources
+
+- Default argument values: https://docs.python.org/3/reference/compound_stmts.html#function-definitions
+- Late-binding lambdas: https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
+- `CancelledError`, `create_task`, `TaskGroup`, `to_thread`: https://docs.python.org/3/library/asyncio-exceptions.html, https://docs.python.org/3/library/asyncio-task.html
+- Blocking code in asyncio: https://docs.python.org/3/library/asyncio-dev.html#running-blocking-code
+- `datetime.utcnow()`: https://docs.python.org/3/library/datetime.html#datetime.datetime.utcnow
+- `dataclasses` mutable defaults: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
+- FastAPI `def` and `async def`, response models, router dependencies: https://fastapi.tiangolo.com/async/, https://fastapi.tiangolo.com/tutorial/response-model/, https://fastapi.tiangolo.com/tutorial/bigger-applications/
+- Django querysets (`select_related`, `prefetch_related`, `update()`, bulk methods, `select_for_update()`): https://docs.djangoproject.com/en/stable/ref/models/querysets/
+- `F()` expressions: https://docs.djangoproject.com/en/stable/ref/models/expressions/#f-expressions
+- Transactions and `on_commit()`: https://docs.djangoproject.com/en/stable/topics/db/transactions/
+- `auto_now`: https://docs.djangoproject.com/en/stable/ref/models/fields/#datefield
+- Time zones: https://docs.djangoproject.com/en/stable/topics/i18n/timezones/
+- `DEBUG` and `SECRET_KEY`: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/, https://docs.djangoproject.com/en/stable/ref/settings/#secret-key
+- `makemigrations --check`: https://docs.djangoproject.com/en/stable/ref/django-admin/#makemigrations
+- Django REST Framework object permissions: https://www.django-rest-framework.org/api-guide/permissions/
+- Flask debugger and `send_from_directory`: https://flask.palletsprojects.com/en/stable/debugging/, https://flask.palletsprojects.com/en/stable/api/#flask.send_from_directory
+- `subprocess` security: https://docs.python.org/3/library/subprocess.html#security-considerations
+- `pickle`: https://docs.python.org/3/library/pickle.html; PyYAML `load`: https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation
+- `os.path.join`: https://docs.python.org/3/library/os.path.html#os.path.join
+- Timeouts: https://requests.readthedocs.io/en/latest/user/advanced/#timeouts, https://www.python-httpx.org/advanced/timeouts/
 
 ## Precedents
 
