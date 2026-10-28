@@ -79,7 +79,7 @@ When the diff or the refs differ, the second opinion failed with the reason `the
 Take each finding block under `### Candidates` as a candidate and check it like one of your own, before the comparison with the comments already in a pull request:
 
 1. A candidate whose Location is not on a changed line, outside the deletion-only exception, is dropped: a second opinion never adds a finding outside the diff. A candidate without an Evidence scenario that you can follow is Low and is dropped.
-2. Apply Do Not Report, the precedents of the stack files you loaded and the repository rules, as for your own candidates.
+2. Apply Do Not Report, the precedents of the stack and pattern files you loaded and the repository rules, as for your own candidates.
 3. When it states the same problem as one of your candidates, in the same file, with Locations that overlap or lie within 3 lines, and with the same cause and the same effect, merge them into one candidate that keeps the Evidence of both. Set its category, severity and confidence yourself, never keeping a severity because the second opinion gave it.
 4. Then compare it with the comments already in a pull request, and run Step 2 on it once, like every candidate. A verifier gets only what Step 2 gives it, never the answer of the second opinion. Count each candidate once on the verification line.
 

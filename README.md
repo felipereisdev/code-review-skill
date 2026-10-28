@@ -16,11 +16,11 @@
 - **Consistency-First Review** - Checks existing project conventions before flagging violations (Step 1.5)
 - **API Validation** - Checks a version-specific or uncertain claim about a library API against the documentation of the version in use, with any documentation tool the agent has (for example the Context7 MCP server) or the official documentation; stable behavior that a loaded stack file documents needs no lookup. A claim it cannot check is never reported and is listed as `API not validated` in the Audit, marked `material` only when a changed behavior or a contract the change relies on depends on it, and `not material` otherwise
 - **Multi-Stack Support** - 28 technology stacks covered
-- **Pattern-Specific Rules** - Apply Clean Architecture, DDD, CQRS, Microservices guidelines
+- **Pattern-Specific Rules** - Applies the Clean Architecture, DDD, CQRS, Event-Driven and Microservices checklists only to code that has adopted the pattern; adopting a pattern is never required, and each pattern file ends with its own precedents
 - **Severity-Based Reporting** - Critical, Warning, and Suggestion levels
 - **Triage, Verdict and Audit** - Every report rates the review effort from 1 to 5, says which tests cover the change and what it ran without claiming a result it did not see, names up to 3 files to look at first, and gives a `**Ready to merge:** Yes / No / With fixes` verdict from a fixed table over the findings, the Warning candidates already raised in open threads (pending verification, never confirmed) and the coverage and verification limits, before any configuration filter; a closing `## Audit` lists every file reviewed and read for context, the categories checked with no findings, and each limit with its reason, marked material or not
 - **Changed Lines Only** - Findings cover only the lines the change adds or modifies; a relevant older problem can go, one line each, to a short "Pre-existing issues (not counted)" section outside the Summary table; the same problem at several places is one finding with an **Also at:** list; length limits apply only to code the change adds, always as Suggestions
-- **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings) and when they stop holding
+- **Do Not Report List and Stack Precedents** - Skips pre-existing problems, tooling-caught issues, silenced rules, style nits, theoretical DoS and generic hardening; each stack file lists protections its framework already provides (for example React escaping or Eloquent bindings), each pattern file lists the safeguards that a pattern the code has adopted already gives (for example a unique constraint behind a CQRS command), and both say when they stop holding
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **Repository Configuration and Custom Rules** - An optional `.code-review/config.yml` sets `ignore_paths`, `min_severity`, `max_findings_per_file` and `disabled_categories`, and `.code-review/rules/*.md` adds the team's own rules with `paths`, `severity` and Bad/Good examples; an invalid file stops the review with a clear error, excluded paths and omitted findings are declared in the report, a Critical finding is never omitted, and a change to `.code-review/` applies to its own review
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
@@ -372,11 +372,11 @@ The five **Always** categories live in `SKILL.md`. Each of the others lives in i
 
 ## 🏛️ Architectural Patterns
 
-- **Clean Architecture** - Layer separation, dependency inversion
-- **DDD** - Domain-driven design patterns
-- **Event-Driven** - Async messaging, event sourcing
-- **Microservices** - Service boundaries, inter-service communication
-- **CQRS** - Command query responsibility segregation
+- **Clean Architecture** - The dependency rule, paths that skip a use case, ports and transaction boundaries
+- **DDD** - Aggregate invariants, value objects, bounded contexts and domain events
+- **Event-Driven** - Atomic publishing, duplicates, ordering, poison messages and event compatibility
+- **Microservices** - Data ownership, consistency across services, API compatibility and trusted identity
+- **CQRS** - Invariants on the write side, queries without side effects and projection consistency
 
 ## 📄 Output Format
 
@@ -438,7 +438,12 @@ code-review-skill/
 ├── README.md             # This file
 ├── LICENSE               # MIT License
 ├── example-output.md     # Sample review report
+├── CHANGELOG.md          # Changes merged since the v2.0.0 tag, not yet released
+├── CONTRIBUTING.md       # How to contribute, the stack guide template and the checks to run
 ├── .gitignore           # Git ignore rules
+├── .github/ISSUE_TEMPLATE/ # Issue forms
+│   ├── false-positive.yml # Report a finding the review should not have made
+│   └── new-stack.yml    # Ask for a new stack guide
 ├── .github/workflows/   # CI
 │   └── ci.yml           # Docs checks, SKILL.md references, eval case validation
 ├── scripts/             # Maintenance scripts
@@ -515,12 +520,12 @@ code-review-skill/
 
 ## 🤝 Contributing
 
-Contributions welcome! Please feel free to submit a Pull Request.
+Contributions welcome! New stack guides, sharper pattern rules and reports of false positives help most. [CONTRIBUTING.md](CONTRIBUTING.md) explains how a rule is judged, gives the stack guide template and says what each check proves, and [CHANGELOG.md](CHANGELOG.md) lists the changes merged since the last release. To ask for a guide or report a finding that the review should not have made, open an issue with the **New stack guide** or **False positive** form.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Run `bash scripts/check-docs.sh` and `bash scripts/test-check-docs.sh` and make sure all checks pass; if you change `SKILL.md`, `stacks/`, `patterns/` or `references/`, also run the evals ([evals/README.md](evals/README.md)) and compare with `evals/baseline.json`
-4. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Commit your changes in the Conventional Commits style (`git commit -m 'feat: add amazing feature'`)
 5. Push to the branch (`git push origin feature/amazing-feature`)
 6. Open a Pull Request
 

@@ -2615,6 +2615,138 @@ replace_line "$work/sdreadban/references/stack-detection.md" '- Settle the packa
 expect_fail "an unqualified read ban on unrelated packages fails" "$work/sdreadban" "references/stack-detection.md says: Never list or read a package that no changed file belongs to"
 # End of stack detection tests.
 
+# Pattern precedents (every patterns/*.md ends with 2 to 5 precedents, each with an exception).
+make_copy "$work/ppnone"
+drop_from "$work/ppnone/patterns/cqrs.md" '## Precedents'
+expect_fail "a pattern without Precedents fails" "$work/ppnone" "patterns/cqrs.md has no '## Precedents' section"
+
+make_copy "$work/ppone"
+drop_lines "$work/ppone/patterns/cqrs.md" '**Commands that return an identifier or a result**'
+drop_lines "$work/ppone/patterns/cqrs.md" '**Unique constraints on the write store**'
+expect_fail "a pattern with one precedent fails" "$work/ppone" "patterns/cqrs.md: '## Precedents' has 1 item(s), need 2 to 5"
+
+make_copy "$work/pptwo"
+drop_lines "$work/pptwo/patterns/cqrs.md" '**Unique constraints on the write store**'
+expect_pass "a pattern with two precedents passes" "$work/pptwo"
+
+make_copy "$work/ppnoexception"
+replace_first "$work/ppnoexception/patterns/ddd.md" '**Exception:**' 'Except'
+expect_fail "a pattern precedent without its exception fails" "$work/ppnoexception" "patterns/ddd.md: Precedents item does not match"
+
+make_copy "$work/ppnotlast"
+printf '\n## Notes\n\n- note\n' >> "$work/ppnotlast/patterns/microservices.md"
+expect_fail "a section after a pattern's Precedents fails" "$work/ppnotlast" "patterns/microservices.md: '## Precedents' must be the last '## ' section"
+# End of pattern precedent tests.
+
+# Issue forms (.github/ISSUE_TEMPLATE/*.yml).
+make_copy "$work/ifmissing"
+rm "$work/ifmissing/.github/ISSUE_TEMPLATE/false-positive.yml"
+expect_fail "a missing false positive form fails" "$work/ifmissing" ".github/ISSUE_TEMPLATE/false-positive.yml is missing"
+
+make_copy "$work/ifyaml"
+printf 'body: [\n' >> "$work/ifyaml/.github/ISSUE_TEMPLATE/new-stack.yml"
+expect_fail "an issue form that is not YAML fails" "$work/ifyaml" ".github/ISSUE_TEMPLATE/new-stack.yml is not valid YAML"
+
+make_copy "$work/ifkey"
+printf 'about: Old Markdown template key\n' >> "$work/ifkey/.github/ISSUE_TEMPLATE/new-stack.yml"
+expect_fail "a Markdown template key in an issue form fails" "$work/ifkey" ".github/ISSUE_TEMPLATE/new-stack.yml: unexpected top-level keys: ['about']"
+
+make_copy "$work/iftype"
+replace_first "$work/iftype/.github/ISSUE_TEMPLATE/false-positive.yml" 'type: textarea' 'type: text'
+expect_fail "an unknown issue form field type fails" "$work/iftype" ".github/ISSUE_TEMPLATE/false-positive.yml: body item 3 has type 'text'"
+
+make_copy "$work/iflabel"
+replace_first "$work/iflabel/.github/ISSUE_TEMPLATE/new-stack.yml" '      label: Technology and versions' '      title: Technology and versions'
+expect_fail "an issue form field without a label fails" "$work/iflabel" ".github/ISSUE_TEMPLATE/new-stack.yml: body item 2 (input) has no label"
+
+make_copy "$work/ifid"
+replace_first "$work/ifid/.github/ISSUE_TEMPLATE/new-stack.yml" 'id: sources' 'id: evidence'
+expect_fail "a duplicate issue form field id fails" "$work/ifid" ".github/ISSUE_TEMPLATE/new-stack.yml: duplicate id 'evidence'"
+
+make_copy "$work/ifname"
+replace_first "$work/ifname/.github/ISSUE_TEMPLATE/false-positive.yml" 'name: False positive' 'name: New stack guide'
+expect_fail "two issue forms with one name fail" "$work/ifname" "issue form name 'New stack guide' is used by more than one form"
+
+make_copy "$work/ifconfig"
+printf 'blank_issues_enabled: true\n' > "$work/ifconfig/.github/ISSUE_TEMPLATE/config.yml"
+expect_pass "a template chooser config.yml next to the forms passes" "$work/ifconfig"
+make_copy "$work/ifupload"
+cat >> "$work/ifupload/.github/ISSUE_TEMPLATE/new-stack.yml" <<'YAML'
+  - type: upload
+    id: attachment
+    attributes:
+      label: Optional sanitized screenshot
+YAML
+expect_pass "a documented upload field passes" "$work/ifupload"
+# End of issue form tests.
+
+# Contributing guide (CONTRIBUTING.md and its stack guide template).
+make_copy "$work/ctmissing"
+rm "$work/ctmissing/CONTRIBUTING.md"
+expect_fail "a missing contributing guide fails" "$work/ctmissing" "CONTRIBUTING.md is missing"
+
+make_copy "$work/cttitle"
+replace_first "$work/cttitle/CONTRIBUTING.md" '# <Stack name> — Code Review Checklist' '# <Stack name>'
+expect_fail "a stack template without the checklist title fails" "$work/cttitle" "CONTRIBUTING.md stack template must start with a '# <name> — Code Review Checklist' line"
+
+make_copy "$work/ctsources"
+replace_line "$work/ctsources/CONTRIBUTING.md" '## Sources' '## Further reading'
+expect_fail "a stack template without Sources fails" "$work/ctsources" "CONTRIBUTING.md stack template has no '## Sources' section"
+
+make_copy "$work/ctexception"
+replace_first "$work/ctexception/CONTRIBUTING.md" '**Exception:** <the condition' 'Except <the condition'
+expect_fail "a stack template precedent without its exception fails" "$work/ctexception" "CONTRIBUTING.md stack template: Precedents item does not match"
+
+make_copy "$work/ctnotlast"
+replace_first "$work/ctnotlast/CONTRIBUTING.md" '**Exception:** <when it stops holding>.' '**Exception:** <when it stops holding>.
+
+## Notes'
+expect_fail "a section after the template's Precedents fails" "$work/ctnotlast" "CONTRIBUTING.md stack template: '## Precedents' must be the last '## ' section"
+
+make_copy "$work/ctlink"
+printf '\nSee [the Elixir guide](stacks/elixir.md).\n' >> "$work/ctlink/CONTRIBUTING.md"
+expect_fail "a contributing link to a missing file fails" "$work/ctlink" "CONTRIBUTING.md links to a missing file: stacks/elixir.md"
+
+make_copy "$work/ctplaceholder"
+printf '\n```markdown\n[example](stacks/<name>.md)\n```\n' >> "$work/ctplaceholder/CONTRIBUTING.md"
+expect_pass "a placeholder link inside a code block passes" "$work/ctplaceholder"
+# End of contributing guide tests.
+
+# Navigation (README.md Project Structure lists CONTRIBUTING.md, CHANGELOG.md and the issue forms).
+make_copy "$work/navcontributing"
+drop_lines "$work/navcontributing/README.md" '── CONTRIBUTING.md'
+expect_fail "a README tree without CONTRIBUTING.md fails" "$work/navcontributing" "README Project Structure is missing: CONTRIBUTING.md"
+
+make_copy "$work/navchangelog"
+drop_lines "$work/navchangelog/README.md" '── CHANGELOG.md'
+expect_fail "a README tree without CHANGELOG.md fails" "$work/navchangelog" "README Project Structure is missing: CHANGELOG.md"
+
+make_copy "$work/navform"
+drop_lines "$work/navform/README.md" '── false-positive.yml'
+expect_fail "a README tree without an issue form fails" "$work/navform" "README Project Structure is missing: .github/ISSUE_TEMPLATE/false-positive.yml"
+
+make_copy "$work/navconfigyaml"
+printf 'blank_issues_enabled: true\n' > "$work/navconfigyaml/.github/ISSUE_TEMPLATE/config.yaml"
+expect_pass "a template chooser config.yaml passes without a README tree line" "$work/navconfigyaml"
+
+make_copy "$work/navyamlmissing"
+cat > "$work/navyamlmissing/.github/ISSUE_TEMPLATE/sample-request.yaml" <<'YAML'
+name: Sample request
+description: Share a sanitized sample for a review question.
+body:
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sanitized sample
+YAML
+expect_fail "a valid .yaml issue form missing from the README tree fails" "$work/navyamlmissing" "README Project Structure is missing: .github/ISSUE_TEMPLATE/sample-request.yaml"
+
+make_copy "$work/navyamlin"
+cp "$work/navyamlmissing/.github/ISSUE_TEMPLATE/sample-request.yaml" "$work/navyamlin/.github/ISSUE_TEMPLATE/"
+printf '├── sample-request.yaml # Share a sanitized sample for a review question\n' >> "$work/navyamlin/README.md"
+expect_pass "a valid .yaml issue form listed in the README tree passes" "$work/navyamlin"
+# End of navigation tests.
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
