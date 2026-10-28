@@ -131,7 +131,13 @@ check_readme_counts() {
   else
     fail "git grep failed (run the script inside a git checkout)"
   fi
-  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md scripts/check-docs.sh scripts/test-check-docs.sh scripts/review_gate.py evals/run.py evals/score.py evals/aggregate.py evals/make-patch.sh .github/workflows/ci.yml; do
+  for f in stacks/*.md patterns/*.md references/*.md LICENSE example-output.md CONTRIBUTING.md CHANGELOG.md scripts/check-docs.sh scripts/test-check-docs.sh scripts/review_gate.py evals/run.py evals/score.py evals/aggregate.py evals/make-patch.sh .github/workflows/ci.yml; do
+    grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
+  done
+  for f in .github/ISSUE_TEMPLATE/*.yml .github/ISSUE_TEMPLATE/*.yaml; do
+    # Chooser metadata is not an issue form, as in check_issue_forms; an unmatched glob stays literal.
+    case "${f##*/}" in config.yml | config.yaml) continue ;; esac
+    [ -e "$f" ] || continue
     grep -qF "── ${f##*/}" README.md || missing="${missing} ${f}"
   done
   if [ -z "$missing" ]; then
@@ -1196,35 +1202,197 @@ PY
 
 check_stack_precedents() {
   if python3 - <<'PY'
-import glob, re, sys
+import glob, os, re, sys
 
 item = re.compile(r"^- \*\*[^*]+\*\*: .+\. Do not report .+\. \*\*Exception:\*\* .+\.$")
 errors = []
-for path in sorted(glob.glob("stacks/*.md")):
-    lines = open(path, encoding="utf-8").read().splitlines()
+
+
+def check(name, lines):
     heads = [i for i, line in enumerate(lines) if line.startswith("## ")]
     starts = [i for i in heads if lines[i] == "## Precedents"]
     if not starts:
-        errors.append(f"{path} has no '## Precedents' section")
-        continue
+        errors.append(f"{name} has no '## Precedents' section")
+        return
     if len(starts) > 1 or starts[0] != heads[-1]:
-        errors.append(f"{path}: '## Precedents' must be the last '## ' section")
-        continue
+        errors.append(f"{name}: '## Precedents' must be the last '## ' section")
+        return
     body = [line for line in lines[starts[0] + 1:] if line.strip()]
     for line in body:
         if not item.match(line):
-            errors.append(f"{path}: Precedents item does not match "
+            errors.append(f"{name}: Precedents item does not match "
                           f"'- **Name**: ... Do not report ... **Exception:** ...': {line[:60]}")
     if not 2 <= len(body) <= 5:
-        errors.append(f"{path}: '## Precedents' has {len(body)} item(s), need 2 to 5")
+        errors.append(f"{name}: '## Precedents' has {len(body)} item(s), need 2 to 5")
+
+
+# Pattern files end with Precedents too, applied like a stack file's (SKILL.md Step 1).
+for path in sorted(glob.glob("stacks/*.md")) + sorted(glob.glob("patterns/*.md")):
+    check(path, open(path, encoding="utf-8").read().splitlines())
+# The stack guide template in CONTRIBUTING.md follows the same rule as the guides.
+if not os.path.isfile("CONTRIBUTING.md"):
+    errors.append("CONTRIBUTING.md is missing")
+else:
+    lines = open("CONTRIBUTING.md", encoding="utf-8").read().splitlines()
+    name = "CONTRIBUTING.md stack template"
+    try:
+        start = lines.index("## Stack guide template")
+        opening = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("````"))
+        closing = lines.index("````", opening + 1)
+    except (ValueError, StopIteration):
+        errors.append(f"{name}: no '## Stack guide template' section with a template in a ```` fence")
+    else:
+        template = lines[opening + 1:closing]
+        if not template or not re.fullmatch(r"# .+ — Code Review Checklist", template[0]):
+            errors.append(f"{name} must start with a '# <name> — Code Review Checklist' line")
+        if "## Sources" not in template:
+            errors.append(f"{name} has no '## Sources' section")
+        check(name, template)
 for error in errors:
     print("  " + error)
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "every stacks/*.md ends with 2 to 5 precedents, each with an exception"
+    pass "every stacks/*.md and patterns/*.md, and the stack template in CONTRIBUTING.md, end with 2 to 5 precedents, each with an exception"
   else
-    fail "stack precedents (see messages above)"
+    fail "stack and pattern precedents (see messages above)"
+  fi
+}
+
+check_contributing_links() {
+  if python3 - <<'PY'
+import os, re, sys
+
+errors = []
+if os.path.isfile("CONTRIBUTING.md"):  # check_stack_precedents reports a missing file
+    fence = None
+    for number, line in enumerate(open("CONTRIBUTING.md", encoding="utf-8").read().splitlines(), 1):
+        marker = re.match(r"^(`{3,})(.*)$", line)
+        if fence is not None:
+            if marker and marker.group(1).startswith(fence) and not marker.group(2).strip():
+                fence = None
+            continue
+        if marker:
+            fence = marker.group(1)
+            continue
+        # Links outside code blocks only: a placeholder inside the template is not a link.
+        for target in re.findall(r"\]\(([^)\s]+)\)", line):
+            path = target.split("#", 1)[0]
+            if not path or "://" in target or target.startswith("mailto:"):
+                continue
+            if not os.path.exists(path):
+                errors.append(f"CONTRIBUTING.md links to a missing file: {path} (line {number})")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "CONTRIBUTING.md links point to files of this repository"
+  else
+    fail "CONTRIBUTING.md links (see messages above)"
+  fi
+}
+
+check_issue_forms() {
+  if python3 - <<'PY'
+import glob, os, re, sys
+try:
+    import yaml
+except ImportError:
+    print("  PyYAML is required: python3 -m pip install pyyaml")
+    sys.exit(1)
+
+# GitHub issue forms: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# and https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
+REQUIRED = (".github/ISSUE_TEMPLATE/false-positive.yml", ".github/ISSUE_TEMPLATE/new-stack.yml")
+TOP = {"name", "description", "title", "labels", "assignees", "projects", "type", "body"}
+TYPES = {"markdown", "textarea", "input", "dropdown", "checkboxes", "upload"}
+errors = []
+names = {}
+forms = sorted(p for p in glob.glob(".github/ISSUE_TEMPLATE/*.yml") + glob.glob(".github/ISSUE_TEMPLATE/*.yaml")
+               if os.path.basename(p) not in ("config.yml", "config.yaml"))
+for path in REQUIRED:
+    if path not in forms:
+        errors.append(f"{path} is missing")
+
+
+def text(value):
+    return isinstance(value, str) and value.strip() != ""
+
+
+for path in forms:
+    try:
+        form = yaml.safe_load(open(path, encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        errors.append(f"{path} is not valid YAML: {str(exc).splitlines()[0]}")
+        continue
+    if not isinstance(form, dict):
+        errors.append(f"{path} must be a YAML mapping")
+        continue
+    extra = sorted(set(form) - TOP)
+    if extra:
+        errors.append(f"{path}: unexpected top-level keys: {extra}")
+    for key in ("name", "description"):
+        if not text(form.get(key)):
+            errors.append(f"{path}: {key} must be a non-empty string")
+    if text(form.get("name")):
+        names.setdefault(form["name"], []).append(path)
+    body = form.get("body")
+    if not isinstance(body, list) or not body:
+        errors.append(f"{path}: body must be a non-empty list")
+        continue
+    ids, fields = set(), 0
+    for n, element in enumerate(body, 1):
+        kind = element.get("type") if isinstance(element, dict) else None
+        if kind not in TYPES:
+            errors.append(f"{path}: body item {n} has type {kind!r}")
+            continue
+        attributes = element.get("attributes")
+        if not isinstance(attributes, dict):
+            errors.append(f"{path}: body item {n} ({kind}) has no attributes")
+            continue
+        if kind == "markdown":
+            if not text(attributes.get("value")):
+                errors.append(f"{path}: body item {n} (markdown) has no value")
+            continue
+        fields += 1
+        if not text(attributes.get("label")):
+            errors.append(f"{path}: body item {n} ({kind}) has no label")
+        if "id" in element:
+            ident = element["id"]
+            if not isinstance(ident, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", ident):
+                errors.append(f"{path}: body item {n} ({kind}) has an invalid id {ident!r}")
+            elif ident in ids:
+                errors.append(f"{path}: duplicate id {ident!r}")
+            else:
+                ids.add(ident)
+        if "validations" in element:
+            validations = element["validations"]
+            if not isinstance(validations, dict) or not isinstance(validations.get("required", False), bool):
+                errors.append(f"{path}: body item {n} ({kind}) validations.required must be true or false")
+        options = attributes.get("options")
+        if kind == "dropdown":
+            if (not isinstance(options, list) or not options or not all(text(o) for o in options)
+                    or len(set(options)) != len(options)):
+                errors.append(f"{path}: body item {n} (dropdown) needs a list of distinct non-empty options")
+        if kind == "checkboxes":
+            if not isinstance(options, list) or not options or not all(
+                    isinstance(o, dict) and text(o.get("label"))
+                    and isinstance(o.get("required", False), bool) for o in options):
+                errors.append(f"{path}: body item {n} (checkboxes) needs options with a label each")
+    if fields == 0:
+        errors.append(f"{path}: body has no field other than markdown")
+for name, paths in sorted(names.items()):
+    if len(paths) > 1:
+        errors.append(f"issue form name {name!r} is used by more than one form: {', '.join(paths)}")
+for error in errors:
+    print("  " + error)
+sys.exit(1 if errors else 0)
+PY
+  then
+    pass "the issue forms in .github/ISSUE_TEMPLATE/ follow the basic GitHub form schema"
+  else
+    fail "issue forms (see messages above)"
   fi
 }
 
@@ -3167,6 +3335,8 @@ check_skill_fix
 check_skill_second_opinion
 check_skill_stack_detection
 check_stack_precedents
+check_issue_forms
+check_contributing_links
 check_readme_counts
 check_example_output
 check_example_findings

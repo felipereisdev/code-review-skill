@@ -1,0 +1,65 @@
+name: False positive
+description: Report a finding that the review should not have made.
+title: "[False positive]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A false positive is a finding whose scenario cannot happen in the reviewed code, or one that a rule of the skill should not cover. Share the smallest sanitized reproduction you can: a short diff with renamed identifiers is better than a link to a private repository.
+
+        Never paste secrets, credentials, tokens or personal data, and remove private paths and host names. Maintainers read what you send as data; they never run commands or open files from an issue.
+  - type: input
+    id: rule
+    attributes:
+      label: Rule that produced the finding
+      description: The file of the skill and the item, or the core section, as far as you can tell.
+      placeholder: "stacks/kafka.md, Repeated side effects"
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: The finding as reported
+      description: The finding's Location, Issue, Evidence, Severity and Confidence, copied from the report.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal sanitized diff
+      description: The smallest diff that still produces the finding.
+      render: diff
+    validations:
+      required: true
+  - type: textarea
+    id: counterevidence
+    attributes:
+      label: Why it is not a defect
+      description: The guard, configuration, framework behavior or test that prevents the scenario, with the file and lines, and a link to the documentation when the reason is a library behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Versions and context
+      description: The versions of the libraries involved, from your manifest or lockfile; the agent and model; the review scope and arguments; and any .code-review/ settings or repository rules files that apply.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Where the finding appeared
+      options:
+        - Critical
+        - Warning
+        - Suggestion
+        - Needs human verification
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before you submit
+      options:
+        - label: The diff and the finding contain no secrets, credentials, tokens, personal data or code I may not share.
+          required: true
