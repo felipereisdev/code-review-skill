@@ -2724,6 +2724,27 @@ expect_fail "a README tree without CHANGELOG.md fails" "$work/navchangelog" "REA
 make_copy "$work/navform"
 drop_lines "$work/navform/README.md" '── false-positive.yml'
 expect_fail "a README tree without an issue form fails" "$work/navform" "README Project Structure is missing: .github/ISSUE_TEMPLATE/false-positive.yml"
+
+make_copy "$work/navconfigyaml"
+printf 'blank_issues_enabled: true\n' > "$work/navconfigyaml/.github/ISSUE_TEMPLATE/config.yaml"
+expect_pass "a template chooser config.yaml passes without a README tree line" "$work/navconfigyaml"
+
+make_copy "$work/navyamlmissing"
+cat > "$work/navyamlmissing/.github/ISSUE_TEMPLATE/sample-request.yaml" <<'YAML'
+name: Sample request
+description: Share a sanitized sample for a review question.
+body:
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sanitized sample
+YAML
+expect_fail "a valid .yaml issue form missing from the README tree fails" "$work/navyamlmissing" "README Project Structure is missing: .github/ISSUE_TEMPLATE/sample-request.yaml"
+
+make_copy "$work/navyamlin"
+cp "$work/navyamlmissing/.github/ISSUE_TEMPLATE/sample-request.yaml" "$work/navyamlin/.github/ISSUE_TEMPLATE/"
+printf '├── sample-request.yaml # Share a sanitized sample for a review question\n' >> "$work/navyamlin/README.md"
+expect_pass "a valid .yaml issue form listed in the README tree passes" "$work/navyamlin"
 # End of navigation tests.
 
 if [ "$failures" -gt 0 ]; then
