@@ -2,6 +2,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/felipereisdev/code-review-skill?style=social)](https://github.com/felipereisdev/code-review-skill)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Latest release](https://img.shields.io/github/v/release/felipereisdev/code-review-skill)](https://github.com/felipereisdev/code-review-skill/releases/latest)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-compatible-purple)](https://agentskills.io)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blue)](https://claude.ai)
 [![OpenCode](https://img.shields.io/badge/OpenCode-compatible-green)](https://opencode.ai)
@@ -97,6 +98,16 @@ ln -s "$(pwd)/code-review-skill" ~/.codex/skills/code-review
 mkdir -p ~/.cursor/skills
 ln -s "$(pwd)/code-review-skill" ~/.cursor/skills/code-review
 ```
+
+## ⬆️ Upgrading from v2
+
+Version 3.0.0 changes how a review starts and what its report looks like:
+
+- **Scope** - The skill no longer opens with a menu of scopes: it takes the scope from the arguments or detects it, asks only when detection is ambiguous in an interactive run, and never stops to ask in a run with no user to answer (see **Scope arguments** under Usage)
+- **Report** - Each finding has `**Location:**`, `**Evidence:**` and `**Confidence:**` lines, and `**File:**` is gone; the report adds a `## Intent` section, a `**Ready to merge:** Yes / No / With fixes` verdict and a closing `## Audit` (see Output Format)
+- **Frontmatter** - `author`, `version` and `date` in `SKILL.md` are now under `metadata`
+
+A script that parses the old Markdown report or the old frontmatter keys needs to be adapted. For new automation, `--format json` gives the review as one JSON document (see **JSON output and the merge gate** under Usage). The [changelog](CHANGELOG.md) lists every change in each release, and the [releases page](https://github.com/felipereisdev/code-review-skill/releases) has the release notes.
 
 ## 🚀 Usage
 
@@ -438,7 +449,7 @@ code-review-skill/
 ├── README.md             # This file
 ├── LICENSE               # MIT License
 ├── example-output.md     # Sample review report
-├── CHANGELOG.md          # Changes merged since the v2.0.0 tag, not yet released
+├── CHANGELOG.md          # Release history, upgrade notes and unreleased changes
 ├── CONTRIBUTING.md       # How to contribute, the stack guide template and the checks to run
 ├── .gitignore           # Git ignore rules
 ├── .github/ISSUE_TEMPLATE/ # Issue forms
@@ -520,7 +531,7 @@ code-review-skill/
 
 ## 🤝 Contributing
 
-Contributions welcome! New stack guides, sharper pattern rules and reports of false positives help most. [CONTRIBUTING.md](CONTRIBUTING.md) explains how a rule is judged, gives the stack guide template and says what each check proves, and [CHANGELOG.md](CHANGELOG.md) lists the changes merged since the last release. To ask for a guide or report a finding that the review should not have made, open an issue with the **New stack guide** or **False positive** form.
+Contributions welcome! New stack guides, sharper pattern rules and reports of false positives help most. [CONTRIBUTING.md](CONTRIBUTING.md) explains how a rule is judged, gives the stack guide template and says what each check proves, and [CHANGELOG.md](CHANGELOG.md) lists the changes of each release, with the changes merged since the latest one under `Unreleased`. To ask for a guide or report a finding that the review should not have made, open an issue with the **New stack guide** or **False positive** form.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -542,6 +553,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
+- [Latest release](https://github.com/felipereisdev/code-review-skill/releases/latest)
+- [Changelog](CHANGELOG.md)
 - [Agent Skills Standard](https://agentskills.io)
 - [Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code/skills)
 - [OpenCode Documentation](https://opencode.ai/docs/skills)
