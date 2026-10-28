@@ -12,8 +12,8 @@ description: >-
 license: MIT
 metadata:
   author: felipereis
-  version: "2.0.0"
-  date: "2026-04-20"
+  version: "3.0.0"
+  date: "2026-10-28"
 ---
 
 # Code Review
