@@ -1,6 +1,6 @@
 # Expanded eval baseline, rescored
 
-- Rescored without a model call from the raw reports of study expanded (manifest sha256 8804c7567dac, original aggregate sha256 2eebfa191633)
+- Rescored without a model call from the raw reports of study expanded (manifest sha256 dd1e40e189db, original aggregate sha256 2eebfa191633)
 - Rescoring completeness-v2: scorer 2454669fd3ad; runner 28001c561963; aggregator 39d117557540; 6 field change(s) in 3 trial(s)
 - Study: expanded; protocol sha256 6c62a5217a65
 - Skill tree e230ce6b116a; runner 9b552b320d30; scorer fb070feccfc5; cases 5ca0541a143f; controls edf78039f1c9; profile 8b9ea30aec21

@@ -2,7 +2,7 @@
 """Optional consumer of the code-review skill's --format json document: validates it and exits with the gate status.
 
 Usage: python3 scripts/review_gate.py [FILE|-]   (no FILE or - reads standard input)
-Exit: 0 pass, 1 fail (verified Critical), 2 incomplete or error, 3 invalid input.
+Exit: 0 pass, 1 fail (verified finding at requested threshold), 2 incomplete or error, 3 invalid input.
 The skill never needs this script; it shows how a CI job turns the document into a real exit status.
 """
 from __future__ import annotations
@@ -12,7 +12,8 @@ import re
 import sys
 
 SCHEMA = "code-review-skill/review"
-VERSION = 1
+VERSION = 2
+SUPPORTED_VERSIONS = (1, 2)
 STATUSES = ("complete", "nothing_to_review", "error")
 GATE_STATUSES = ("pass", "fail", "incomplete", "error", "not_requested")
 TOP_KEYS = ("schema", "version", "status", "message", "scope", "gate", "review")
@@ -132,8 +133,9 @@ def _text_list(errors, name, value) -> bool:
     return True
 
 
-def _finding_errors(errors, name, finding, confidence):
-    if not _keys(errors, name, finding, FINDING_KEYS):
+def _finding_errors(errors, name, finding, confidence, version=1):
+    keys = FINDING_KEYS + (("blocking",) if version == 2 else ())
+    if not _keys(errors, name, finding, keys):
         return
     if finding["category"] not in CATEGORIES:
         errors.append(f"{name}.category is not a Summary table category: {finding['category']!r}")
@@ -166,6 +168,19 @@ def _finding_errors(errors, name, finding, confidence):
         errors.append(f"{name}.omitted_by must be null or one of {', '.join(FILTERS)}")
     if finding["severity"] == "Critical" and finding["omitted_by"] is not None:
         errors.append(f"{name}: a Critical finding is never omitted by a filter")
+
+    if version == 2:
+        blocking = finding["blocking"]
+        if type(blocking) is not bool:
+            errors.append(f"{name}.blocking must be a boolean")
+        elif confidence == "Medium" and blocking:
+            errors.append(f"{name}: a Medium-confidence finding cannot block")
+        elif finding["severity"] == "Critical" and confidence == "High" and not blocking:
+            errors.append(f"{name}: a verified Critical finding must block")
+        elif finding["severity"] == "Suggestion" and blocking:
+            errors.append(f"{name}: a Suggestion cannot block")
+        if blocking is True and finding["omitted_by"] is not None:
+            errors.append(f"{name}: a blocking finding is never omitted by a filter")
 
 
 def _audit_errors(errors, audit):
@@ -292,7 +307,7 @@ def _count_text(number: int) -> str:
         return "a count too long to write out"
 
 
-def expected_row(review: dict) -> int:
+def expected_row(review: dict, version: int = 1) -> int:
     """The verdict row of SKILL.md Step 3 from the facts, counting findings before the configuration filters."""
     findings, needs, audit = review["findings"], review["needs_verification"], review["audit"]
     if audit["files_reviewed"]["reviewed"] == 0:
@@ -301,6 +316,8 @@ def expected_row(review: dict) -> int:
         return 2
     if any(item["material"] for item in audit["not_verified"]):
         return 3
+    if version == 2 and any(f.get("blocking") is True for f in findings):
+        return 8
     if any(f["severity"] == "Warning" for f in findings):
         return 4
     if any(f["severity"] in ("Critical", "Warning") for f in needs):
@@ -318,11 +335,19 @@ def expected_gate(doc: dict) -> str:
         return "not_requested"
     if doc["status"] == "nothing_to_review":
         return "pass"
-    row = expected_row(doc["review"])
+    row = expected_row(doc["review"], doc["version"])
+    if doc["gate"]["fail_on"] == "blocking" and any(
+            f.get("blocking") is True for f in doc["review"]["findings"]):
+        return "fail"
     if row == 2:
         return "fail"
     if row in (1, 3):
         return "incomplete"
+    if doc["gate"]["fail_on"] == "blocking":
+        review = doc["review"]
+        pending = any(f["severity"] in ("Critical", "Warning") for f in review["needs_verification"])
+        if pending or review["audit"]["already_raised_not_verified"]:
+            return "incomplete"
     return "pass"
 
 
@@ -337,8 +362,9 @@ def contract_errors(doc: dict) -> list:
         return errors
     if doc["schema"] != SCHEMA:
         return [f'schema must be "{SCHEMA}"']
-    if not _is_int(doc["version"]) or doc["version"] != VERSION:
-        return [f"version must be {VERSION}; this gate reads only version {VERSION}"]
+    if not _is_int(doc["version"]) or doc["version"] not in SUPPORTED_VERSIONS:
+        return ["version must be 1 or 2; this gate reads versions 1 and 2"]
+    version = doc["version"]
     status = doc["status"]
     if status not in STATUSES:
         return [f"status must be one of {', '.join(STATUSES)}"]
@@ -357,8 +383,9 @@ def contract_errors(doc: dict) -> list:
         errors.append("scope must be null or a non-empty string")
     gate = doc["gate"]
     if _keys(errors, "gate", gate, GATE_KEYS):
-        if gate["fail_on"] not in ("critical", None):
-            errors.append('gate.fail_on must be "critical" or null')
+        thresholds = ("critical", "blocking", None) if version == 2 else ("critical", None)
+        if gate["fail_on"] not in thresholds:
+            errors.append('gate.fail_on must be "critical", "blocking" or null in version 2; version 1 accepts "critical" or null')
         if gate["status"] not in GATE_STATUSES:
             errors.append(f"gate.status must be one of {', '.join(GATE_STATUSES)}")
         if not _is_text(gate["reason"]):
@@ -377,7 +404,7 @@ def contract_errors(doc: dict) -> list:
                 errors.append(f"review.{key} must be a list")
                 continue
             for i, finding in enumerate(review[key]):
-                _finding_errors(errors, f"review.{key}[{i}]", finding, confidence)
+                _finding_errors(errors, f"review.{key}[{i}]", finding, confidence, version)
         _text_list(errors, "review.pre_existing", review["pre_existing"])
         _text_list(errors, "review.already_raised", review["already_raised"])
         omitted = review["omitted_by_configuration"]
@@ -389,9 +416,9 @@ def contract_errors(doc: dict) -> list:
                     errors.append(f"review.triage.{key} must be a non-empty string")
         verdict = review["verdict"]
         if _keys(errors, "review.verdict", verdict, ("ready_to_merge", "row")) and not (
-                _is_int(verdict["row"]) and verdict["row"] in ROW_VALUES
-                and verdict["ready_to_merge"] == ROW_VALUES[verdict["row"]]):
-            errors.append("review.verdict: row must be 1 to 7 and ready_to_merge the value of that row")
+                _is_int(verdict["row"]) and verdict["row"] in (ROW_VALUES if version == 1 else {**ROW_VALUES, 8: "No"})
+                and verdict["ready_to_merge"] == ({**ROW_VALUES, 8: "No"}[verdict["row"]])):
+            errors.append("review.verdict: row must be 1 to 7 in version 1, or 1 to 8 in version 2, and ready_to_merge the value of that row")
         _audit_errors(errors, review["audit"])
         verification = review["verification"]
         if _keys(errors, "review.verification", verification, ("checked", "refuted")) and not (
@@ -411,7 +438,7 @@ def contract_errors(doc: dict) -> list:
                           "or Warning findings are reported")
         if not review["triage"]["ready_to_merge"].startswith(f"{verdict['ready_to_merge']} — "):
             errors.append(f"review.triage.ready_to_merge must start with \"{verdict['ready_to_merge']} — \"")
-        row = expected_row(review)
+        row = expected_row(review, version)
         if verdict["row"] != row:
             errors.append(f"review.verdict row {verdict['row']} does not match the facts (row {row})")
     if errors:
@@ -450,8 +477,9 @@ def main(argv: list | None = None) -> int:
     if doc["status"] == "error":
         print(f"review-gate: error: {doc['message']}")
         return EXIT["error"]
-    if doc["gate"]["fail_on"] != "critical":
-        print("review-gate: invalid: the review was not run with --fail-on critical")
+    if doc["gate"]["fail_on"] not in ("critical", "blocking"):
+        threshold_hint = "--fail-on critical" if doc["version"] == 1 else "--fail-on critical or --fail-on blocking"
+        print(f"review-gate: invalid: the review was not run with {threshold_hint}")
         return INVALID
     status = doc["gate"]["status"]
     print(f"review-gate: {status}: {doc['gate']['reason']}")

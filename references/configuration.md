@@ -134,6 +134,8 @@ Apply the filters in this order. A finding that one of them omits is counted the
 2. `disabled_categories`: omit a finding whose category is disabled.
 3. `max_findings_per_file`: for each file (the path of the finding's **Location:**), rank the findings still shown by severity (Critical first), then by the first line of the Location, then by its last line, then by category name. Walk them in that order, keep each one while fewer findings than the limit are kept, and omit the rest. A grouped finding counts once, for the file of its **Location:**.
 
+**Blocking findings are never omitted.** A High-confidence finding with `Blocking: yes` survives every filter, including per-rule severity and exclusions by category; it counts toward the per-file limit for lower-ranked findings. A rule may not downgrade or suppress a proven broken required behavior to escape this protection. Recompute blocking from final verified impact, never from a filter. Ignored files remain outside scope: never call them reviewed or invent blockers in unread code.
+
 **Critical findings are never omitted.** No filter omits a **Critical** finding, whatever its category. Past the per-file limit a Critical finding is still kept, and it counts toward the limit for the findings ranked after it. This keeps every Critical security finding, which no repository rule may silence either, and every finding that blocks the merge.
 
 **Reporting.**

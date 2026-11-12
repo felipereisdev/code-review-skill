@@ -1952,7 +1952,7 @@ expect_fail "history read after consolidation fails" "$work/rhdimpass" "referenc
 
 # JSON output and merge gate (references/json-output.md, SKILL.md Step 0, Step 3 and Output Format).
 make_copy "$work/jsflag"
-replace_first "$work/jsflag/SKILL.md" ' `--fail-on critical` without `--format json`: `--fail-on needs --format json`.' ''
+replace_first "$work/jsflag/SKILL.md" ' `--fail-on critical` or `--fail-on blocking` without `--format json`: `--fail-on needs --format json`.' ''
 expect_fail "a gate without --format json fails" "$work/jsflag" "Step 0 — Scope Selection is missing: \`--fail-on needs --format json\`"
 
 make_copy "$work/jscompact"
@@ -2004,8 +2004,8 @@ replace_first "$work/jsgate/references/json-output.md" '"status": "fail"' '"stat
 expect_fail "an example whose gate contradicts its findings fails" "$work/jsgate" "references/json-output.md example 1: gate status \"pass\" does not match the facts (\"fail\")"
 
 make_copy "$work/jsversion"
-replace_first "$work/jsversion/references/json-output.md" '"version": 1,' '"version": 2,'
-expect_fail "an example of another version fails" "$work/jsversion" "references/json-output.md example 1: version must be 1; this gate reads only version 1"
+replace_first "$work/jsversion/references/json-output.md" '"version": 2,' '"version": 3,'
+expect_fail "an example of another version fails" "$work/jsversion" "references/json-output.md example 1: version must be 1 or 2; this gate reads versions 1 and 2"
 
 make_copy "$work/jsomitted"
 replace_first "$work/jsomitted/references/json-output.md" '"omitted_by": null' '"omitted_by": "disabled_categories"'
@@ -2016,7 +2016,7 @@ replace_first "$work/jsduplicate/references/json-output.md" '"rule": null,' '"ru
 expect_fail "an example with a duplicate key fails" "$work/jsduplicate" "references/json-output.md example 1: duplicate key \"rule\""
 
 make_copy "$work/jsguide"
-replace_first "$work/jsguide/references/json-output.md" '"skill:references/json-output.md", ' ''
+replace_first "$work/jsguide/references/json-output.md" '"skill:references/json-output.md",' ''
 expect_fail "an example that hides the JSON guide from the Audit fails" "$work/jsguide" "references/json-output.md example 1: review.audit.read_for_context must list skill:references/json-output.md"
 
 make_copy "$work/jsaccount"

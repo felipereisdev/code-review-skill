@@ -11,6 +11,26 @@
 
 **Compatible with any LLM that supports the [Agent Skills Standard](https://agentskills.io)** - Claude Code, OpenCode, Cursor, and any other AI coding assistant that implements the skills protocol.
 
+## Evidence-driven review (3.1)
+
+The default remains a static, read-only review. Every review now checks nine adversarial axes, qualifies static/executed/fixture-only evidence and checks stated acceptance criteria against the reviewed behavior. Re-reviews retain earlier reproductions and valid controls. A mock is not automatically a defect; a concrete mismatch with the real contract needs evidence. See [evidence-driven review](references/evidence-driven-review.md).
+
+```text
+/code-review pr 123 --execute
+/code-review pr https://bitbucket.org/acme/service/pull-requests/42 --comment --dry-run
+/code-review pr 123 --comment --workflow --dry-run
+/code-review branch main --format json --fail-on blocking
+```
+
+- `--execute` authorizes local tests/probes and merged-tree verification in isolated scratch worktrees, using pinned source/destination SHAs. It does not authorize installing dependencies, live service probes or reading credentials. Missing runtime access is reported as a limit, while statically demonstrated findings remain valid. It cannot combine with `--fix`. See [execution](references/execution.md).
+- Every PR records the reviewed pair and rechecks it before reporting or writing. A moved pair makes the result historical until the affected delta/integration is covered; current-head publication and workflow writes stop. See [snapshots](references/pr-snapshots.md).
+- Bitbucket Cloud joins GitHub/GitLab, through an already authenticated connector/client. Bitbucket Data Center is unsupported. See [provider protocol](references/bitbucket.md).
+- `--workflow` requires `pr --comment` and adds own-thread resolution and own request-changes/withdrawal operations when verified evidence supports them. It never approves or merges. Tracker writes require an explicit tracker request and legal transitions. Provider capabilities may limit operations. `--dry-run` suppresses all external writes; separately requested local execution still runs. See [workflow](references/review-workflow.md).
+- **Blocking is separate from severity.** Critical findings block. A verified Warning also blocks when it breaks required behavior or a public/integration contract without an adequate supported workaround. Suggestions do not block; Medium-confidence candidates require verification. Filters cannot omit a blocking finding. Markdown records `**Blocking:** yes | no — reason` and row 8 gives `Ready to merge: No` for blocking Warnings.
+- New JSON reports use contract version 2, with boolean `blocking` on each finding; the consumer still accepts historical version 1 without reinterpreting it. `--fail-on critical` retains its explicit threshold. `--fail-on blocking` fails on any verified blocker and returns incomplete for pending candidates/material gaps. Consumer exits are 0 pass, 1 verified finding at threshold, 2 incomplete/error, 3 invalid input. See [JSON contract](references/json-output.md).
+
+[Executable evidence scenarios](evals/scenarios/evidence-driven/README.md) add fixture/integration checks and a protocol for a future model study. Their passing tests validate the artifacts, not improved reviewer recall. Existing measured reports, trial records and scores are retained unchanged; environment metadata uses privacy-safe placeholders as documented in `evals/README.md`.
+
 ## 🌟 Features
 
 - **Automatic Stack Detection** - Identifies the technology of the code the change touches from config files and directly declared dependencies, per package in a monorepo (`references/stack-detection.md`); a lockfile, a transitive dependency or a generated file never proves a framework, and a technology with no stack guide, such as Java without Spring Boot, gets the generic checks and a `no stack guide` item in the Audit; platform rules, such as Android, iOS or Rails, apply only when the build or manifest proves that platform
@@ -216,7 +236,7 @@ The skill's text cannot change the exit status of your agent's CLI: that status 
 | 0 | `pass`: a complete review with no verified Critical finding, or nothing to review |
 | 1 | `fail`: at least one verified Critical finding |
 | 2 | `incomplete` or `error`: the review is not complete, or the run stopped with `Cannot review` |
-| 3 | invalid input: empty, not exactly one JSON document, another schema or version, a document that contradicts itself, its file accounting included, or a review run without `--fail-on critical` |
+| 3 | invalid input: empty, not exactly one JSON document, another schema or version, a document that contradicts itself, its file accounting included, or a review run without `--fail-on critical` or `--fail-on blocking` |
 
 The consumer checks the structure of the document and the facts it states; it cannot check that the review read what the document says, or that its evidence and judgments are right.
 
@@ -410,7 +430,7 @@ Each finding carries a severity, a location inside the diff, a concrete trigger 
 - **Repository configuration**: with `.code-review/`, the report adds a `**Configuration:**` line and, when files were ignored, an `**Excluded by configuration:**` line after the Scope line, and an `**Omitted by configuration:**` line after the verification line.
 - **Changed lines, pre-existing issues and repeats**: findings cite only lines the change adds or modifies. An older problem the change does not touch is never a finding; it can go, one line each (`path:line — problem`), under `## Pre-existing issues (not counted)`, which the Summary table does not count. The same problem at several places is one finding whose **Also at:** line lists the other places; in compact mode the line ends with `(also at path:line)` before any rule citation.
 - **Already raised in the PR**: in a `pr` review, the lines under `## Already raised in the PR (not repeated)` have no severity and are not counted in the Summary table; a Warning candidate already raised in an open thread makes the verdict `With fixes` as pending verification, because an open thread does not prove the problem, and the verdict never calls it confirmed or fixed.
-- **Triage and verdict**: after the verification line come `**Review effort:** <n>/5` (from the line and file counts measured on the diff, never estimated), `**Relevant tests:**` (with `Execution:` saying what ran, or `not run`), `**Look first:**` and `**Ready to merge:**`. No changed file reviewed, a Critical finding, or a material limit such as changed lines the review could not read gives `No`; a Warning finding, a finding under Needs human verification or a Warning candidate already raised in an open thread gives `With fixes`; otherwise `Yes`. Files excluded by configuration are counted in the verdict, never called clean, and the verdict never approves or blocks a pull request.
+- **Triage and verdict**: after the verification line come `**Review effort:** <n>/5` (from the line and file counts measured on the diff, never estimated), `**Relevant tests:**` (with `Execution:` saying what ran, or `not run`), `**Look first:**` and `**Ready to merge:**`. No changed file reviewed, a Critical finding, a blocking Warning, or a material limit such as changed lines the review could not read gives `No`; a nonblocking Warning finding, a finding under Needs human verification or a Warning candidate already raised in an open thread gives `With fixes`; otherwise `Yes`. Files excluded by configuration are counted in the verdict, never called clean, and the verdict never approves or blocks a pull request.
 - **Audit**: the report ends with `## Audit` (one `**Audit:**` line in compact mode): every file reviewed and every file read for context, each once (repository files by their path, the skill's own files as `skill:<path>`), the categories checked with no findings, the already-raised Warning candidates in a `pr` review, and each limit with its reason, such as `not read`, `API not validated` or `tests not verified`, marked `material` when it leaves a changed behavior, or a contract the change relies on, unjudged.
 - **Compact mode**: ask for `/code-review compact` to get one line per finding (`path:line: Severity: problem → fix`).
 
@@ -487,6 +507,11 @@ code-review-skill/
 │   ├── database-migrations.md
 │   ├── dimensions.md    # Dimension review with subagents (not a review category)
 │   ├── fix.md           # Approved fixes and their re-review for --fix (not a review category)
+│   ├── bitbucket.md # Evidence/execution/provider workflow guidance (not a review category)
+│   ├── evidence-driven-review.md # Evidence/execution/provider workflow guidance (not a review category)
+│   ├── execution.md # Evidence/execution/provider workflow guidance (not a review category)
+│   ├── pr-snapshots.md # Evidence/execution/provider workflow guidance (not a review category)
+│   ├── review-workflow.md # Evidence/execution/provider workflow guidance (not a review category)
 │   ├── i18n.md
 │   ├── intent.md        # Intent and requirements of every review (not a review category)
 │   ├── json-output.md   # JSON document and merge gate for --format json (not a review category)

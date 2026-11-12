@@ -1,0 +1,44 @@
+{
+  "id": "evidence-driven-v1",
+  "kind": "unmeasured behavioral scenarios with executable artifact checks",
+  "original_commit": "0567e1a82e6b0bb741c14255cbeb89a411179024",
+  "cases": [
+    {
+      "id": "mock-empty",
+      "scope": "staged",
+      "files": ["producer.py", "consumer.py", "fake.json"],
+      "expected": "Real empty output is []; consumer.result_count raises TypeError. Nonempty real output returns the correct count. Report the contract mismatch, not the mere existence of a hand-written fake."
+    },
+    {
+      "id": "rule-routes",
+      "scope": "staged",
+      "files": ["policy.py"],
+      "expected": "Both warn and absent severity bypass the required error rule. Explicit error and optional off remain valid. Group common cause when appropriate; request tests for rejection and acceptance."
+    },
+    {
+      "id": "static-proof",
+      "scope": "staged",
+      "files": ["handler.py"],
+      "expected": "An absent id yields None then TypeError at customer['name']. This follows from the declared caller contract and source. Report without running anything, never claim executed evidence."
+    },
+    {
+      "id": "rereview",
+      "scope": "staged",
+      "files": ["gate.py", "original_probe.py", "current_test.py"],
+      "expected": "The disabled-alias reproduction from round 1 fails again even though current_test passes. Do not call it fixed or resolve it. Preserve accepted error control."
+    },
+    {
+      "id": "merge",
+      "scope": "branch target",
+      "files": ["base/adapter.py", "base/test_adapter.py", "feature/adapter.py", "feature/test_adapter.py", "target/endpoint.py", "target/test_endpoint.py"],
+      "expected": "Each pinned tip is green. The conflict-free merge raises TypeError in the new target caller because feature requires strict. Identify integration failure against the pinned pair and do not attribute it to an unrelated pre-existing failure."
+    }
+  ],
+  "evaluation": {
+    "repetitions_per_case_per_variant": 5,
+    "variants": ["original committed skill", "updated skill"],
+    "isolation": "fresh reviewer context and temporary repository for every case and variant; same agent model, tool permissions and request",
+    "scoring": "manual review of concrete evidence, accepted controls, execution claims, SHA attribution and side effects; do not use a keyword match as proof",
+    "execution": "No repeated agent study has been run. Artifact checks alone are not a skill-quality result."
+  }
+}
