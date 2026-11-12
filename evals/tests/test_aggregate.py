@@ -268,7 +268,7 @@ class OriginalStudyTest(unittest.TestCase):
 
 
 ORIGINAL_STUDY = os.path.join(EVALS, "baseline", "expanded")
-ORIGINAL_MANIFEST_SHA256 = "8804c7567dace5b2a16c0826eadf5de007120d97b0deb8a9b4fc89e12df86557"
+ORIGINAL_MANIFEST_SHA256 = "dd1e40e189dba4ef5dbbd7877097203e8287595d5e592c552d00456e2b4bb34b"
 I1_TRIALS = ["s2/elapsed-timer-react/clean", "s3/elapsed-timer-react/clean", "s3/sqli-laravel/clean"]
 
 

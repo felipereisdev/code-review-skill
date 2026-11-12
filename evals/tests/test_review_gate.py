@@ -85,8 +85,8 @@ class ContractTest(unittest.TestCase):
 
     def test_another_version_is_incompatible(self):
         doc = fixture("pass")
-        doc["version"] = 2
-        self.assertEqual(review_gate.contract_errors(doc), ["version must be 1; this gate reads only version 1"])
+        doc["version"] = 3
+        self.assertEqual(review_gate.contract_errors(doc), ["version must be 1 or 2; this gate reads versions 1 and 2"])
 
     def test_another_schema_is_incompatible(self):
         doc = fixture("pass")
@@ -538,7 +538,13 @@ class JsonOutputGuideTest(unittest.TestCase):
             with self.subTest(name=name):
                 doc = review_gate.load(block.encode("utf-8"))
                 self.assertEqual(review_gate.contract_errors(doc), [])
-                self.assertEqual(doc, fixture(name))
+                expected = fixture(name)
+                expected["version"] = 2
+                if expected["review"]:
+                    for key in ("findings", "needs_verification"):
+                        for finding in expected["review"][key]:
+                            finding["blocking"] = finding["severity"] == "Critical" and finding["confidence"] == "High"
+                self.assertEqual(doc, expected)
 
 
 if __name__ == "__main__":

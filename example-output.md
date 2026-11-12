@@ -40,6 +40,7 @@ Reviewing pull request #123 on GitHub (`https://github.com/acme/shop-api/pull/12
 **Issue:** The JWT secret falls back to the hard-coded string `'dev-secret'` when `JWT_SECRET` is not set.
 **Evidence:** A deployment without `JWT_SECRET` signs every token with `'dev-secret'` → anyone who reads this repository can forge a token for any user ID and pass `authMiddleware`. Raised in https://github.com/acme/shop-api/pull/123#discussion_r1188 and marked resolved, but the fallback is still in the current diff.
 **Confidence:** High
+**Blocking:** yes — The demonstrated security hole must be fixed before merge.
 **Fix:** Fail at startup instead of falling back:
 ```typescript
 if (!process.env.JWT_SECRET) {
@@ -53,6 +54,7 @@ if (!process.env.JWT_SECRET) {
 **Issue:** Token refresh reads the stored refresh token, then deletes it and creates a new one in separate queries.
 **Evidence:** Two concurrent `POST /auth/refresh` requests with the same refresh token both pass the `findUnique` check before either delete runs → both receive a new valid refresh token, so a stolen token can be replayed without ending the session. Verification checked `POST /auth/refresh`, the only caller of the rotation code, and found no lock or transaction around the read and the delete.
 **Confidence:** High
+**Blocking:** yes — The demonstrated security hole must be fixed before merge.
 **Fix:** Rotate the token in one transaction, so the second request fails on the delete:
 ```typescript
 await db.$transaction(async (tx) => {
@@ -67,6 +69,7 @@ await db.$transaction(async (tx) => {
 **Issue:** Login answers "User not found" for an unknown email and "Invalid credentials" for a wrong password.
 **Evidence:** `POST /auth/login` with `alice@example.com` and a wrong password answers "Invalid credentials" when that account exists and "User not found" when it does not → an attacker can find out which emails are registered.
 **Confidence:** High
+**Blocking:** no — This illustrative noncritical finding does not establish a required-contract violation.
 **Fix:** Return the same message for both cases: "Invalid email or password".
 
 ### Performance — Suggestion
@@ -75,6 +78,7 @@ await db.$transaction(async (tx) => {
 **Issue:** The query that loads the user for token generation fetches every column, including the password hash, when only `id` and `email` are used.
 **Evidence:** Each token refresh reads the full user row, including `passwordHash` → the result is correct, but the query moves more data than needed and keeps the hash in memory for no reason.
 **Confidence:** High
+**Blocking:** no — This illustrative noncritical finding does not establish a required-contract violation.
 **Fix:** Select only the needed fields:
 ```typescript
 const user = await db.users.findFirst({
@@ -89,6 +93,7 @@ const user = await db.users.findFirst({
 **Issue:** The login test mocks `jwt.sign`, so it never checks the claims or the expiry of the real token.
 **Evidence:** If `generateToken` stopped passing `expiresIn`, this test would still pass → tokens that never expire could ship unnoticed. The code is correct today; the test is weaker than it looks.
 **Confidence:** High
+**Blocking:** no — This illustrative noncritical finding does not establish a required-contract violation.
 **Fix:** Verify the real token:
 ```typescript
 const decoded = jwt.verify(token, process.env.JWT_SECRET!);
@@ -102,6 +107,7 @@ expect(decoded).toHaveProperty('exp');
 **Issue:** The new `authMiddleware` is 57 lines long and handles token extraction, verification and user lookup.
 **Evidence:** Adding API-key authentication means editing this one function in three places → the change is harder to review and to test in isolation. Behavior is correct today.
 **Confidence:** High
+**Blocking:** no — This illustrative noncritical finding does not establish a required-contract violation.
 **Fix:** Extract token extraction and user lookup into separate functions:
 ```typescript
 const extractToken = (authHeader: string): string | null => { ... }
@@ -114,6 +120,7 @@ const getUserFromToken = (token: string): Promise<User | null> => { ... }
 **Issue:** The branch adds a 487-line controller for login, register, logout, token refresh, password reset and email verification.
 **Evidence:** A change to password reset edits the same file as login → unrelated changes conflict and every review covers all six flows. The file is new in this branch, and the other controllers in `src/controllers/` stay under 200 lines. Behavior is correct.
 **Confidence:** High
+**Blocking:** no — This illustrative noncritical finding does not establish a required-contract violation.
 **Fix:** Split into separate controllers: `login.controller.ts`, `register.controller.ts`, etc.
 
 ### Observability — Suggestion
@@ -124,6 +131,7 @@ const getUserFromToken = (token: string): Promise<User | null> => { ... }
 **Issue:** Authentication failures are logged with `console.error` in two places, which the rules for `src/services/` forbid.
 **Evidence:** `src/services/AGENTS.md:L4-L5` says services log through `logger` and never call `console.*`; lines 112 and 124 call `console.error` → a burst of failed logins writes free-text lines that the log pipeline cannot count or alert on by `reason`. Login behavior itself is correct.
 **Confidence:** High
+**Blocking:** no — This illustrative noncritical finding does not establish a required-contract violation.
 **Fix:** Use the structured logger:
 ```typescript
 logger.warn('Authentication failed', {
@@ -406,4 +414,4 @@ gh api --hostname github.com --method POST repos/acme/shop-api/issues/123/commen
 
 ---
 
-*Generated by Code Review Skill v3.0.0*
+*Generated by Code Review Skill v3.1.0*

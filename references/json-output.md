@@ -17,7 +17,7 @@ Every document has these seven keys, in this order:
 | Key | Value |
 | --- | --- |
 | `schema` | always `"code-review-skill/review"` |
-| `version` | always `1`, the version of this contract |
+| `version` | always `2` for new reports; the consumer also accepts historical version `1` |
 | `status` | `"complete"`, `"nothing_to_review"` or `"error"` (see **Status**) |
 | `message` | the `Nothing to review` or `Cannot review` line as written, or `null` for a complete review |
 | `scope` | the text after `**Scope:** ` of the Scope line, such as `"staged (git diff --cached)"`, or `null` when the run stopped before the scope and its command were known |
@@ -50,6 +50,8 @@ The review object has these keys, in this order:
 
 The document leaves out What Was Done Well and the Summary table: the findings carry every count that the table shows, which counts the findings whose `omitted_by` is `null`.
 
+**Version compatibility.** New reports use version 2 and add `blocking` to every finding. Historical version 1 is read with its original fields, rows 1–7 and critical-only gate; never reinterpret an old Warning as a blocker. The consumer rejects unknown versions and fields. Version 2 adds verdict row 8 (No for a blocking Warning after material limits) and the blocking threshold.
+
 **Finding object.** Each finding has these keys, in this order:
 
 | Key | Value |
@@ -57,6 +59,7 @@ The document leaves out What Was Done Well and the Summary table: the findings c
 | `category` | the category of its heading, a row of the Summary table |
 | `severity` | `"Critical"`, `"Warning"` or `"Suggestion"` |
 | `confidence` | `"High"` under `findings`, `"Medium"` under `needs_verification` |
+| `blocking` | boolean; true only for High-confidence verified blockers; High Critical must be true, Suggestion/Medium must be false. Explain the decision in `evidence`. |
 | `location` | the **Location:** as written, without backticks: `path:line` or `path:start-end` |
 | `path` | the path of the Location |
 | `side` | `"new"` for lines that the change adds or modifies, `"old"` for removed lines under the deletion-only exception |
@@ -67,6 +70,8 @@ The document leaves out What Was Done Well and the Summary table: the findings c
 | `issue`, `evidence`, `fix` | the text of its **Issue:**, **Evidence:** and **Fix:** lines |
 | `omitted_by` | `null` when the report shows the finding; otherwise the filter of `./references/configuration.md` that omitted it: `"min_severity"`, `"disabled_categories"` or `"max_findings_per_file"` |
 
+- Every blocking finding has `omitted_by` `null`, regardless of severity or filter; it still counts for row 8 and the gate.
+- `context_lines` also carries the Snapshot and Review checks lines, including evidence basis and execution/re-review records. They remain strings and add no findings or audit keys.
 - A grouped finding is one object: its other places are in `also_at`, never in objects of their own, and no place is listed twice.
 - A Critical finding always has `omitted_by` `null`: no filter omits it, as `./references/configuration.md` says.
 - A finding that a filter omits keeps every other key as Step 2 left it. The filters decide only what the Markdown report would show; the document keeps every fact that the verdict and the gate count.
@@ -89,15 +94,15 @@ This file is listed on **Read for context** as `skill:references/json-output.md`
 
 The gate object has three keys:
 
-- `fail_on`: `"critical"` when the arguments include `--fail-on critical`, otherwise `null`.
+- `fail_on`: `"critical"` or `"blocking"` for the corresponding `--fail-on` value, otherwise `null`. Version 1 accepts only `"critical"`.
 - `status`: the first of these that applies:
   1. `"error"` when the document's status is `"error"`.
   2. `"not_requested"` when `fail_on` is `null`.
   3. `"pass"` when the document's status is `"nothing_to_review"`.
-  4. `"fail"` when the verdict row is 2: a Critical finding is under `## Findings`.
-  5. `"incomplete"` when the verdict row is 1 or 3: no changed file was reviewed, or the Audit lists a `material` limit.
+  4. `"fail"` when the verdict row is 2, or when the threshold is `"blocking"` and any finding has `blocking: true`, regardless of the verdict row or other limits: a verified blocker is under `## Findings`.
+  5. `"incomplete"` when the verdict row is 1 or 3, and also any pending Critical/Warning candidate or already-raised unverified candidate for the `"blocking"` threshold, even when a nonblocking Warning selects row 4: no changed file was reviewed, the Audit lists a `material` limit, or a candidate still needs verification.
   6. `"pass"` otherwise.
-- `reason`: for `"error"`, the `message`; for `"not_requested"`, `no gate was requested`; for `"pass"` on a document with nothing to review, `nothing to review`; for `"fail"`, `1 verified Critical finding` or `<c> verified Critical findings`; for `"incomplete"`, the text after `No — ` of the **Ready to merge:** line; for any other `"pass"`, `complete review with no verified Critical finding`.
+- `reason`: with the blocking threshold, use the number of verified blocking findings for fail, the pending/material limitation for incomplete, and `complete review with no verified blocker` for pass. With the critical threshold, use the original reasons: for `"error"`, the `message`; for `"not_requested"`, `no gate was requested`; for `"pass"` on a document with nothing to review, `nothing to review`; for `"fail"`, `1 verified Critical finding` or `<c> verified Critical findings`; for `"incomplete"`, the text after `No — ` of the **Ready to merge:** line; for any other `"pass"`, `complete review with no verified Critical finding`.
 
 The gate counts only the findings under `## Findings`, before the filters: they have High confidence and went through Step 2. A Critical finding under `## Needs human verification` is not verified: it never fails the gate, and verdict row 5 already asks a person to check it. When what a person must check depends on code that you could not inspect, SKILL.md also lists a `context not read` limit, and a `material` one makes the gate `"incomplete"`. A review that is not complete never passes the gate, and a run that stopped with `Cannot review` is an error, never a pass.
 
@@ -110,13 +115,19 @@ These examples are fictional. A `branch` review whose configuration sets `min_se
 ```json
 {
   "schema": "code-review-skill/review",
-  "version": 1,
+  "version": 2,
   "status": "complete",
   "message": null,
   "scope": "branch origin/main (git diff origin/main...HEAD)",
-  "gate": {"fail_on": "critical", "status": "fail", "reason": "1 verified Critical finding"},
+  "gate": {
+    "fail_on": "critical",
+    "status": "fail",
+    "reason": "1 verified Critical finding"
+  },
   "review": {
-    "context_lines": ["**Configuration:** `.code-review/config.yml`."],
+    "context_lines": [
+      "**Configuration:** `.code-review/config.yml`."
+    ],
     "intent": [
       "**Intent:** inferred: filter the order report by customer (diff).",
       "**Requirements:** none stated.",
@@ -138,7 +149,8 @@ These examples are fictional. A `branch` review whose configuration sets `min_se
         "issue": "`findOrders` concatenates the customer filter into the SQL query.",
         "evidence": "`/report?customer=1 OR 1=1` reaches `findOrders(\"1 OR 1=1\")` through `src/report.js:9` → the query `WHERE customer_id = 1 OR 1=1` returns the orders of every customer. Verification checked `src/routes.js`; nothing validates `customer`.",
         "fix": "Bind the value: `db.query(\"SELECT * FROM orders WHERE customer_id = $1\", [customerId])`.",
-        "omitted_by": null
+        "omitted_by": null,
+        "blocking": true
       },
       {
         "category": "Potential Bugs",
@@ -154,13 +166,17 @@ These examples are fictional. A `branch` review whose configuration sets `min_se
         "issue": "The page loop stops one page early.",
         "evidence": "A report with 3 pages runs `for (let p = 1; p < pages; p++)` → page 3 is never read and its orders are missing from the report.",
         "fix": "Loop while `p <= pages`.",
-        "omitted_by": "min_severity"
+        "omitted_by": "min_severity",
+        "blocking": false
       }
     ],
     "needs_verification": [],
     "pre_existing": [],
     "already_raised": [],
-    "verification": {"checked": 3, "refuted": 1},
+    "verification": {
+      "checked": 3,
+      "refuted": 1
+    },
     "omitted_by_configuration": "min_severity Critical: 1 omitted; disabled categories Security: 0 omitted.",
     "triage": {
       "review_effort": "1/5 — up to 50 changed lines in 2 files; no risk area.",
@@ -168,11 +184,33 @@ These examples are fictional. A `branch` review whose configuration sets `min_se
       "look_first": "`src/orders.js` (Critical SQL injection in the customer filter), `src/report.js` (Warning: the last page is skipped).",
       "ready_to_merge": "No — 1 Critical finding must be fixed before merging."
     },
-    "verdict": {"ready_to_merge": "No", "row": 2},
+    "verdict": {
+      "ready_to_merge": "No",
+      "row": 2
+    },
     "audit": {
-      "files_reviewed": {"reviewed": 2, "changed": 2, "paths": ["src/orders.js", "src/report.js"]},
-      "read_for_context": [".code-review/config.yml", "skill:references/configuration.md", "skill:references/intent.md", "skill:references/json-output.md", "src/routes.js", "tests/orders.test.js"],
-      "checked_with_no_findings": ["Performance", "Tests/Coverage", "Architecture", "Code & File Size"],
+      "files_reviewed": {
+        "reviewed": 2,
+        "changed": 2,
+        "paths": [
+          "src/orders.js",
+          "src/report.js"
+        ]
+      },
+      "read_for_context": [
+        ".code-review/config.yml",
+        "skill:references/configuration.md",
+        "skill:references/intent.md",
+        "skill:references/json-output.md",
+        "src/routes.js",
+        "tests/orders.test.js"
+      ],
+      "checked_with_no_findings": [
+        "Performance",
+        "Tests/Coverage",
+        "Architecture",
+        "Code & File Size"
+      ],
       "already_raised_not_verified": null,
       "not_verified": []
     }
@@ -185,11 +223,15 @@ A run with `--format json --fail-on critical --comment` stops before it reviews 
 ```json
 {
   "schema": "code-review-skill/review",
-  "version": 1,
+  "version": 2,
   "status": "error",
   "message": "Cannot review: --comment cannot be combined with --format json; publish from a Markdown review. Nothing was reviewed.",
   "scope": null,
-  "gate": {"fail_on": "critical", "status": "error", "reason": "Cannot review: --comment cannot be combined with --format json; publish from a Markdown review. Nothing was reviewed."},
+  "gate": {
+    "fail_on": "critical",
+    "status": "error",
+    "reason": "Cannot review: --comment cannot be combined with --format json; publish from a Markdown review. Nothing was reviewed."
+  },
   "review": null
 }
 ```
@@ -199,11 +241,15 @@ A `staged` review with `--format json --fail-on critical` and nothing staged:
 ```json
 {
   "schema": "code-review-skill/review",
-  "version": 1,
+  "version": 2,
   "status": "nothing_to_review",
   "message": "Nothing to review: git diff --cached shows no changes.",
   "scope": "staged (git diff --cached)",
-  "gate": {"fail_on": "critical", "status": "pass", "reason": "nothing to review"},
+  "gate": {
+    "fail_on": "critical",
+    "status": "pass",
+    "reason": "nothing to review"
+  },
   "review": null
 }
 ```
