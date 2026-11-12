@@ -87,6 +87,8 @@ The allowlist limits what the agent is permitted to run. It is not an operating-
 
 ## Baseline
 
+**Privacy-redacted environment records (2026-11-12).** The two expanded studies' `env.txt` files use generic home/profile placeholders. Only those metadata files, their manifest entries and dependent manifest identities were refreshed; raw reports, trial records, scores, measured provenance and the canonical baseline remain unchanged. Historical measurement-time hash statements inside the environment records still describe the original collection. Later statements below about unchanged study files have this explicit metadata-redaction exception.
+
 Three expanded records are kept, and none replaces another:
 
 - **Original study**, `baseline/expanded/`: the 84 trials of the first expanded protocol as the runner recorded and scored them, with the protocol, the freeze hashes, the per-sample raw results and reports, `aggregate.json`, `summary.md` and `manifest-sha256.txt`. Its files are never edited. Its scorer counted a report that says `not fully reviewed`, or a passed headline beside a verdict that is not Yes, as complete, and its `elapsed-timer-react` tests were not isolated (see **Limits**). It is integrity-valid evidence of what was measured, not a quality benchmark.

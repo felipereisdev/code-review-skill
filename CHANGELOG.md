@@ -2,6 +2,14 @@
 
 All notable changes to this project are listed here, in the format of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Each release lists the changes merged since the release before it, and changes merged after the latest release wait under `## [Unreleased]` for the next one. Changes up to `v2.0.0` (commit `f9f00fe`) are described in the [v2.0.0 release notes](https://github.com/felipereisdev/code-review-skill/releases/tag/v2.0.0).
 
+## 3.1.0 — 2026-11-12
+
+- Add evidence-driven adversarial coverage, real-contract fixture checks, cumulative re-review and proportionate regression tests.
+- Add opt-in isolated execution and source-into-target integration checks on pinned SHA pairs.
+- Add Bitbucket Cloud review/publishing and opt-in own-thread/review-state workflow, with explicit tracker authorization and dry runs.
+- Separate merge blocking from severity; emit JSON contract v2 while retaining v1 consumer compatibility and frozen studies.
+- Add deterministic blocker-gate tests and executable evidence scenarios. No new model-quality benchmark is claimed.
+
 ## [Unreleased]
 
 ## [3.0.0] - 2026-10-28
