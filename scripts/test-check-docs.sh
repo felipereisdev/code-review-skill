@@ -111,7 +111,7 @@ expect_fail "a Low-confidence example finding fails" "$work/lowconf" "example-ou
 
 make_copy "$work/badtotal"
 replace_first "$work/badtotal/example-output.md" '| **Total** | **2** |' '| **Total** | **3** |'
-expect_fail "a Summary total that does not match the findings fails" "$work/badtotal" "Summary Total row is [3, 1, 5]"
+expect_fail "a Summary total that does not match the findings fails" "$work/badtotal" "Summary Total row is [3, 1, 3]"
 
 make_copy "$work/slowpath"
 drop_lines "$work/slowpath/SKILL.md" 'do work or queries that grow with data size'
@@ -438,7 +438,7 @@ replace_first "$work/sizeconsistency/SKILL.md" 'if the project already lives wit
 expect_fail "size findings that skip the consistency check fail" "$work/sizeconsistency" "Code & File Size is missing: if the project already lives with"
 
 make_copy "$work/stalerefactor"
-replace_first "$work/stalerefactor/SKILL.md" 'are candidates for refactoring' 'require refactoring'
+replace_first "$work/stalerefactor/SKILL.md" 'a method or function that the change makes longer than **50 lines**' 'a method or function longer than **50 lines** must require refactoring'
 expect_fail "a size bullet that demands refactoring fails" "$work/stalerefactor" "Code & File Size still says: require refactoring"
 
 make_copy "$work/limitchanged"
@@ -1345,6 +1345,26 @@ expect_fail "a default run without reproductions fails" "$work/execnorepro" "ref
 make_copy "$work/unrealistic"
 drop_lines "$work/unrealistic/SKILL.md" '**Realistic trigger.**'
 expect_fail "a Critical with an unrealistic trigger fails" "$work/unrealistic" "SKILL.md is missing: **Realistic trigger.** A finding is **Critical**, and blocks, only when its trigger can happen in real use"
+
+make_copy "$work/propmechanism"
+drop_lines "$work/propmechanism/SKILL.md" '**Missing mechanism or pattern**'
+expect_fail "asking for missing mechanisms again fails" "$work/propmechanism" "Do Not Report is missing: **Missing mechanism or pattern**"
+
+make_copy "$work/propsolid"
+replace_first "$work/propsolid/SKILL.md" '### Simplicity — check the change for over-engineering' '### SOLID'
+expect_fail "an architecture checklist that demands SOLID again fails" "$work/propsolid" "SKILL.md is missing: ### Simplicity — check the change for over-engineering"
+
+make_copy "$work/propfix"
+replace_first "$work/propfix/SKILL.md" '**Fix:** The smallest change that removes the trigger.' '**Fix:** Suggested correction or approach.'
+expect_fail "a Fix that is not the smallest change fails" "$work/propfix" "SKILL.md is missing: **Fix:** The smallest change that removes the trigger."
+
+make_copy "$work/propbudget"
+replace_first "$work/propbudget/SKILL.md" '**At most 3 per review:**' '**As many as you find:**'
+expect_fail "an unlimited number of Suggestions fails" "$work/propbudget" "SKILL.md is missing: **At most 3 per review:**"
+
+make_copy "$work/propaxes"
+replace_first "$work/propaxes/references/evidence-driven-review.md" '**Adversarial axes only where they fit:**' '**Adversarial axes everywhere:**'
+expect_fail "adversarial axes on every change fail" "$work/propaxes" "references/evidence-driven-review.md is missing: **Adversarial axes only where they fit:**"
 
 make_copy "$work/roundslate"
 replace_first "$work/roundslate/references/review-rounds.md" 'A late **Critical** candidate stays a candidate like any other' 'A late **Critical** candidate is dropped like any other'

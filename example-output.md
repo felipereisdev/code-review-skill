@@ -102,28 +102,6 @@ expect(decoded).toHaveProperty('userId');
 expect(decoded).toHaveProperty('exp');
 ```
 
-### Architecture — Suggestion
-
-**Location:** `src/middleware/auth.middleware.ts:18-74`
-**Issue:** The new `authMiddleware` is 57 lines long and handles token extraction, verification and user lookup.
-**Evidence:** Adding API-key authentication means editing this one function in three places → the change is harder to review and to test in isolation. Behavior is correct today.
-**Confidence:** High
-**Blocking:** no — Only Critical findings block the merge; this one should still be fixed.
-**Fix:** Extract token extraction and user lookup into separate functions:
-```typescript
-const extractToken = (authHeader: string): string | null => { ... }
-const getUserFromToken = (token: string): Promise<User | null> => { ... }
-```
-
-### Code & File Size — Suggestion
-
-**Location:** `src/controllers/auth.controller.ts:1-487`
-**Issue:** The branch adds a 487-line controller for login, register, logout, token refresh, password reset and email verification.
-**Evidence:** A change to password reset edits the same file as login → unrelated changes conflict and every review covers all six flows. The file is new in this branch, and the other controllers in `src/controllers/` stay under 200 lines. Behavior is correct.
-**Confidence:** High
-**Blocking:** no — Only Critical findings block the merge; this one should still be fixed.
-**Fix:** Split into separate controllers: `login.controller.ts`, `register.controller.ts`, etc.
-
 ### Observability — Suggestion
 
 **Location:** `src/services/auth.service.ts:112`
@@ -176,8 +154,8 @@ logger.warn('Authentication failed', {
 | Security | 1 | 1 | 0 | |
 | Performance | 0 | 0 | 1 | |
 | Tests/Coverage | 0 | 0 | 1 | |
-| Architecture | 0 | 0 | 1 | |
-| Code & File Size | 0 | 0 | 1 | |
+| Architecture | 0 | 0 | 0 | |
+| Code & File Size | 0 | 0 | 0 | |
 | Potential Bugs | 1 | 0 | 0 | |
 | Accessibility | 0 | 0 | 0 | ✓ |
 | Observability | 0 | 0 | 1 | |
@@ -189,7 +167,7 @@ logger.warn('Authentication failed', {
 | Privacy/Compliance | 0 | 0 | 0 | ✓ |
 | Architecture Patterns | 0 | 0 | 0 | |
 | Stack-Specific | 0 | 0 | 0 | |
-| **Total** | **2** | **1** | **5** | |
+| **Total** | **2** | **1** | **3** | |
 
 **Verification:** 5 Critical/Warning candidates checked, 1 refuted.
 
@@ -204,7 +182,7 @@ The Medium-confidence finding under Needs human verification is not counted in t
 
 **Files reviewed:** 6 of 6 changed files: `src/app.ts`, `src/controllers/auth.controller.ts`, `src/middleware/auth.middleware.ts`, `src/routes/auth.routes.ts`, `src/services/auth.service.ts`, `tests/auth.test.ts`.
 **Read for context:** `AGENTS.md`, `package.json`, `skill:references/api-design.md`, `skill:references/concurrency.md`, `skill:references/intent.md`, `skill:references/large-diffs.md`, `skill:references/observability.md`, `skill:stacks/node.md`, `skill:stacks/typescript.md`, `src/controllers/user.controller.ts`, `src/lib/logger.ts`, `src/services/AGENTS.md`.
-**Checked with no findings:** API Design, Architecture Patterns, Stack-Specific.
+**Checked with no findings:** Architecture, Code & File Size, API Design, Architecture Patterns, Stack-Specific.
 **Already raised, not verified:** `src/routes/auth.routes.ts:8` (Security).
 **Not verified:**
 - `jsonwebtoken` version-specific migration recommendations — API not validated, not material: no documentation tool was available and the official documentation for the installed version could not be read; no migration finding is made, and no changed behavior or contract relies on those recommendations.
@@ -226,12 +204,10 @@ The report ends with the Audit above. The action items below are not part of it:
 ### Optional Improvements
 4. 💡 Select only the needed fields when loading the user
 5. 💡 Assert the real token claims and expiry in tests
-6. 💡 Split the auth middleware into smaller functions
-7. 💡 Split the auth controller into smaller files
-8. 💡 Replace console.error with structured logging (rule in src/services/AGENTS.md)
+6. 💡 Replace console.error with structured logging (rule in src/services/AGENTS.md)
 
 ### Ask a Human
-9. 🔍 Check whether failed-login counting can run in parallel for one account
+7. 🔍 Check whether failed-login counting can run in parallel for one account
 
 ---
 
@@ -256,8 +232,6 @@ The same review when the user asks for `/code-review pr 123 compact`:
 - src/controllers/auth.controller.ts:23-27: Warning: different login errors reveal which emails are registered → return one message for both cases
 - src/services/auth.service.ts:67-69: Suggestion: token generation loads every user column, including the password hash → select only id and email
 - tests/auth.test.ts:34-41: Suggestion: the test mocks jwt.sign and never checks claims or expiry → verify the real token
-- src/middleware/auth.middleware.ts:18-74: Suggestion: the 57-line middleware mixes extraction, verification and lookup → extract helpers
-- src/controllers/auth.controller.ts:1-487: Suggestion: one 487-line controller handles six flows → split it into one controller per flow
 - src/services/auth.service.ts:112: Suggestion: auth failures go to console.error, which the services rules forbid → use the structured logger (also at src/services/auth.service.ts:124) (Rule: src/services/AGENTS.md:L4-L5)
 
 ## Needs human verification
@@ -278,7 +252,7 @@ The same review when the user asks for `/code-review pr 123 compact`:
 **Relevant tests:** changed — `tests/auth.test.ts` covers login and token generation; no test covers token refresh. Execution: not run.
 **Look first:** `src/services/auth.service.ts` (the JWT secret fallback and the refresh-token race, both Critical), `src/controllers/auth.controller.ts` (login answers reveal which emails are registered), `src/middleware/auth.middleware.ts` (every protected route depends on it).
 **Ready to merge:** No — 2 Critical findings must be fixed before merging. Not fully reviewed: see the Audit.
-**Audit:** 6 of 6 changed files reviewed; 12 files read for context; no findings in API Design, Architecture Patterns, Stack-Specific; already raised, not verified: 1 Warning candidate; not verified: `jsonwebtoken` version-specific migration recommendations (API not validated, not material), gateway configuration (context not read, material).
+**Audit:** 6 of 6 changed files reviewed; 12 files read for context; no findings in Architecture, Code & File Size, API Design, Architecture Patterns, Stack-Specific; already raised, not verified: 1 Warning candidate; not verified: `jsonwebtoken` version-specific migration recommendations (API not validated, not material), gateway configuration (context not read, material).
 
 ---
 
@@ -374,11 +348,11 @@ Right after the verification line, the report counts what the filters left out: 
 
 ## Publishing Dry Run
 
-The same review when the user asks for `/code-review pr 123 --dry-run`: after the report, the skill prints what the review would post and posts nothing. The pull request has no summary comment from an earlier run, so the summary comment would be created. The review payload below shows one of its 8 inline comments. The summary comment opens with the verdict as a highlighted heading, its reason and the files to look at first, then the findings under one heading per severity, a verification table that carries the other two triage lines, and the Audit as a list; no inline comment carries them. In the chat, the run shows only this summary, never the full report above, which this example prints only to show where each line comes from. With `--comment` the skill also read the publishing guide, so this run's **Read for context** line adds `skill:references/publishing.md` after `skill:references/observability.md`, and its audit counts 13 files read for context.
+The same review when the user asks for `/code-review pr 123 --dry-run`: after the report, the skill prints what the review would post and posts nothing. The pull request has no summary comment from an earlier run, so the summary comment would be created. The review payload below shows one of its 3 inline comments: only Critical and Warning findings become inline comments, and the Suggestions appear only in the summary comment. The summary comment opens with the verdict as a highlighted heading, its reason and the files to look at first, then the findings under one heading per severity, a verification table that carries the other two triage lines, and the Audit as a list; no inline comment carries them. In the chat, the run shows only this summary, never the full report above, which this example prints only to show where each line comes from. With `--comment` the skill also read the publishing guide, so this run's **Read for context** line adds `skill:references/publishing.md` after `skill:references/observability.md`, and its audit counts 13 files read for context.
 
 ## Dry run — nothing was published
 
-### 1. Review with 8 inline comments
+### 1. Review with 3 inline comments
 
 ```sh
 gh api --hostname github.com --method POST repos/acme/shop-api/pulls/123/reviews -H 'Content-Type: application/json' --input review.json
@@ -388,7 +362,7 @@ gh api --hostname github.com --method POST repos/acme/shop-api/pulls/123/reviews
 {
   "commit_id": "9c1e4b7a2f3d5e6c8b0a1d2e3f4a5b6c7d8e9f01",
   "event": "COMMENT",
-  "body": "Inline comments from code-review-skill: 8. The summary comment lists every finding.",
+  "body": "Inline comments from code-review-skill: 3. The summary comment lists every finding.",
   "comments": [
     {
       "path": "src/controllers/auth.controller.ts",
@@ -410,7 +384,7 @@ gh api --hostname github.com --method POST repos/acme/shop-api/issues/123/commen
 
 ```json
 {
-  "body": "<!-- code-review-skill:summary -->\n# Code review (round 1): pr 123 at `9c1e4b7`\n\n## 🔴 Ready to merge: No\n\n2 Critical findings must be fixed before merging. Not fully reviewed: see the Audit.\n\n**Look first:** `src/services/auth.service.ts` (the JWT secret fallback and the refresh-token race, both Critical), `src/controllers/auth.controller.ts` (login answers reveal which emails are registered), `src/middleware/auth.middleware.ts` (every protected route depends on it).\n\n## Findings\n\n**Findings:** 2 Critical, 1 Warning, 5 Suggestion. Inline comments: 8.\n\n### Critical\n\n- `src/services/auth.service.ts:45-46`: the JWT secret falls back to `[REDACTED]`, so anyone can forge tokens → fail at startup when JWT_SECRET is unset (inline)\n- `src/services/auth.service.ts:89-97`: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction (inline)\n\n### Warning\n\n- `src/controllers/auth.controller.ts:23-27`: different login errors reveal which emails are registered → return one message for both cases (inline)\n\n### Suggestion\n\n- `src/services/auth.service.ts:67-69`: token generation loads every user column, including the password hash → select only id and email (inline)\n- `tests/auth.test.ts:34-41`: the test mocks jwt.sign and never checks claims or expiry → verify the real token (inline)\n- `src/middleware/auth.middleware.ts:18-74`: the 57-line middleware mixes extraction, verification and lookup → extract helpers (inline)\n- `src/controllers/auth.controller.ts:1-487`: one 487-line controller handles six flows → split it into one controller per flow (inline)\n- `src/services/auth.service.ts:112`: auth failures go to console.error, which the services rules forbid → use the structured logger (also at src/services/auth.service.ts:124) (Rule: src/services/AGENTS.md:L4-L5) (inline)\n\n## Needs human verification\n\n- `src/services/auth.service.ts:131-133`: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment\n\n## Verification\n\n| Check | Result |\n| --- | --- |\n| Diff | `gh pr diff 123` |\n| Round | 1 — first review of this pull request. |\n| Candidates | 5 Critical/Warning candidates checked, 1 refuted. |\n| Review effort | 5/5 — 501 to 1000 changed lines in 6 files; authentication and concurrency. |\n| Relevant tests | changed — `tests/auth.test.ts` covers login and token generation; no test covers token refresh. Execution: not run. |\n\n## Audit\n\n- **Files reviewed:** 6 of 6 changed files\n- **Read for context:** 13 files\n- **Checked with no findings:** API Design, Architecture Patterns, Stack-Specific\n- **Already raised, not verified:** 1 Warning candidate\n- **Not verified:**\n  - `jsonwebtoken` version-specific migration recommendations (API not validated, not material)\n  - gateway configuration (context not read, material)\n\n<!-- code-review-skill:state {\"version\": 1, \"round\": 1, \"head\": \"9c1e4b7a2f3d5e6c8b0a1d2e3f4a5b6c7d8e9f01\", \"destination\": \"4d2a7c9e1b3f5a6c8e0d2b4f6a8c0e2d4f6b8a0c\", \"findings\": [{\"key\": \"security-jwt-secret-fallback\", \"severity\": \"Critical\", \"location\": \"src/services/auth.service.ts:45-46\"}, {\"key\": \"concurrency-refresh-token-race\", \"severity\": \"Critical\", \"location\": \"src/services/auth.service.ts:89-97\"}, {\"key\": \"security-login-reveals-registered-emails\", \"severity\": \"Warning\", \"location\": \"src/controllers/auth.controller.ts:23-27\"}, {\"key\": \"performance-token-loads-every-column\", \"severity\": \"Suggestion\", \"location\": \"src/services/auth.service.ts:67-69\"}, {\"key\": \"tests-jwt-sign-mocked\", \"severity\": \"Suggestion\", \"location\": \"tests/auth.test.ts:34-41\"}, {\"key\": \"code-size-auth-middleware-mixes-steps\", \"severity\": \"Suggestion\", \"location\": \"src/middleware/auth.middleware.ts:18-74\"}, {\"key\": \"code-size-auth-controller-six-flows\", \"severity\": \"Suggestion\", \"location\": \"src/controllers/auth.controller.ts:1-487\"}, {\"key\": \"observability-console-error-in-services\", \"severity\": \"Suggestion\", \"location\": \"src/services/auth.service.ts:112\"}]} -->"
+  "body": "<!-- code-review-skill:summary -->\n# Code review (round 1): pr 123 at `9c1e4b7`\n\n## 🔴 Ready to merge: No\n\n2 Critical findings must be fixed before merging. Not fully reviewed: see the Audit.\n\n**Look first:** `src/services/auth.service.ts` (the JWT secret fallback and the refresh-token race, both Critical), `src/controllers/auth.controller.ts` (login answers reveal which emails are registered), `src/middleware/auth.middleware.ts` (every protected route depends on it).\n\n## Findings\n\n**Findings:** 2 Critical, 1 Warning, 3 Suggestion. Inline comments: 3.\n\n### Critical\n\n- `src/services/auth.service.ts:45-46`: the JWT secret falls back to `[REDACTED]`, so anyone can forge tokens → fail at startup when JWT_SECRET is unset (inline)\n- `src/services/auth.service.ts:89-97`: two concurrent refreshes with one token both get a new valid token → rotate the token in one transaction (inline)\n\n### Warning\n\n- `src/controllers/auth.controller.ts:23-27`: different login errors reveal which emails are registered → return one message for both cases (inline)\n\n### Suggestion\n\n- `src/services/auth.service.ts:67-69`: token generation loads every user column, including the password hash → select only id and email (summary only)\n- `tests/auth.test.ts:34-41`: the test mocks jwt.sign and never checks claims or expiry → verify the real token (summary only)\n- `src/services/auth.service.ts:112`: auth failures go to console.error, which the services rules forbid → use the structured logger (also at src/services/auth.service.ts:124) (Rule: src/services/AGENTS.md:L4-L5) (summary only)\n\n## Needs human verification\n\n- `src/services/auth.service.ts:131-133`: Warning: six parallel wrong-password requests all read 0 and store 1, so a lockout at a stored count of 5 never engages → use an atomic increment\n\n## Verification\n\n| Check | Result |\n| --- | --- |\n| Diff | `gh pr diff 123` |\n| Round | 1 — first review of this pull request. |\n| Candidates | 5 Critical/Warning candidates checked, 1 refuted. |\n| Review effort | 5/5 — 501 to 1000 changed lines in 6 files; authentication and concurrency. |\n| Relevant tests | changed — `tests/auth.test.ts` covers login and token generation; no test covers token refresh. Execution: not run. |\n\n## Audit\n\n- **Files reviewed:** 6 of 6 changed files\n- **Read for context:** 13 files\n- **Checked with no findings:** Architecture, Code & File Size, API Design, Architecture Patterns, Stack-Specific\n- **Already raised, not verified:** 1 Warning candidate\n- **Not verified:**\n  - `jsonwebtoken` version-specific migration recommendations (API not validated, not material)\n  - gateway configuration (context not read, material)\n\n<!-- code-review-skill:state {\"version\": 1, \"round\": 1, \"head\": \"9c1e4b7a2f3d5e6c8b0a1d2e3f4a5b6c7d8e9f01\", \"destination\": \"4d2a7c9e1b3f5a6c8e0d2b4f6a8c0e2d4f6b8a0c\", \"findings\": [{\"key\": \"security-jwt-secret-fallback\", \"severity\": \"Critical\", \"location\": \"src/services/auth.service.ts:45-46\"}, {\"key\": \"concurrency-refresh-token-race\", \"severity\": \"Critical\", \"location\": \"src/services/auth.service.ts:89-97\"}, {\"key\": \"security-login-reveals-registered-emails\", \"severity\": \"Warning\", \"location\": \"src/controllers/auth.controller.ts:23-27\"}, {\"key\": \"performance-token-loads-every-column\", \"severity\": \"Suggestion\", \"location\": \"src/services/auth.service.ts:67-69\"}, {\"key\": \"tests-jwt-sign-mocked\", \"severity\": \"Suggestion\", \"location\": \"tests/auth.test.ts:34-41\"}, {\"key\": \"observability-console-error-in-services\", \"severity\": \"Suggestion\", \"location\": \"src/services/auth.service.ts:112\"}]} -->"
 }
 ```
 

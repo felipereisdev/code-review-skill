@@ -1,6 +1,6 @@
 ## Dry run — nothing was published
 
-### 1. Review with 3 inline comments
+### 1. Review with 2 inline comments
 
 ```sh
 gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/reviews -H 'Content-Type: application/json' --input review.json
@@ -10,7 +10,7 @@ gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/revie
 {
   "commit_id": "3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a",
   "event": "COMMENT",
-  "body": "Inline comments from code-review-skill: 3. The summary comment lists every finding.",
+  "body": "Inline comments from code-review-skill: 2. The summary comment lists every finding.",
   "comments": [
     {
       "path": "src/invoices.js",
@@ -25,14 +25,6 @@ gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/revie
       "line": 3,
       "side": "LEFT",
       "body": "**Critical — Security** · `src/auth.js:3`\n\n**Issue:** The change removes the admin role check from `requireAdmin`.\n\n**Evidence:** The removed line 3 answered 403 to a user whose role is not `admin`; without it, any logged-in user who calls an admin route reaches `next()` → non-admins can run admin actions.\n\n**Fix:** Restore the role check before `next()`.\n\n<!-- code-review-skill:finding -->"
-    },
-    {
-      "path": "src/invoices.js",
-      "start_line": 15,
-      "start_side": "RIGHT",
-      "line": 17,
-      "side": "RIGHT",
-      "body": "**Suggestion — Tests/Coverage** · `src/invoices.js:15-17`\n\n**Issue:** `applyDiscount` has no test.\n\n**Evidence:** A change that applied the percent twice would still pass the suite → wrong discounts could ship unnoticed. The function is correct today.\n\n**Fix:** Add a test for it:\n\n```js\ntest(\"applyDiscount\", () => { ... });\n```\n\n<!-- code-review-skill:finding -->"
     }
   ]
 }
@@ -46,6 +38,6 @@ gh api --hostname github.com --method POST repos/acme/billing-api/issues/42/comm
 
 ```json
 {
-  "body": "<!-- code-review-skill:summary -->\n# Code review (round 1): pr 42 at `3f1c2a9`\n\n## 🔴 Ready to merge: No\n\n3 Critical findings must be fixed before merging.\n\n**Look first:** `src/auth.js` (the removed admin role check), `src/invoices.js` (the loop past the last line).\n\n## Findings\n\n**Findings:** 3 Critical, 0 Warning, 1 Suggestion. Inline comments: 3.\n\n### Critical\n\n- `src/config.js:3`: the payments API key `[REDACTED]` is committed in the source → read the key from the environment (already commented)\n- `src/invoices.js:9-10`: the loop runs one step past the last line → stop at the last line (inline)\n- `src/auth.js:3`: the change removes the admin role check from requireAdmin → restore the role check (inline)\n\n### Suggestion\n\n- `src/invoices.js:15-17`: applyDiscount has no test → add a test for it (inline)\n\n## Needs human verification\n\n- `src/invoices.js:16`: Warning: applyDiscount accepts a percent above 100 → reject percents outside 0-100\n\n## Verification\n\n| Check | Result |\n| --- | --- |\n| Diff | `gh pr diff 42` |\n| Round | 1 — first review of this pull request. |\n| Candidates | 4 Critical/Warning candidates checked, 0 refuted. |\n\n<!-- code-review-skill:state {\"version\": 1, \"round\": 1, \"head\": \"3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a\", \"destination\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\", \"findings\": [{\"key\": \"security-payments-key-committed\", \"severity\": \"Critical\", \"location\": \"src/config.js:3\"}, {\"key\": \"potential-bugs-loop-past-last-line\", \"severity\": \"Critical\", \"location\": \"src/invoices.js:9-10\"}, {\"key\": \"security-admin-role-check-removed\", \"severity\": \"Critical\", \"location\": \"src/auth.js:3\"}, {\"key\": \"tests-apply-discount-untested\", \"severity\": \"Suggestion\", \"location\": \"src/invoices.js:15-17\"}]} -->"
+  "body": "<!-- code-review-skill:summary -->\n# Code review (round 1): pr 42 at `3f1c2a9`\n\n## 🔴 Ready to merge: No\n\n3 Critical findings must be fixed before merging.\n\n**Look first:** `src/auth.js` (the removed admin role check), `src/invoices.js` (the loop past the last line).\n\n## Findings\n\n**Findings:** 3 Critical, 0 Warning, 1 Suggestion. Inline comments: 2.\n\n### Critical\n\n- `src/config.js:3`: the payments API key `[REDACTED]` is committed in the source → read the key from the environment (already commented)\n- `src/invoices.js:9-10`: the loop runs one step past the last line → stop at the last line (inline)\n- `src/auth.js:3`: the change removes the admin role check from requireAdmin → restore the role check (inline)\n\n### Suggestion\n\n- `src/invoices.js:15-17`: applyDiscount has no test → add a test for it (summary only)\n\n## Needs human verification\n\n- `src/invoices.js:16`: Warning: applyDiscount accepts a percent above 100 → reject percents outside 0-100\n\n## Verification\n\n| Check | Result |\n| --- | --- |\n| Diff | `gh pr diff 42` |\n| Round | 1 — first review of this pull request. |\n| Candidates | 4 Critical/Warning candidates checked, 0 refuted. |\n\n<!-- code-review-skill:state {\"version\": 1, \"round\": 1, \"head\": \"3f1c2a9b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a\", \"destination\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\", \"findings\": [{\"key\": \"security-payments-key-committed\", \"severity\": \"Critical\", \"location\": \"src/config.js:3\"}, {\"key\": \"potential-bugs-loop-past-last-line\", \"severity\": \"Critical\", \"location\": \"src/invoices.js:9-10\"}, {\"key\": \"security-admin-role-check-removed\", \"severity\": \"Critical\", \"location\": \"src/auth.js:3\"}, {\"key\": \"tests-apply-discount-untested\", \"severity\": \"Suggestion\", \"location\": \"src/invoices.js:15-17\"}]} -->"
 }
 ```

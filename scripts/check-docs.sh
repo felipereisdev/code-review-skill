@@ -317,7 +317,7 @@ else:
     text = "\n".join(body)
     for s in ("**Pre-existing problems**", "**What tooling already catches**", "**Silenced rules**",
               "**Style and naming nits**", "**Theoretical denial of service**",
-              '**"Verify" or "ensure" without a scenario**', "**Generic hardening**",
+              '**"Verify" or "ensure" without a scenario**', "**Generic hardening**", "**Missing mechanism or pattern**",
               "When a changed line triggers a problem in old code, report it",
               "counts as refuted on the verification line", "dropped without being counted",
               "Do not move a matching finding to `## Needs human verification`", "`## Precedents`"):
@@ -504,7 +504,7 @@ else:
 for s in ("only to code the change adds, or to growth the change causes",
           "Never report the length of code the change only touches",
           "A length finding is always a **Suggestion**", "if the project already lives with",
-          "**30 lines**", "**50 lines**", "**300 lines**", "**500 lines**"):
+          "**50 lines**", "**500 lines**", "**400 total lines**", "Below these limits, length alone is never a finding"):
     if s not in size_text:
         errors.append(f"Code & File Size is missing: {s}")
 for s in ("require refactoring", "require decomposition"):
@@ -998,7 +998,8 @@ require("Publishing", publishing, (
     "Read this file only when the review publishes",
     '`"event": "COMMENT"`', '"event": "COMMENT",',
     "Never approve, label, edit, merge or close the pull request", "Outside the workflow (with `--no-workflow`), never request changes",
-    "Only findings under `## Findings` can become inline comments",
+    "Only Critical and Warning findings under `## Findings` can become inline comments", "A Suggestion never does",
+    "`(summary only)` for every Suggestion",
     "A fix is complete when", "```` ```suggestion ````", "```` ```suggestion:-<k>+0 ````",
     "`viewerDidAuthor`", "resolved or not", "within 3 lines",
     "<!-- code-review-skill:summary -->", "<!-- code-review-skill:finding -->",
@@ -1739,6 +1740,36 @@ check_default_execution_and_triggers() {
     pass "execution is on by default with --no-execute to opt out, reproduces every kept Critical/Warning candidate, and Critical needs a realistic trigger"
   else
     fail "default execution and realistic triggers (see messages above)"
+  fi
+}
+
+check_proportionate_review() {
+  local missing=0 s f
+  check_in() {
+    if ! grep -qF -- "$2" "$1"; then
+      printf '  %s is missing: %s\n' "$1" "$2"
+      missing=$((missing + 1))
+    fi
+  }
+  for s in \
+    'an absent ideal is not a defect of this change' \
+    '### Simplicity — check the change for over-engineering' \
+    'Never ask for an abstraction, an interface, a layer or a design pattern only to follow a principle such as SOLID' \
+    '**Speculative generality**' \
+    '**Fix:** The smallest change that removes the trigger.' \
+    'Never propose a redesign, a new abstraction, layer, dependency or piece of infrastructure' \
+    '**At most 3 per review:**' \
+    'A Suggestion never becomes an inline comment'; do
+    check_in SKILL.md "$s"
+  done
+  check_in references/resilience.md 'never ask for them'
+  check_in references/observability.md 'never a missing observability practice'
+  check_in references/evidence-driven-review.md '**Adversarial axes only where they fit:**'
+  check_in references/publishing.md '`(summary only)` for every Suggestion'
+  if [ "$missing" -eq 0 ]; then
+    pass "reviews stay proportionate: no missing-pattern findings, simplicity checked against the change, smallest fixes, at most 3 summary-only Suggestions, adversarial axes only where they fit"
+  else
+    fail "proportionate review (see messages above)"
   fi
 }
 
@@ -3423,6 +3454,7 @@ check_skill_triage_audit
 check_api_validation
 check_triage_references
 check_review_rounds
+check_proportionate_review
 check_default_execution_and_triggers
 check_skill_dimensions
 check_skill_large_diffs

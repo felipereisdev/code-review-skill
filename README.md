@@ -213,7 +213,7 @@ Only a `pr` review publishes, and never with `--no-comment`, `--format json` or 
 {
   "commit_id": "9c1e4b7a2f3d5e6c8b0a1d2e3f4a5b6c7d8e9f01",
   "event": "COMMENT",
-  "body": "Inline comments from code-review-skill: 8. The summary comment lists every finding.",
+  "body": "Inline comments from code-review-skill: 3. The summary comment lists every finding.",
   "comments": [
     {"path": "src/controllers/auth.controller.ts", "start_line": 23, "start_side": "RIGHT", "line": 27, "side": "RIGHT", "body": "**Warning — Security** · `src/controllers/auth.controller.ts:23-27` ..."}
   ]
@@ -360,7 +360,7 @@ A `pr` review picks `gh` or `glab` from the URL or from the `origin` remote; tha
 | **Security** | Always | Injection vulnerabilities, auth, secrets, input validation |
 | **Performance** | Always | N+1 queries, caching, pagination, memory leaks |
 | **Tests** | Always | Coverage, edge cases, mocking, assertions |
-| **Architecture** | Always | SOLID, DRY, KISS, separation of concerns |
+| **Architecture** | Always | Over-engineering in the change (speculative abstractions, layers that only forward, infrastructure without a need), drifting duplicated rules, consistent patterns |
 | **Potential Bugs** | Always | Null dereferences, off-by-one errors, race conditions |
 | **Accessibility** | When the diff changes UI markup, templates, components or styles | Semantic HTML, ARIA, keyboard navigation |
 | **Observability** | When the diff changes logging, error handling, metrics, jobs or external calls | Logging, metrics, error tracking |
