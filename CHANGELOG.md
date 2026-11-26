@@ -4,9 +4,16 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-26
+
+### Upgrading from v4.1
+
+- **Reviews now run code by default.** Every review runs the tests that cover the change and reproductions of its Critical and Warning candidates in an isolated scratch worktree. A CI job or a review of a change you do not trust that must stay static needs `--no-execute` ([#32](https://github.com/felipereisdev/code-review-skill/pull/32)).
+- **Fewer, smaller findings.** Missing mechanisms and patterns are no longer findings, fixes are the smallest change that removes the trigger, and Suggestions are capped at 3 and appear only in the summary comment ([#33](https://github.com/felipereisdev/code-review-skill/pull/33)).
+
 ### Changed
 
-- **Proportionate reviews, no over-engineering.** The review no longer pushes for more machinery than the change needs:
+- **Proportionate reviews, no over-engineering.** The review no longer pushes for more machinery than the change needs ([#33](https://github.com/felipereisdev/code-review-skill/pull/33)):
   - **Missing mechanism or pattern** joins Do Not Report: an absent timeout, retry, cache, metric, interface, abstraction, dependency injection, API version, rate limit or idempotency key is not a finding unless its absence causes a concrete failure in realistic use and the nearby code already uses that mechanism or a repository rule requires it.
   - The checklists name concrete failures instead of ideals. Architecture drops the SOLID, immutability and pure-function bullets and instead checks the change itself for over-engineering (speculative generality, layers that only forward, infrastructure without a need, dead flexibility); duplication counts only for business rules whose copies can drift. Resilience, observability, API design and concurrency no longer ask for circuit breakers, bulkheads, backoff, metrics, correlation IDs, versioning or idempotency keys the project does not already use.
   - **Fix** is the smallest change that removes the trigger, in the style of the surrounding code; never a redesign, new abstraction, dependency or infrastructure unless the smallest fix cannot work.
@@ -14,8 +21,8 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
   - The adversarial axes (alternate routes, trusted inputs, identity and collisions, mutable bounds) apply only when the change accepts untrusted input or enforces a rule, limit, permission or quota.
   - Requests for tests are unchanged.
 
-- **Execution is the default.** Every review, whatever its scope, now runs the tests that cover the change and a targeted reproduction, with a valid control, of each Critical or Warning candidate that verification keeps, plus the merged-tree check for pull requests, all in an isolated scratch worktree as `references/execution.md` says. `--no-execute` keeps the review static, `--execute` only states the default, and a review with `--fix` never executes. The **Relevant tests:** line names what ran and its result. The change's code runs on your machine: pass `--no-execute` for a change you do not trust.
-- **Realistic triggers only for Critical.** A finding is Critical, and blocks, only when its trigger can happen in real use: attacker or untrusted input, or input within what production data, a documented or enforced limit, or normal use can reach. A trigger that needs an input far beyond normal use, with nothing showing such inputs occur, is at most a Warning, and its Evidence says what triggers it and why that is unlikely.
+- **Execution is the default.** Every review, whatever its scope, now runs the tests that cover the change and a targeted reproduction, with a valid control, of each Critical or Warning candidate that verification keeps, plus the merged-tree check for pull requests, all in an isolated scratch worktree as `references/execution.md` says. `--no-execute` keeps the review static, `--execute` only states the default, and a review with `--fix` never executes. The **Relevant tests:** line names what ran and its result. The change's code runs on your machine: pass `--no-execute` for a change you do not trust ([#32](https://github.com/felipereisdev/code-review-skill/pull/32)).
+- **Realistic triggers only for Critical.** A finding is Critical, and blocks, only when its trigger can happen in real use: attacker or untrusted input, or input within what production data, a documented or enforced limit, or normal use can reach. A trigger that needs an input far beyond normal use, with nothing showing such inputs occur, is at most a Warning, and its Evidence says what triggers it and why that is unlikely ([#32](https://github.com/felipereisdev/code-review-skill/pull/32)).
 
 ## [4.1.0] - 2026-11-26
 
@@ -113,7 +120,8 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 - Review triage, audit and review effort claims reconciled ([#14](https://github.com/felipereisdev/code-review-skill/pull/14)).
 - README counts, the MIT `LICENSE` and the `SKILL.md` frontmatter ([#1](https://github.com/felipereisdev/code-review-skill/pull/1)).
 
-[Unreleased]: https://github.com/felipereisdev/code-review-skill/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/felipereisdev/code-review-skill/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/felipereisdev/code-review-skill/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/felipereisdev/code-review-skill/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/felipereisdev/code-review-skill/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/felipereisdev/code-review-skill/compare/v3.0.0...v3.1.0
