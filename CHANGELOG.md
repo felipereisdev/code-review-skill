@@ -2,25 +2,48 @@
 
 All notable changes to this project are listed here, in the format of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Each release lists the changes merged since the release before it, and changes merged after the latest release wait under `## [Unreleased]` for the next one. Changes up to `v2.0.0` (commit `f9f00fe`) are described in the [v2.0.0 release notes](https://github.com/felipereisdev/code-review-skill/releases/tag/v2.0.0).
 
-## 3.1.0 — 2026-11-12
-
-- Add evidence-driven adversarial coverage, real-contract fixture checks, cumulative re-review and proportionate regression tests.
-- Add opt-in isolated execution and source-into-target integration checks on pinned SHA pairs.
-- Add Bitbucket Cloud review/publishing and opt-in own-thread/review-state workflow, with explicit tracker authorization and dry runs.
-- Separate merge blocking from severity; emit JSON contract v2 while retaining v1 consumer compatibility and frozen studies.
-- Add deterministic blocker-gate tests and executable evidence scenarios. No new model-quality benchmark is claimed.
-
 ## [Unreleased]
+
+## [4.0.0] - 2026-11-26
+
+### Upgrading from v3
+
+- **Pull request reviews publish by default.** `/code-review pr <n>` (or a pull or merge request link alone) now publishes its inline comments and summary and then runs the review workflow: it resolves its own verified threads and requests changes, or withdraws its own request, when the evidence supports it. Add `--no-comment` for a report-only run, as `v3` gave without flags, or `--no-workflow` to publish comments without touching threads or the review state. `--comment` and `--workflow` still work and only state the defaults ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Only Critical blocks.** A Warning never blocks the merge: a report with Warnings and no Critical says `Ready to merge: With fixes`. JSON version 2 marks `blocking` true exactly for a High-confidence Critical finding and rejects a blocking Warning and verdict row 8, so a consumer that expected either must be adapted ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Comment format.** The summary comment is a structured document, and each field of an inline comment is its own paragraph, so a script that parsed the old bodies must be adapted. Everything published is written in English ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+
+### Added
+
+- **Review rounds.** Every `pr` review reads `references/review-rounds.md`. The state of the last published round lives in a hidden `<!-- code-review-skill:state {...} -->` line at the end of the skill's own summary comment (round, head and destination SHAs, and each finding's stable key, severity and location), so no local file is needed. From round 2 on, the report adds a `**Round:**` line, verifies each earlier finding again under `## Previous findings` (fixed, still open, withdrawn or not verified), keeps keys and severity stable unless the Evidence states a reversal, and moves Warning and Suggestion candidates on code that the previous round already reviewed to `## Late notes (not counted)`; a late Critical still blocks. Publishing writes nothing when the own summary already covers the current head and destination, and a state written by another account is never read ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **A link alone is a `pr` review.** `/code-review <pull or merge request URL>` reviews it as `pr <url>` does, for GitHub, GitLab and Bitbucket Cloud links; a bare number still needs `pr` ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **`--no-comment` and `--no-workflow`** to opt out of publishing and of the workflow ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
 
 ### Changed
 
-- **Summary comment layout.** With `--comment`, the summary comment on the pull request or merge request is now a structured document instead of consecutive `**Label:**` lines, which GitLab joined into one paragraph: a `# Code review: <scope> at <sha>` title, a `## Verification` table (diff, snapshot, review checks, candidates, review effort, relevant tests), `## Findings` with one `### <Severity>` heading per severity, `## Needs human verification`, `## Audit` as a list and a closing `## Assessment` with the `**Ready to merge:**` verdict and `**Look first:**`. Inline comments keep their fields but put a blank line between each of them, so `**Issue:**`, `**Evidence:**`, `**Blocking:**` and `**Fix:**` are separate paragraphs. A script that parsed the old summary or inline bodies must be adapted.
-- **Only Critical blocks.** A Warning never blocks the merge any more: `**Blocking:**` is `yes` exactly for a High-confidence Critical finding, and a report with Warnings and no Critical says `Ready to merge: With fixes`. Verdict row 8 (No for a blocking Warning) is retired; JSON version 2 rejects a document that uses it or marks a Warning as blocking.
-- **Broken requirements and failing tests are Critical.** A broken acceptance criterion, spec or required public contract is Critical when an executed reproduction or a static trace that quotes the requirement's exact text proves it; without that proof it goes to Needs human verification. With `--execute`, a test or suite that fails because of the change is Critical, one finding per cause, never counted again as missing tests.
-- **A link alone is a `pr` review.** `/code-review <pull or merge request URL>` reviews it as `pr <url>` does, for GitHub, GitLab and Bitbucket Cloud links; a bare number still needs `pr`.
-- **Publishing and the workflow are the default.** A `pr` review now publishes its inline comments and summary and then runs the review workflow (own-thread resolution and own request-changes/withdrawal) without any flag. `--no-comment` gives a report-only run, and `--no-workflow` publishes comments without touching threads or the review state. `--comment` and `--workflow` are still accepted and only state the defaults. A `pr` review with `--format json` or `--fix` never publishes, `--dry-run` needs a review that publishes, and tracker writes still need an explicit request. Scripts or CI jobs that ran `/code-review pr <n>` expecting a read-only review must add `--no-comment`.
-- **Review rounds.** Every `pr` review reads `references/review-rounds.md`. The state of the last published round lives in a hidden `<!-- code-review-skill:state {...} -->` line at the end of the skill's own summary comment (round, head and destination SHAs, and each finding's stable key, severity and location), so no local file is needed. From round 2 on, the report adds a `**Round:**` line, verifies each earlier finding again under `## Previous findings` (fixed, still open, withdrawn or not verified), keeps keys and severity stable unless the Evidence states a reversal, and moves Warning and Suggestion candidates on code that the previous round already reviewed to `## Late notes (not counted)`; a late Critical still blocks. The summary title says `(round <n>)`, and `--comment` publishes nothing when the own summary already covers the current head and destination. A state written by another account is never read.
-- **Published language.** Everything `--comment` publishes, the summary and the inline comments, is written in English, whatever the language of the chat; code, paths, identifiers and quoted errors stay as they are.
+- **Summary comment layout.** The summary comment is a structured document instead of consecutive `**Label:**` lines, which GitLab joined into one paragraph: a `# Code review (round <n>): <scope> at <sha>` title, a `## Verification` table (diff, snapshot, round, review checks, candidates, review effort, relevant tests), `## Findings` with one `### <Severity>` heading per severity, `## Needs human verification`, `## Late notes (not counted)`, `## Previous findings`, `## Audit` as a list and a closing `## Assessment` with the `**Ready to merge:**` verdict and `**Look first:**` ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Inline comments.** Each field (`**Issue:**`, `**Evidence:**`, `**Blocking:**`, `**Fix:**` and the others) is its own paragraph; the header line is unchanged, so deduplication across runs still works ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Published language.** Everything that is published, the summary and the inline comments, is written in English, whatever the language of the chat; code, paths, identifiers and quoted errors stay as they are ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Only Critical blocks.** `**Blocking:**` is `yes` exactly for a High-confidence Critical finding; Warnings never block ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Broken requirements and failing tests are Critical.** A broken acceptance criterion, spec or required public contract is Critical when an executed reproduction or a static trace that quotes the requirement's exact text proves it; without that proof it goes to Needs human verification. With `--execute`, a test or suite that fails because of the change is Critical, one finding per cause, never counted again as missing tests ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- **Publishing and the workflow are the default** in `pr` reviews. A `pr` review with `--format json` or `--fix` never publishes, `--dry-run` needs a review that publishes, and tracker writes still need an explicit request ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+
+### Removed
+
+- Verdict row 8 (No for a blocking Warning) ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+- The internal planning documents under `docs/superpowers/` ([#28](https://github.com/felipereisdev/code-review-skill/pull/28)).
+
+## [3.1.0] - 2026-11-12
+
+### Added
+
+- Evidence-driven adversarial coverage, real-contract fixture checks, cumulative re-review and proportionate regression tests ([#27](https://github.com/felipereisdev/code-review-skill/pull/27)).
+- Opt-in isolated execution and source-into-target integration checks on pinned SHA pairs ([#27](https://github.com/felipereisdev/code-review-skill/pull/27)).
+- Bitbucket Cloud review/publishing and an opt-in own-thread/review-state workflow, with explicit tracker authorization and dry runs ([#27](https://github.com/felipereisdev/code-review-skill/pull/27)).
+- Deterministic blocker-gate tests and executable evidence scenarios. No new model-quality benchmark is claimed ([#27](https://github.com/felipereisdev/code-review-skill/pull/27)).
+
+### Changed
+
+- Merge blocking separate from severity; JSON contract v2 emitted while retaining v1 consumer compatibility and frozen studies ([#27](https://github.com/felipereisdev/code-review-skill/pull/27)).
 
 ## [3.0.0] - 2026-10-28
 
@@ -69,5 +92,7 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 - Review triage, audit and review effort claims reconciled ([#14](https://github.com/felipereisdev/code-review-skill/pull/14)).
 - README counts, the MIT `LICENSE` and the `SKILL.md` frontmatter ([#1](https://github.com/felipereisdev/code-review-skill/pull/1)).
 
-[Unreleased]: https://github.com/felipereisdev/code-review-skill/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/felipereisdev/code-review-skill/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/felipereisdev/code-review-skill/compare/v3.1.0...v4.0.0
+[3.1.0]: https://github.com/felipereisdev/code-review-skill/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/felipereisdev/code-review-skill/compare/v2.0.0...v3.0.0
