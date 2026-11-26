@@ -6,6 +6,14 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 
 ### Changed
 
+- **Proportionate reviews, no over-engineering.** The review no longer pushes for more machinery than the change needs:
+  - **Missing mechanism or pattern** joins Do Not Report: an absent timeout, retry, cache, metric, interface, abstraction, dependency injection, API version, rate limit or idempotency key is not a finding unless its absence causes a concrete failure in realistic use and the nearby code already uses that mechanism or a repository rule requires it.
+  - The checklists name concrete failures instead of ideals. Architecture drops the SOLID, immutability and pure-function bullets and instead checks the change itself for over-engineering (speculative generality, layers that only forward, infrastructure without a need, dead flexibility); duplication counts only for business rules whose copies can drift. Resilience, observability, API design and concurrency no longer ask for circuit breakers, bulkheads, backoff, metrics, correlation IDs, versioning or idempotency keys the project does not already use.
+  - **Fix** is the smallest change that removes the trigger, in the style of the surrounding code; never a redesign, new abstraction, dependency or infrastructure unless the smallest fix cannot work.
+  - At most 3 Suggestions per review, and Suggestions appear only in the summary comment, tagged `(summary only)`, never as inline comments. Length findings start at 50-line methods, 500-line classes and files and 400-line components, and must name what the size makes hard.
+  - The adversarial axes (alternate routes, trusted inputs, identity and collisions, mutable bounds) apply only when the change accepts untrusted input or enforces a rule, limit, permission or quota.
+  - Requests for tests are unchanged.
+
 - **Execution is the default.** Every review, whatever its scope, now runs the tests that cover the change and a targeted reproduction, with a valid control, of each Critical or Warning candidate that verification keeps, plus the merged-tree check for pull requests, all in an isolated scratch worktree as `references/execution.md` says. `--no-execute` keeps the review static, `--execute` only states the default, and a review with `--fix` never executes. The **Relevant tests:** line names what ran and its result. The change's code runs on your machine: pass `--no-execute` for a change you do not trust.
 - **Realistic triggers only for Critical.** A finding is Critical, and blocks, only when its trigger can happen in real use: attacker or untrusted input, or input within what production data, a documented or enforced limit, or normal use can reach. A trigger that needs an input far beyond normal use, with nothing showing such inputs occur, is at most a Warning, and its Evidence says what triggers it and why that is unlikely.
 

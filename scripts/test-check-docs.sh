@@ -1346,6 +1346,26 @@ make_copy "$work/unrealistic"
 drop_lines "$work/unrealistic/SKILL.md" '**Realistic trigger.**'
 expect_fail "a Critical with an unrealistic trigger fails" "$work/unrealistic" "SKILL.md is missing: **Realistic trigger.** A finding is **Critical**, and blocks, only when its trigger can happen in real use"
 
+make_copy "$work/propmechanism"
+drop_lines "$work/propmechanism/SKILL.md" '**Missing mechanism or pattern**'
+expect_fail "asking for missing mechanisms again fails" "$work/propmechanism" "Do Not Report is missing: **Missing mechanism or pattern**"
+
+make_copy "$work/propsolid"
+replace_first "$work/propsolid/SKILL.md" '### Simplicity — check the change for over-engineering' '### SOLID'
+expect_fail "an architecture checklist that demands SOLID again fails" "$work/propsolid" "SKILL.md is missing: ### Simplicity — check the change for over-engineering"
+
+make_copy "$work/propfix"
+replace_first "$work/propfix/SKILL.md" '**Fix:** The smallest change that removes the trigger.' '**Fix:** Suggested correction or approach.'
+expect_fail "a Fix that is not the smallest change fails" "$work/propfix" "SKILL.md is missing: **Fix:** The smallest change that removes the trigger."
+
+make_copy "$work/propbudget"
+replace_first "$work/propbudget/SKILL.md" '**At most 3 per review:**' '**As many as you find:**'
+expect_fail "an unlimited number of Suggestions fails" "$work/propbudget" "SKILL.md is missing: **At most 3 per review:**"
+
+make_copy "$work/propaxes"
+replace_first "$work/propaxes/references/evidence-driven-review.md" '**Adversarial axes only where they fit:**' '**Adversarial axes everywhere:**'
+expect_fail "adversarial axes on every change fail" "$work/propaxes" "references/evidence-driven-review.md is missing: **Adversarial axes only where they fit:**"
+
 make_copy "$work/roundslate"
 replace_first "$work/roundslate/references/review-rounds.md" 'A late **Critical** candidate stays a candidate like any other' 'A late **Critical** candidate is dropped like any other'
 expect_fail "a late Critical that is dropped instead of reported fails" "$work/roundslate" "references/review-rounds.md is missing: A late **Critical** candidate stays a candidate like any other"

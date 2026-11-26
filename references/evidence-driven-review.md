@@ -4,7 +4,7 @@ Read for every review, after intent and before the checklist pass. This extends 
 
 ## Fixed questions, proportionate depth
 
-Walk these nine axes during the first pass. For each, record `checked` with the concrete routes and result, `not applicable` with why, or `not verified` with the missing evidence. An axis is not a finding or a Summary category. Follow the changed behavior into callers, guards, shared helpers and real external contracts; pre-existing defects remain outside this PR's findings. A later newly discovered axis is a coverage gap in the earlier review, not evidence that the author introduced a new bug.
+Walk these nine axes during the first pass, with depth proportionate to the risk of the change. For each, record `checked` with the concrete routes and result, `not applicable` with why, or `not verified` with the missing evidence. **Adversarial axes only where they fit:** Alternate routes, Trusted inputs, Identity and collisions and Mutable bounds apply only when the changed code accepts input from an untrusted party or enforces a rule, limit, permission, quota or check that someone could try to get around. For any other change, such as an internal screen, a report or a refactor, record each of them as `not applicable` with `no untrusted input or enforced rule`, and never turn them into hardening requests. An axis is not a finding or a Summary category. Follow the changed behavior into callers, guards, shared helpers and real external contracts; pre-existing defects remain outside this PR's findings. A later newly discovered axis is a coverage gap in the earlier review, not evidence that the author introduced a new bug.
 
 | Axis | Question and useful probes |
 | --- | --- |

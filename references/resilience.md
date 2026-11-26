@@ -1,8 +1,10 @@
 # Resilience & Fault Tolerance *(only if the diff involves external calls, queues, or critical flows)*
 
-- **Timeouts**: all outbound HTTP calls, database queries, and queue operations have explicit timeouts
-- **Retry with backoff**: transient failures retried with exponential backoff and jitter; non-retriable errors not retried
-- **Circuit breakers**: repeated failures to an external dependency trip a circuit breaker to prevent cascade
-- **Graceful degradation**: the system degrades gracefully when a non-critical dependency is unavailable
-- **Idempotency**: operations that may be retried are idempotent (safe to execute more than once)
-- **Bulkhead isolation**: slow or failing dependencies do not exhaust shared resources (thread pools, connections)
+Report a failure the change causes, never a missing resilience pattern (see **Missing mechanism or pattern** under Do Not Report in SKILL.md).
+
+- **Calls that can hang**: an outbound call on a request path or in a job that the change adds without a timeout, where the client's default waits without limit, so a slow dependency hangs requests or workers. Not a finding when the client, the framework or the project's shared client already sets a timeout.
+- **Unsafe retries**: a retry that the change adds repeats an operation that is not safe to run twice (a charge, a sent message, a created record), or retries without a bound.
+- **Half-done critical flows**: a failure of the external call leaves a critical flow half-done, such as a payment charged but not recorded, or a record saved but its event never sent, with no way to detect or recover it.
+- **Retriable but not idempotent**: an operation that the change makes run again on failure, such as a queue consumer or a webhook handler, has an effect that duplicates when it runs twice.
+
+Circuit breakers, bulkheads, backoff with jitter and graceful-degradation layers are architecture decisions, not defects of a change: never ask for them, unless the project already uses one for that dependency and the change bypasses it.

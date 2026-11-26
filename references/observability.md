@@ -1,8 +1,9 @@
 # Observability
 
-- **Structured logging**: logs use a structured format (JSON or key=value); no `console.log` / `var_dump` left in production code
-- **Sensitive data in logs**: no passwords, tokens, PII, or secrets logged — even partially
-- **Log levels**: appropriate log levels used (`debug`, `info`, `warning`, `error`); no critical events logged at `debug`
-- **Correlation IDs**: requests and async jobs carry a trace/correlation ID through logs
-- **Error reporting**: exceptions are captured and forwarded to the error tracking system (e.g. Sentry, Bugsnag)
-- **Metrics**: significant new operations (queue jobs, external calls, cache hits) are instrumented where relevant
+Report what the change breaks or hides, never a missing observability practice (see **Missing mechanism or pattern** under Do Not Report in SKILL.md).
+
+- **Debug output left behind**: `console.log`, `var_dump`, `print` or similar debug output that the change leaves in production code, where the project uses a logger
+- **Sensitive data in logs**: passwords, tokens, PII or secrets that the change logs, even partially
+- **Wrong log levels**: an error or a critical event that the change logs at `debug`, so it never shows in production
+- **Swallowed errors**: an exception that the change catches and neither handles, rethrows nor reports, where the project reports such errors (for example to Sentry or Bugsnag)
+- **Broken correlation**: the change drops a trace or correlation ID that the project already propagates through that flow

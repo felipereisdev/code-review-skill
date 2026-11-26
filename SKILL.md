@@ -244,7 +244,7 @@ Give each finding the highest level whose definition it meets, and no higher:
   - **Broken requirement**: the change breaks a stated requirement (an acceptance criterion, a spec or a required public contract, as `./references/intent.md` defines it), proven by an executed reproduction (execution is on by default), or by a static trace that quotes the exact text of the requirement from its source and shows the changed lines contradict it. Without that proof, a candidate that rests on the requirement is never Critical: put it under `## Needs human verification` with Medium confidence.
   - **Failing test**: when execution is on, a test that the change adds or modifies, or an existing test or suite, fails on the reviewed snapshot or on the integration tree, and the failure is attributed to the change after ruling out environmental and flaky causes (see `./references/execution.md`). Report one finding per cause, at the changed code that causes it, and never count the same failure again as missing tests.
 - **Warning**: the change gives a wrong result or wrong behavior in at least one concrete scenario, without a crash, data loss or security hole; or it makes a hot path (code that runs per request or per job) do work or queries that grow with data size (N+1 queries, unbounded queries or loads, O(n^2) work per request), because that causes timeouts or outages at scale. Never blocks the merge: a Warning should be fixed, and the verdict says `With fixes`. A Warning that proves a broken requirement or a failing test is Critical, as above.
-- **Suggestion**: the code is correct but suboptimal (readability, structure, naming, performance improvements that do not grow with data size, missing tests for code that works). Optional; does not block merge.
+- **Suggestion**: the code is correct but suboptimal (readability, structure, naming, performance improvements that do not grow with data size, missing tests for code that works). Optional; does not block merge. **At most 3 per review:** keep the Suggestions with the clearest value for this change and drop the others without counting them; never fill the budget for its own sake. A Suggestion never becomes an inline comment: it appears only in the summary.
 
 Severity caps:
 
@@ -302,6 +302,7 @@ Drop any candidate finding, of any severity, that matches an item below. Each it
 - **Theoretical denial of service**: resource exhaustion, slow regular expressions or large inputs with no realistic path from an attacker or from production data to the changed code. Why: without that path there is no Evidence scenario. When you can name the input and the path, it is a normal finding under Severity Levels.
 - **"Verify" or "ensure" without a scenario**: advice to verify, ensure, confirm or check something when you cannot write its trigger → effect. Why: without a scenario the finding is Low confidence, and Low-confidence findings are never reported; the **Warning** cap for verify-only advice applies only when a scenario exists.
 - **Generic hardening**: defense-in-depth advice (an extra header, a stricter flag, a tighter limit) when you cannot name the attack the change makes possible. Why: it is a wish for the codebase, not a defect in this change.
+- **Missing mechanism or pattern**: the changed code works in its realistic use, and the candidate only says that a mechanism or pattern is absent, such as a timeout, retry, circuit breaker, cache, metric, correlation ID, interface, abstraction, dependency injection, API version, rate limit or idempotency key. Why: an absent ideal is not a defect of this change, and asking for it makes the code heavier for no proven gain. Report it only when you can name the concrete failure its absence causes in realistic use of the changed code (see **Realistic trigger** under Severity Levels) and either the code around it already uses that mechanism for the same kind of operation or a repository rule (Step 1.6) requires it.
 - **Excluded by repository rules**: a repository rules file that applies to the changed file (Step 1.6) says not to report this kind of problem. Why: the team made that decision for its own code. This item never drops a security finding that meets **Critical**.
 
 These reporting exclusions do not suppress a verified blocker: a concrete broken required behavior is not a style preference, generic hardening or mere test gap. If tooling already reports it, cite that check once without duplicating lint findings; the blocker still counts. A repository rule cannot waive a verified blocker.
@@ -473,7 +474,7 @@ Decide here how to run the checklist pass: sections 1 to 5 and the conditional c
 - **CSRF protection**: state-changing operations protected against cross-site request forgery
 - **Dependency vulnerabilities**: no known CVEs in added/updated dependencies
 - **File upload handling**: proper validation of file types, sizes, and storage paths
-- **Rate limiting & abuse prevention**: endpoints exposed to the public have appropriate limits
+- **Abuse of new public endpoints**: an endpoint the change exposes to anonymous callers triggers costly or abusive work (sending email or SMS, creating accounts, heavy queries) without the limit that the rest of the API already applies
 - **Secure defaults**: encryption, HTTPS, secure cookies, proper CORS configuration
 - **Mass assignment protection**: objects not blindly accepting all user input fields
 
@@ -483,14 +484,14 @@ Decide here how to run the checklist pass: sections 1 to 5 and the conditional c
 
 - **N+1 queries**: data access patterns avoid unnecessary repeated queries
 - **Indexing**: new queries have proper database indexes to support them
-- **Caching**: appropriate use of caching for expensive or repeated operations
+- **Repeated expensive work**: the change recomputes or refetches the same expensive result several times in one request or job, on a hot path
 - **Pagination**: large datasets are paginated, not loaded entirely into memory
 - **Lazy loading vs eager loading**: relationships loaded efficiently for the use case
 - **Unnecessary computation**: no redundant loops, recalculations, or re-renders
 - **Memory leaks**: no event listeners, subscriptions, or references left dangling
 - **Bundle size**: no unnecessarily large dependencies added for small functionality
 - **Database transactions**: long-running transactions avoided; transactions scoped minimally
-- **Async operations**: I/O-bound work uses async patterns where available
+- **Blocking I/O**: the change runs synchronous I/O inside an event loop or an async request path, so other requests wait
 
 ---
 
@@ -509,38 +510,38 @@ Decide here how to run the checklist pass: sections 1 to 5 and the conditional c
 
 ## 4. Architecture & Design Principles
 
-### SOLID
-- **Single Responsibility**: each class/module/function does one thing well
-- **Open/Closed**: code is extendable without modifying existing behavior
-- **Liskov Substitution**: subtypes can replace their base types without breaking behavior
-- **Interface Segregation**: interfaces are small and focused, not bloated
-- **Dependency Inversion**: high-level modules depend on abstractions, not concrete implementations
+Judge the structure that the change adds against the code around it, never against an ideal design. A finding here needs a concrete cost in this change: a defect, a business rule duplicated where the copies can drift, or complexity that the change adds without a use. Never ask for an abstraction, an interface, a layer or a design pattern only to follow a principle such as SOLID.
 
-### DRY (Don't Repeat Yourself)
-- No duplicated logic across files or methods — extract shared behavior when duplication introduces a risk of inconsistency
+### Simplicity — check the change for over-engineering
 
-### KISS (Keep It Simple, Stupid)
-- Solution uses the simplest approach that works; no over-engineering
-- No premature abstractions or unnecessary design patterns
+The change itself must stay as simple as what it does. Report as a **Suggestion**, saying what to remove or inline:
+
+- **Speculative generality**: an interface, abstract class, factory, strategy, plugin point, configuration option or parameter that the change adds with a single implementation or caller and no stated requirement for more
+- **Layers that only forward**: wrappers, services or helpers that only pass calls through, adding files without isolating anything
+- **Infrastructure without a need**: caches, queues, retries, feature flags, background jobs or concurrency that the change adds without a measured or stated need
+- **Dead flexibility**: parameters, options, branches or extension points that nothing uses
+
+### Duplication
+
+- **Drifting copies**: the change copies a business rule, calculation or validation that must stay identical to another copy, so the two can drift apart. Code that looks alike but may legitimately diverge is not duplication, and a few repeated lines are not worth an abstraction.
 
 ### General
-- **Separation of concerns**: business logic, data access, and presentation are clearly separated
-- **Naming conventions**: variables, functions, and classes have clear, descriptive names
-- **Error handling**: errors are handled gracefully with meaningful messages; no silent catches
-- **Code readability**: code is self-documenting; complex logic has brief explanatory comments
-- **No dead code**: unused imports, variables, functions, or commented-out blocks are removed
+
 - **Consistent patterns**: new code follows the patterns already established in the codebase
-- **Immutability**: prefer immutable data structures where appropriate; avoid mutating shared state
-- **Pure functions**: side effects isolated and explicit; core logic written as pure functions where possible
+- **Error handling**: errors are not silently caught; an error that a caller or the user needs is not swallowed or turned into success
+- **Misleading names**: a name that says something different from what the code does (style preferences are nits, see Do Not Report)
+- **No dead code**: unused imports, variables, functions or commented-out blocks that the change adds
 
 ### Code & File Size
 
 Apply the length limits below (method, class, file and component) only to code the change adds, or to growth the change causes: a method, class, component or file that crosses a limit because of lines the change adds. Never report the length of code the change only touches, such as one edited line in a large legacy file. A length finding is always a **Suggestion**, and the consistency check (Step 1.5) comes first: if the project already lives with methods, classes, components or files of that size, do not report it. Report each oversized method, class, component or file once, with the changed range as its Location.
 
-- **Method/function length**: methods exceeding **30 lines** should be justified; methods exceeding **50 lines** are candidates for refactoring — they are doing too much (Clean Code / Rule of 30)
-- **Class length**: classes exceeding **200 lines** should be reviewed for single-responsibility violations; classes exceeding **500 lines** are candidates for decomposition
-- **File length**: source files exceeding **300 lines** are a signal of multiple responsibilities; files exceeding **500 lines** should be investigated and split
-- **Component length** *(Vue/React)*: SFCs or components exceeding **300 total lines** should be decomposed; `<template>` and `<script>` blocks each kept under **150 lines** where possible
+- **Method/function length**: a method or function that the change makes longer than **50 lines**
+- **Class length**: a class that the change makes longer than **500 lines**
+- **File length**: a source file that the change makes longer than **500 lines**
+- **Component length** *(Vue/React)*: an SFC or component that the change makes longer than **400 total lines**
+
+Below these limits, length alone is never a finding, and splitting code only to make it shorter is not a fix: a length finding must also name what the size makes hard in this change, such as two unrelated flows that the change mixes in one function.
 - **Binary files in git**: images, PDFs, videos, database dumps, and compiled binaries not committed to the repository; `.gitignore` covers them; Git LFS used for large assets that must be versioned
 - **File reading at runtime**: files read from disk using streaming (not loaded entirely into memory) when the file size is not bounded and could be large
 
@@ -785,9 +786,10 @@ Use this block for each finding:
 **Evidence:** Trigger → effect: the concrete scenario in which it goes wrong.
 **Confidence:** High
 **Blocking:** yes | no — `yes` for a Critical finding, `no` otherwise, with the concrete reason.
-**Fix:** Suggested correction or approach.
+**Fix:** The smallest change that removes the trigger.
 ```
 
+- **Fix** is the smallest change that removes the trigger, in the style of the surrounding code. Never propose a redesign, a new abstraction, layer, dependency or piece of infrastructure, or a rewrite of code the change did not touch, unless the smallest fix cannot work; then say why in one sentence.
 - Under `## Findings`, list only High-confidence findings. Every Evidence states its basis (static trace, executed reproduction, fixture-only or runtime not verified) as `./references/evidence-driven-review.md` describes. The **Blocking:** decision follows Merge blocking: `yes` exactly for a Critical finding.
 - Under `## Needs human verification`, list Medium-confidence findings in the same block with `**Confidence:** Medium`, and say in the Evidence what a person must check.
 - Never report Low-confidence findings.

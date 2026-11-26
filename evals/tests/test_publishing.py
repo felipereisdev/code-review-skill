@@ -350,7 +350,7 @@ def check_summary(body, report, findings, needs, diff, own, inline_count, head=N
     where = summary_sections(lines)
     for f in findings:
         side = anchor(f, diff)
-        tag = "not on a diff line" if side is None else (
+        tag = "summary only" if f["severity"] == "Suggestion" else "not on a diff line" if side is None else (
             "already commented" if own_commented(f, side, own) else "inline")
         if not any(line.startswith(f"- `{f['loc']}`: ") and line.endswith(f"({tag})")
                    and where[i] == ("Findings", f["severity"]) for i, line in enumerate(lines)):
@@ -421,7 +421,7 @@ def check_github(pairs, report, diff_text, state):
         elif "start_line" in c and c.get("start_side") != side:
             item["error"] = f"comment {c.get('path')}:{line} has a start_side that differs from its side"
         items.append(item)
-    errors += check_inline(items, findings, diff, own, "github")
+    errors += check_inline(items, [f for f in findings if f["severity"] != "Suggestion"], diff, own, "github")
     summaries = [(c, p) for c, p in pairs if GITHUB_CREATE.match(c) or GITHUB_EDIT.match(c)]
     if len(summaries) != 1:
         errors.append(f"expected 1 summary comment, found {len(summaries)}")
@@ -519,7 +519,7 @@ def check_gitlab(pairs, report, diff_text, state):
             elif kinds[0] == "ctx" and new not in mapped:
                 item["error"] = f"context line needs old_line and new_line: {where}"
         items.append(item)
-    errors += check_inline(items, findings, diff, own, "gitlab")
+    errors += check_inline(items, [f for f in findings if f["severity"] != "Suggestion"], diff, own, "gitlab")
 
     summaries = [(c, p) for c, p in pairs if GITLAB_CREATE.match(c) or GITLAB_EDIT.match(c)]
     if len(summaries) != 1:
@@ -540,66 +540,66 @@ GL_DISCUSSION_1 = "--input discussion-1.json\n```\n\n```json"
 # exactly one occurrence of old, or ("tail", old, new), which replaces the text from the last old to the end.
 PARSER_PROBES = [
     ("P01", "github-dry-run.md", None,
-     "006e19e85cf6a768e8b0224bcb946ea7e6588ed397779c95b30315af59831f6c", []),
+     "5e741e418477d7c417e31549ecab420861e38015dd4ef6aa3b69353944cfc6bc", []),
     ("P02", "gitlab-dry-run.md", None,
-     "dd918692375c167d6583992c6dbefdc3a3782b2c952b4843809b85543dd84650", []),
+     "e1bb78073d6446c46bd7d42e9954ec53b727c86993005963dfdba4555b6a3b9b", []),
     ("P03", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
-     "7003b69910e7a7e0ae297ccae69dafa3882839bda2cbe5cdeeba8a8077457c9a",
+     "e82dd8e297a9a08565a055132f3183ffb60a6e6102c4c61e3c2a71553b3dacf1",
      [("append", "", "\n```sh\ngh pr review 42 --approve\n```\n")]),
     ("P04", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
-     "68408744bd8c03765cc4fba3ecd61f8b871090a8a0c7ab01a06827b032c6065d",
+     "7f135544d358851c44c21769e673b3b976dac739904f2761f45fa993661408ad",
      [("append", "", "\n```sh\nglab mr approve 42\n```\n")]),
     ("P05", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
-     "2385bcb52c73fb0c4eb6e38ace73860e1094ec0db6c0ce476ba98a0b60c54586",
+     "e49f1a27d43debab1a0f4e3eecc5400b33a62b0d57ea5fd26ca09c9b727fa422",
      [("replace", "### 2. Summary comment (create)",
        "```sh\ngh pr review 42 --approve\n```\n\n### 2. Summary comment (create)")]),
     ("P06", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
-     "cad6faed9c87be13e412705871515772e0016f0dd1a218216acef0ce033810a7",
-     [("replace", "### 4. Summary comment (create)",
-       "```sh\nglab mr approve 42\n```\n\n### 4. Summary comment (create)")]),
+     "6ddd5e9fbc4cf4884b61b769416e1047f9425429e84c2743481e8484b3207533",
+     [("replace", "### 3. Summary comment (create)",
+       "```sh\nglab mr approve 42\n```\n\n### 3. Summary comment (create)")]),
     ("P07", "github-dry-run.md", "write command without its JSON payload: " + GH_REVIEW_CMD,
-     "87fae4f7725212d43ef92e956beac83151b0981bf3c3b5a91197a4e44a180174",
+     "9c26d425bfaa4414300a6b583debdbc5b005b5f842543659e6e1f05c6c0d8838",
      [("append", "", "\n```sh\n" + GH_REVIEW_CMD + "\n```\n")]),
     ("P08", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST projects/77/merge_requests/42/notes",
-     "11eeed308a8655e3c97210dbd467fb9f342c1835230604931417ddf2e28e680d",
+     "aa08818c1a5e7176618d29ecdae70f8ee1ffb5bb20f19c67d21fe523e61fe697",
      [("tail", "```json\n", "\n")]),
     ("P09", "github-dry-run.md", "unclosed fence: ```sh",
-     "c76ee0eed83e1ce74a10f767fb685b06e10d0330b3490098240f26473392bd80",
+     "37e255635e3aa978da689d85fdba5a4b96cada8208d54c1130aa42755dc136bc",
      [("append", "", "\n```sh\ngh pr review 42 --approve\n")]),
     ("P10", "gitlab-dry-run.md", "unclosed fence: ```json",
-     "6eaf6069d67a43ea609bc14d3ec06ccb710c9fa83f908ca81f895a9848b4b99f",
+     "3b87f1e70e6718702283bfe45d785f73345678a9d4054c1e0344e1b07a427d11",
      [("append", "", "\n```sh\nglab api --hostname gitlab.com --method POST projects/77/merge_requests/42/discussions "
        + H + " --input discussion-1.json\n```\n\n```json\n{}\n")]),
     ("P11", "github-dry-run.md", "invalid JSON payload for: gh api --hostname github.com --method POST repos/acme/billing-api/issues/42/comments",
-     "c713bbf8267b4f7428f3319051b569ee0e60a97dc2b80a80845ca6f291bb9f12",
+     "2029c231401fe9e0fc14572489c715a5992e601ef730f7ab8602b6a12c720ad8",
      [("tail", "```json\n", "```json\n{not-json}\n```\n")]),
     ("P12", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
-     "751d926257f4a2714f85c994503a38ae97fdfbd4896f5b7e98e5337da0a8dc53",
+     "8a401576529832f6c658d4ceb227a8210bb93ae0442ed5d6dfc04c7bece7d27c",
      [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n```text\nintervening block\n```\n\n```json")]),
     ("P13", "gitlab-dry-run.md", "JSON payload without a write command",
-     "4c9a614a28b96eeec1fe6c35435fb47efee0e121f917852b41469715fb84ac49",
+     "15cc2a07ed093e1d2a9e880e211198d269d834a555019a8290def946906396bd",
      [("append", "", "\n```json\n{}\n```\n")]),
     ("P14", "github-dry-run.md", "unsupported fence: ```bash",
-     "2ce80d49f5caa44b0e7ca152b1080747af0fd901a2bc42abce45a00944bfa27b",
+     "9590a01c141f576ba5b9e1f28c712636907a492566bb496411c592dfc73449ca",
      [("append", "", "\n```bash\ngh pr review 42 --approve\n```\n")]),
     ("P15", "gitlab-dry-run.md", "unsupported fence: ```shell",
-     "81f2c871fe27a67aaf93180d9ef547f4ce5f1350135984d4ac593cab841b3dee",
+     "eb886c108832f86c64325e3d6986434fac5bdb032f8b071cce680d3e4b89f0bd",
      [("append", "", "\n```shell\nglab mr approve 42\n```\n")]),
     ("P16", "github-dry-run.md", "unsupported fence: ````sh",
-     "5269b4e76bc4f4bd3c7218a66ff91d432eb87448be654124fe6f2ecd0eca2782",
+     "581f6b032dfe1bdcd74d5c2564b71bbd3074c98ce2483c4244c42f7ebdf51183",
      [("append", "", "\n````sh\ngh pr review 42 --approve\n````\n")]),
     ("P17", "github-dry-run.md", "unclosed fence: ```json",
-     "30a9f2d703b27ebe3116d7252ac6b1b2af06c89ebf59f61a9fa59b0a759b11f2",
+     "46ff6fe788bc50d6b7fdf23348eb41b001fdf6bde7c59828ae71245dfa1b34c4",
      [("tail", "\n```\n", "\n``\n")]),
     ("P18", "gitlab-dry-run.md", None,
-     "86940c1f4252da87cc02c89127ca02128df0c001c006939a3966456f5180cbda",
+     "d6abe243ebbe9995416d22b62be3df39cb19eba434f5d47df6dc0b4c72a9581a",
      [("replace", "## Dry run — nothing was published\n\n", "## Dry run — nothing was published\n\n\n\n"),
       ("replace", "\n\n### 2. Discussion on src/auth.js:3", "\n\n\n\n### 2. Discussion on src/auth.js:3")]),
     ("P19", "github-dry-run.md", None,
-     "7cde2a45e563d7b2a732f9411b1ca794f9bb19ccc47b09ab139c8c58c4a055e8",
+     "a3b8291103f4ca0c993e300dcbdecbea10c3fef3d3e0bfb79fbf57689fb3ff62",
      [("tail", "\n```\n", "\n```")]),
     ("P20", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
-     "aac5ed6d4bd39e0b76fb9c3f4c583a1915a459eb2261fee18ed833c666a5a480",
+     "5a0f6bb15c54bbc64f521607c1d0f617baf5535f796eb9b5b3f995845c5d4941",
      [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n### 2. Discussion on src/auth.js:3\n\n```json")]),
 ]
 
@@ -639,7 +639,7 @@ class FixtureTest(unittest.TestCase):
 
     def test_fixture_shapes(self):
         self.assertEqual(len(self.gh), 2)
-        self.assertEqual(len(self.gl), 4)
+        self.assertEqual(len(self.gl), 3)
         self.assertEqual(self.gh[0][1]["event"], "COMMENT")
         self.assertIn("```suggestion\n", self.gh[0][1]["comments"][0]["body"])
         self.assertIn("```suggestion:-1+0\n", self.gl[0][1]["body"])
@@ -669,13 +669,26 @@ class FixtureTest(unittest.TestCase):
 
     def test_comment_off_the_diff_fails(self):
         pairs = copy.deepcopy(self.gh)
-        pairs[0][1]["comments"][2]["line"] = 30
+        pairs[0][1]["comments"][0]["line"] = 30
         self.assertError(self.gh_errors(pairs), "src/invoices.js:30 (RIGHT) is not on a diff line")
 
     def test_suggestion_without_complete_fix_fails(self):
+        """A Warning whose Fix ends with a partial code block must not offer it as a suggestion block."""
+        report = self.report.replace("### Tests/Coverage — Suggestion", "### Tests/Coverage — Warning")
         pairs = copy.deepcopy(self.gh)
-        pairs[0][1]["comments"][2]["body"] = pairs[0][1]["comments"][2]["body"].replace("```js\n", "```suggestion\n")
-        self.assertError(self.gh_errors(pairs), "suggestion in a comment without a complete fix: src/invoices.js:15-17")
+        pairs[0][1]["comments"].append({
+            "path": "src/invoices.js", "start_line": 15, "start_side": "RIGHT", "line": 17, "side": "RIGHT",
+            "body": "**Warning — Tests/Coverage** · `src/invoices.js:15-17`\n\n**Fix:** Add a test for it:\n\n"
+                    "```suggestion\ntest(\"applyDiscount\", () => { ... });\n```\n\n" + FINDING_MARKER})
+        self.assertError(check_github(pairs, report, self.diff, self.gh_state),
+                         "suggestion in a comment without a complete fix: src/invoices.js:15-17")
+
+    def test_suggestion_finding_is_never_inline(self):
+        pairs = copy.deepcopy(self.gh)
+        pairs[0][1]["comments"].append({
+            "path": "src/invoices.js", "start_line": 15, "start_side": "RIGHT", "line": 17, "side": "RIGHT",
+            "body": "**Suggestion — Tests/Coverage** · `src/invoices.js:15-17`\n\n" + FINDING_MARKER})
+        self.assertError(self.gh_errors(pairs), "comment src/invoices.js:17 (RIGHT) matches no inline finding")
 
     def test_suggestion_on_removed_line_fails(self):
         pairs = copy.deepcopy(self.gh)
@@ -695,8 +708,8 @@ class FixtureTest(unittest.TestCase):
 
     def test_editing_an_earlier_round_note_fails(self):
         pairs = copy.deepcopy(self.gl)
-        pairs[3] = ("glab api --hostname gitlab.com --method PUT projects/77/merge_requests/42/notes/502 "
-                    + H + " --input summary.json", pairs[3][1])
+        pairs[2] = ("glab api --hostname gitlab.com --method PUT projects/77/merge_requests/42/notes/502 "
+                    + H + " --input summary.json", pairs[2][1])
         self.assertError(self.gl_errors(pairs), "summary must create a new comment for this round")
 
     def test_without_own_summary_a_new_one_is_created(self):
@@ -738,8 +751,8 @@ class FixtureTest(unittest.TestCase):
 
     def test_slash_command_line_fails(self):
         pairs = copy.deepcopy(self.gl)
-        pairs[2][1]["body"] = pairs[2][1]["body"].replace("**Issue:**", "/merge\n**Issue:**", 1)
-        self.assertError(self.gl_errors(pairs), "line starts with a slash command: src/invoices.js:15-17")
+        pairs[0][1]["body"] = pairs[0][1]["body"].replace("**Issue:**", "/merge\n**Issue:**", 1)
+        self.assertError(self.gl_errors(pairs), "line starts with a slash command: src/invoices.js:9-10")
 
     def test_needs_verification_finding_is_never_inline(self):
         pairs = copy.deepcopy(self.gh)
@@ -749,7 +762,7 @@ class FixtureTest(unittest.TestCase):
 
     def test_gitlab_context_line_needs_both_lines(self):
         pairs = copy.deepcopy(self.gl)
-        pairs[2][1]["position"]["new_line"] = 14
+        pairs[0][1]["position"]["new_line"] = 14
         self.assertError(self.gl_errors(pairs), "context line needs old_line and new_line: src/invoices.js:14")
 
     def test_empty_review_fails(self):
@@ -854,7 +867,7 @@ class FixtureTest(unittest.TestCase):
                     self.assertNotIn("```", cmd)
                 if error is None:
                     self.assertEqual(errors, [])
-                    self.assertEqual(len(pairs), 2 if name.startswith("github") else 4)
+                    self.assertEqual(len(pairs), 2 if name.startswith("github") else 3)
                 else:
                     self.assertError(errors, error)
 
@@ -953,7 +966,7 @@ class FixtureTest(unittest.TestCase):
         summary = pairs[-1][1]
         summary["body"], tagged = re.subn(r"^(- `src/auth\.js:3-4`: .*) \(inline\)$", r"\1 (already commented)",
                                           summary["body"], flags=re.M)
-        summary["body"], counted = re.subn(r"Inline comments: 3\.", "Inline comments: 2.", summary["body"])
+        summary["body"], counted = re.subn(r"Inline comments: 2\.", "Inline comments: 1.", summary["body"])
         self.assertEqual((tagged, counted), (1, 1))
         self.assertEqual(check_gitlab(pairs, report, self.diff, state), [])
 
@@ -997,7 +1010,7 @@ class FixtureTest(unittest.TestCase):
         summary = pairs[-1][1]
         summary["body"], tagged = re.subn(r"^(- `src/auth\.js:3-4`: .*) \(inline\)$", r"\1 (already commented)",
                                           summary["body"], flags=re.M)
-        summary["body"], counted = re.subn(r"Inline comments: 3\.", "Inline comments: 2.", summary["body"])
+        summary["body"], counted = re.subn(r"Inline comments: 2\.", "Inline comments: 1.", summary["body"])
         self.assertEqual((tagged, counted), (1, 1))
         self.assertError(check_gitlab(pairs, report, self.audit_auth_diff(), self.audit_auth_state()),
                          "summary line missing or mis-tagged for src/auth.js:3-4")
