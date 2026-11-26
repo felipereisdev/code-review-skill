@@ -120,6 +120,16 @@ mkdir -p ~/.cursor/skills
 ln -s "$(pwd)/code-review-skill" ~/.cursor/skills/code-review
 ```
 
+## ⬆️ Upgrading from v3
+
+Version 4.0.0 changes what a pull request review does by default and what blocks a merge:
+
+- **Publishing** - `/code-review pr 123`, or a pull or merge request link alone, now posts its comments and runs the review workflow (resolving its own verified threads and requesting changes, or withdrawing its own request); add `--no-comment` for a report-only run, or `--no-workflow` to post comments without touching threads or the review state
+- **Blocking** - Only a Critical finding blocks the merge; a Warning gives `Ready to merge: With fixes`, and JSON version 2 rejects a blocking Warning and verdict row 8
+- **Comments** - The summary comment is a structured document with a round number, and each field of an inline comment is its own paragraph; everything published is in English
+
+A CI job or script that ran `/code-review pr <n>` expecting a read-only review must add `--no-comment`, and a script that parsed the old comment bodies needs to be adapted. The [changelog](CHANGELOG.md) lists every change.
+
 ## ⬆️ Upgrading from v2
 
 Version 3.0.0 changes how a review starts and what its report looks like:
