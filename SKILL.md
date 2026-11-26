@@ -12,7 +12,7 @@ description: >-
 license: MIT
 metadata:
   author: felipereis
-  version: "4.0.0"
+  version: "4.1.0"
   date: "2026-11-26"
 ---
 
