@@ -177,6 +177,8 @@ def _finding_errors(errors, name, finding, confidence, version=1):
             errors.append(f"{name}: a Medium-confidence finding cannot block")
         elif finding["severity"] == "Critical" and confidence == "High" and not blocking:
             errors.append(f"{name}: a verified Critical finding must block")
+        elif finding["severity"] == "Warning" and blocking:
+            errors.append(f"{name}: a Warning cannot block; only a Critical finding blocks")
         elif finding["severity"] == "Suggestion" and blocking:
             errors.append(f"{name}: a Suggestion cannot block")
         if blocking is True and finding["omitted_by"] is not None:
@@ -316,8 +318,6 @@ def expected_row(review: dict, version: int = 1) -> int:
         return 2
     if any(item["material"] for item in audit["not_verified"]):
         return 3
-    if version == 2 and any(f.get("blocking") is True for f in findings):
-        return 8
     if any(f["severity"] == "Warning" for f in findings):
         return 4
     if any(f["severity"] in ("Critical", "Warning") for f in needs):
@@ -416,9 +416,10 @@ def contract_errors(doc: dict) -> list:
                     errors.append(f"review.triage.{key} must be a non-empty string")
         verdict = review["verdict"]
         if _keys(errors, "review.verdict", verdict, ("ready_to_merge", "row")) and not (
-                _is_int(verdict["row"]) and verdict["row"] in (ROW_VALUES if version == 1 else {**ROW_VALUES, 8: "No"})
-                and verdict["ready_to_merge"] == ({**ROW_VALUES, 8: "No"}[verdict["row"]])):
-            errors.append("review.verdict: row must be 1 to 7 in version 1, or 1 to 8 in version 2, and ready_to_merge the value of that row")
+                _is_int(verdict["row"]) and verdict["row"] in ROW_VALUES
+                and verdict["ready_to_merge"] == ROW_VALUES[verdict["row"]]):
+            errors.append("review.verdict: row must be 1 to 7 (row 8 is retired: a Warning never blocks), "
+                          "and ready_to_merge the value of that row")
         _audit_errors(errors, review["audit"])
         verification = review["verification"]
         if _keys(errors, "review.verification", verification, ("checked", "refuted")) and not (

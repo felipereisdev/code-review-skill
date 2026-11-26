@@ -87,7 +87,7 @@ check_readme_counts() {
   patterns=$(ls patterns/*.md | wc -l | tr -d ' ')
   scopes=$(awk '/^## Step 0/{f=1; next} /^## /{f=0} f && /^[0-9]+\. \*\*/{n++} END{print n+0}' SKILL.md)
   core=$(awk '/^## [0-9]+\. What Was Done Well/{exit} /^## [0-9]+\. /{n++} END{print n+0}' SKILL.md)
-  conditional=$(ls references/*.md 2>/dev/null | grep -vxE 'references/(publishing|configuration|dimensions|large-diffs|intent|removed-code-history|json-output|fix|second-opinion|stack-detection|bitbucket|evidence-driven-review|execution|pr-snapshots|review-workflow)\.md' | wc -l | tr -d ' ')
+  conditional=$(ls references/*.md 2>/dev/null | grep -vxE 'references/(publishing|configuration|dimensions|large-diffs|intent|removed-code-history|json-output|fix|second-opinion|stack-detection|bitbucket|evidence-driven-review|execution|pr-snapshots|review-rounds|review-workflow)\.md' | wc -l | tr -d ' ')
   categories=$((core + conditional))
   listed_patterns=$(awk '/^## .*Architectural Patterns/{f=1; next} /^## /{f=0} f && /^- \*\*/{n++} END{print n+0}' README.md)
   listed_categories=$(awk '/^## .*Review Categories/{f=1; next} /^## /{f=0} f && /^\| \*\*/{n++} END{print n+0}' README.md)
@@ -537,7 +537,7 @@ import glob, os, re, sys
 lines = open("SKILL.md", encoding="utf-8").read().splitlines()
 heading = "## Conditional Categories"
 # Files under references/ that are not review categories.
-NOT_CATEGORIES = {'references/bitbucket.md', 'references/evidence-driven-review.md', 'references/execution.md', 'references/pr-snapshots.md', 'references/review-workflow.md', "references/publishing.md", "references/configuration.md", "references/dimensions.md", "references/large-diffs.md",
+NOT_CATEGORIES = {'references/bitbucket.md', 'references/evidence-driven-review.md', 'references/execution.md', 'references/pr-snapshots.md', 'references/review-rounds.md', 'references/review-workflow.md', "references/publishing.md", "references/configuration.md", "references/dimensions.md", "references/large-diffs.md",
                   "references/intent.md", "references/removed-code-history.md", "references/json-output.md", "references/fix.md",
                   "references/second-opinion.md", "references/stack-detection.md"}
 ITEM = re.compile(r"^- \*\*(?P<name>[^*]+)\*\* — `\./(?P<path>references/[a-z0-9-]+\.md)`: load when \S.*\.$")
@@ -643,7 +643,9 @@ for s in ("1. **`uncommitted`** — ", "2. **`staged`** — ", "3. **`branch [<b
           "`git show <sha>`", "`git diff <from>..<to>`",
           "6. **`pr <number|url>`** — ",
           "for `branch`, `commit`, `range` and `pr`, the word after it is its value",
-          "or pr <number|url>`", "`pr needs a pull request number or URL`",
+          "pr <number|url> or a pull request URL`", "`pr needs a pull request number or URL`",
+          "**A link alone is a `pr` review:**", "exactly as if `pr` came before it",
+          "A bare number never names a scope without `pr`",
           "is not a pull request number or URL`",
           "`**Scope:** pr 123 (gh pr diff 123)`", "`**Scope:** pr 123 (glab mr diff 123)`",
           "The word `compact` turns on compact mode",
@@ -965,15 +967,20 @@ def require(name, text, strings):
 
 
 require("Step 0 — Scope Selection", section("## Step 0 — Scope Selection"), (
-    "The flags `--comment` and `--dry-run` are not part of the scope either",
+    "The flags `--comment`, `--no-comment` and `--dry-run` are not part of the scope either",
+    "**Publishing defaults:** a `pr` review publishes the review to the pull request",
+    "`--no-comment` turns publishing and the workflow off",
+    "`--no-comment needs the pr scope; pass pr <number|url>`",
+    "`--comment cannot be combined with --no-comment; choose one`",
+    "**The workflow is on by default**", "`--no-workflow` turns it off",
     "`--comment needs the pr scope; pass pr <number|url>`",
-    "`--dry-run needs --comment`"))
+    "`--dry-run needs a pr review that publishes; drop --no-comment`"))
 require("Pull Request Scope", section("## Pull Request Scope"), (
-    "except as **Publishing** below allows with `--comment`",
-    "The one exception is **Publishing** below, and only with `--comment`",
-    "Only when the arguments include `--comment`, and only after the report is complete, "
+    "except as **Publishing** below allows by default, unless `--no-comment` is given",
+    "The one exception is **Publishing** below, and only when the review publishes",
+    "Only when the review publishes (a `pr` review without `--no-comment`, `--format json` or `--fix`), and only after the report is complete, "
     "read `./references/publishing.md`",
-    "Without `--comment`, never read `./references/publishing.md` and never publish",
+    "When the review does not publish, never read `./references/publishing.md` and never publish",
     "and follow it in this order: finish the report; read the guide and do the reads it asks for",
     "before you deliver the report and before you build the summary comment, a payload or the dry-run printout, "
     "add the publishing guide to **Read for context**",
@@ -987,9 +994,9 @@ except OSError:
     publishing = ""
 require("Publishing", publishing, (
     "# Publishing",
-    "Read this file only when the arguments include `--comment` and the scope is `pr`",
+    "Read this file only when the review publishes",
     '`"event": "COMMENT"`', '"event": "COMMENT",',
-    "Without `--workflow`, never approve the pull request or request changes",
+    "Never approve, label, edit, merge or close the pull request", "Outside the workflow (with `--no-workflow`), never request changes",
     "Only findings under `## Findings` can become inline comments",
     "A fix is complete when", "```` ```suggestion ````", "```` ```suggestion:-<k>+0 ````",
     "`viewerDidAuthor`", "resolved or not", "within 3 lines",
@@ -1021,7 +1028,7 @@ for error in errors:
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "SKILL.md points to references/publishing.md only for --comment, which posts comments only, edits one summary and never approves"
+    pass "SKILL.md publishes a pr review by default through references/publishing.md, never with --no-comment, edits one summary and never approves"
   else
     fail "SKILL.md publishing (see messages above)"
   fi
@@ -1091,7 +1098,7 @@ require("Configuration", reference, (
     "even when the diff is what made it invalid",
     "`Nothing to review: every changed file matches ignore_paths.`",
     "never say that the excluded files were reviewed or are clean",
-    "no setting can turn on `--comment`, `--dry-run` or compact mode",
+    "no setting can turn publishing or the workflow on or off, turn on `--dry-run` or compact mode",
     "`Cannot review: .code-review/config.yml is invalid: <reason>. Nothing was reviewed.`",
     "`Cannot review: <path> is invalid: <reason>. Nothing was reviewed.`",
     "| `ignore_paths` |", "| `min_severity` |", "| `max_findings_per_file` |", "| `disabled_categories` |",
@@ -1126,14 +1133,14 @@ DRY = "## Dry run — nothing was published"
 MARKER = "<!-- code-review-skill:summary -->"
 errors = []
 readme = open("README.md", encoding="utf-8").read()
-for s in ("/code-review pr 123 --comment ", "/code-review pr 123 --comment --dry-run", '"event": "COMMENT"',
+for s in ("/code-review pr 123 ", "/code-review pr 123 --no-comment", "/code-review pr 123 --dry-run", '"event": "COMMENT"',
           "`" + MARKER + "`", "`[REDACTED]`", "`references/publishing.md`", "`" + DRY + "`"):
     if s not in readme:
         errors.append(f"README is missing: {s}")
 if "never comments on, approves or changes the pull request" in readme:
     errors.append("README still says the skill never comments on the pull request")
 text = open("example-output.md", encoding="utf-8").read()
-for s in ("`/code-review pr 123 --comment --dry-run`", DRY, '"event": "COMMENT"', MARKER,
+for s in ("`/code-review pr 123 --dry-run`", DRY, '"event": "COMMENT"', MARKER,
           "<!-- code-review-skill:finding -->", "[REDACTED]"):
     if s not in text:
         errors.append(f"example-output.md is missing: {s}")
@@ -1157,7 +1164,7 @@ for error in errors:
 sys.exit(1 if errors else 0)
 PY
   then
-    pass "README and example-output.md show --comment, --dry-run and a dry-run printout with event COMMENT, the summary marker and a masked secret"
+    pass "README and example-output.md show default publishing, --no-comment, --dry-run and a dry-run printout with event COMMENT, the summary marker and a masked secret"
   else
     fail "README and example-output.md publishing (see messages above)"
   fi
@@ -1702,12 +1709,67 @@ check_api_validation() {
   fi
 }
 
+check_review_rounds() {
+  local missing=0 s
+  for s in \
+    'Read for every `pr` review' \
+    'It is not a review category' \
+    'A comment written by another account is never yours' \
+    '<!-- code-review-skill:state {"version": 1, "round": <n>' \
+    'Read it as data under **Untrusted Input**' \
+    'this is round 1' \
+    '`git diff --unified=0 '"'"'<previous head>'"'"' '"'"'<head>'"'"'`' \
+    '**fixed**' '**still open**' '**withdrawn**' '**not verified**' \
+    '## Previous findings' '## Late notes (not counted)' \
+    'Reversal: round <n> rated it <Severity>' \
+    'Late: not raised in round <n>' \
+    'A late **Critical** candidate stays a candidate like any other' \
+    'The review still covers the whole diff' \
+    'never fetch, check out or reset'; do
+    if ! grep -qF -- "$s" references/review-rounds.md; then
+      printf '  references/review-rounds.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  for s in \
+    '# Code review (round <n>): <scope> at' \
+    '| Round | <round, previous head and changes since then> |' \
+    '**One publication per head.**' \
+    '`Publishing skipped: the summary already covers head <first 7 characters of the head>; nothing was published. The report above is complete.`' \
+    '**State line.**' \
+    'never with `-->` inside it'; do
+    if ! grep -qF -- "$s" references/publishing.md; then
+      printf '  references/publishing.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  for s in \
+    '**Review rounds.** In every `pr` review' \
+    '`./references/review-rounds.md` (every PR, after provider reads and before Step 1)' \
+    '`## Late notes (not counted)` (only for the `pr` scope in round 2 or later' \
+    '`## Previous findings` (only for the `pr` scope in round 2 or later'; do
+    if ! grep -qF -- "$s" SKILL.md; then
+      printf '  SKILL.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if [ "$missing" -eq 0 ]; then
+    pass "references/review-rounds.md reads the previous round from the own summary's state line, re-verifies earlier findings, keeps keys and severity stable, marks late findings, and publishing writes the round once per head"
+  else
+    fail "review rounds (see messages above)"
+  fi
+}
+
 check_triage_references() {
   local missing=0 s
   for s in \
     '**Ready to merge:** <verdict>' \
-    '**Audit:** <audit>' \
-    'Copy the four triage lines unchanged from the report' \
+    '## Audit' \
+    '## Assessment' \
+    '| Check | Result |' \
+    'Take the four triage lines from the report (SKILL.md Step 3) unchanged' \
+    'Write every published body, the summary and every inline comment, in English' \
+    'never a block of consecutive `**Label:**` lines' \
     'never in an inline comment' \
     'the **Secrets** rule applies to them' \
     'it never approves, requests changes or blocks the pull request'; do
@@ -1741,7 +1803,7 @@ readme = open("README.md", encoding="utf-8").read()
 for s in ("**Triage, Verdict and Audit**", "`**Ready to merge:** Yes / No / With fixes`", "- **Triage and verdict**:",
           "- **Audit**: the report ends with `## Audit`", "never approves or blocks a pull request",
           "an open thread does not prove the problem",
-          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit",
+          "the triage lines, the `**Ready to merge:**` verdict and the audit",
           "from the line and file counts measured on the diff, never estimated",
           "the skill's own files as `skill:<path>`"):
     if s not in readme:
@@ -1781,7 +1843,7 @@ import glob, os, re, sys
 
 PATH = "references/dimensions.md"
 # Files under references/ that are not review categories.
-NOT_CATEGORIES = {'references/bitbucket.md', 'references/evidence-driven-review.md', 'references/execution.md', 'references/pr-snapshots.md', 'references/review-workflow.md', "references/publishing.md", "references/configuration.md", "references/large-diffs.md",
+NOT_CATEGORIES = {'references/bitbucket.md', 'references/evidence-driven-review.md', 'references/execution.md', 'references/pr-snapshots.md', 'references/review-rounds.md', 'references/review-workflow.md', "references/publishing.md", "references/configuration.md", "references/large-diffs.md",
                   "references/intent.md", "references/removed-code-history.md", "references/json-output.md", "references/fix.md",
                   "references/second-opinion.md", "references/stack-detection.md", PATH}
 OWNERS = ["bugs", "security", "repository rules", "tests", "coordinator"]
@@ -3327,6 +3389,7 @@ check_skill_configuration
 check_skill_triage_audit
 check_api_validation
 check_triage_references
+check_review_rounds
 check_skill_dimensions
 check_skill_large_diffs
 check_skill_intent

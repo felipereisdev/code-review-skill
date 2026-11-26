@@ -1,6 +1,6 @@
 # Review Workflow
 
-Read only for `pr ... --comment --workflow`, after the review and publishing preparation are complete. `--workflow` requires both explicit `pr` scope and `--comment`; reject other combinations before reviewing. It extends comment publication with the review-state and own-thread operations below. Without it, comments do not change review state or resolve threads. Approval and merge require separate explicit user instructions and are outside this flag's operations.
+Read for every `pr` review that publishes, unless the arguments include `--no-workflow`, after the review and publishing preparation are complete: the workflow is on by default, and `--workflow` only states that default. A review that does not publish (`--no-comment`, `--format json`, `--fix` or another scope) never runs it, and SKILL.md Step 0 rejects `--workflow` there before reviewing. It extends comment publication with the review-state and own-thread operations below. With `--no-workflow`, comments do not change review state or resolve threads. Approval and merge require separate explicit user instructions and are outside these operations.
 
 ## Preconditions and order
 
@@ -15,7 +15,7 @@ An eligible thread has an own root finding and no other user's unresolved action
 
 ## Review-state decision
 
-- **Confirmed blocker remains:** request changes, identifying the blocking findings and the published review URL. Critical findings block; a Warning blocks only when the report's `Blocking` decision demonstrates broken required behavior, a public contract or an integration regression. Suggestions and Medium-confidence candidates never become confirmed blockers by this flag.
+- **Confirmed blocker remains:** request changes, identifying the blocking findings and the published review URL. Only Critical findings block, including a broken requirement or a failing test that SKILL.md proves Critical. Warnings, Suggestions and Medium-confidence candidates never become confirmed blockers by this flag; a Warning can stay open as a nonblocking note.
 - **Only a material limit or unverified candidate remains:** preserve the existing review state and state what still needs verification. Missing access is not proof that the author must change code.
 - **Every earlier blocker is verified fixed, no pending blocker or material verification gap remains, and the current pair was fully reviewed:** withdraw only this account's own request for changes, without approving. A nonblocking note can stay open; identify it as nonblocking.
 - **Withdrawal with no relevant own request, or desired state already current:** no state write. This no-op applies to withdrawing an absent request, not to creating an initial request-changes review when confirmed blockers remain. Never alter another reviewer's request or approval.
@@ -38,7 +38,7 @@ Prefer a connected tool when it exposes the required operation and resource iden
 
 ## Optional tracker update
 
-`--workflow` alone does not authorize tracker writes. When the user explicitly requested them and a tracker is connected, identify the linked card, re-read its status, list the legal transitions, and map the board's actual change-requested status before acting. When confirmed blockers remain, move the card only through a legal, semantically correct transition and add a short comment linking this review. Deduplicate an existing own link comment. If reaching the target would require claiming implementation has begun, completion, validation or merge, leave the card in its truthful current state and report the missing transition. Never select an unrelated intermediate state to manufacture a route.
+The workflow alone does not authorize tracker writes. When the user explicitly requested them and a tracker is connected, identify the linked card, re-read its status, list the legal transitions, and map the board's actual change-requested status before acting. When confirmed blockers remain, move the card only through a legal, semantically correct transition and add a short comment linking this review. Deduplicate an existing own link comment. If reaching the target would require claiming implementation has begun, completion, validation or merge, leave the card in its truthful current state and report the missing transition. Never select an unrelated intermediate state to manufacture a route.
 
 When fixes are verified, do not move a card to a status meaning “validated after merge” before a merge. State available transitions and leave that move to its actual event. Re-read PR and tracker state immediately before the final summary, including when no transition was possible. Report whose account made each change and link the review/card; never describe a ten-minute-old status as current.
 

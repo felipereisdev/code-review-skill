@@ -59,7 +59,7 @@ In each batch:
 Batches split only the checklist pass. Settle the scope, the snapshot, the configuration, the stack and pattern files and the repository rules once, before the first batch. After the last batch, do each of these once, for all batches together, never per batch:
 
 - Consolidate the candidates of every batch. Apply **One finding per problem** of SKILL.md across batches: the same problem in several batches is one candidate with an **Also at:** line. Two candidates that state the same cause and the same effect at the same place are one candidate that keeps the Evidence and the counterevidence of both, every **Also at:** place and every **Rule:** citation.
-- Compare the candidates with the comments already in a pull request, run Step 2, write the verification line, apply the configuration filters, run Step 3 and, only with `--comment`, publish.
+- Compare the candidates with the comments already in a pull request, run Step 2, write the verification line, apply the configuration filters, run Step 3 and, only when the review publishes, publish.
 
 ## When you cannot finish
 

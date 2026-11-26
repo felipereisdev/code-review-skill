@@ -824,23 +824,69 @@ def missing_headline_errors(text):
     return ["no finding is listed under ## Findings, so the report needs its headline"]
 
 
-def check_summary_triage(body, report, compact_line):
-    """Errors for a published summary that lacks the report's triage lines or its compact Audit line."""
+def summary_audit_lines(audit):
+    """The ## Audit section of a published summary: the compact Audit line as five list items."""
+    clean = ", ".join(audit["clean"])
+    lines = ["## Audit", "",
+             f"- **Files reviewed:** {audit['reviewed']} of {plural(audit['changed'], 'changed file')}",
+             f"- **Read for context:** {plural(audit['context_count'], 'file')}",
+             f"- **Checked with no findings:** {clean or 'no category'}"]
+    if audit["raised"] is not None:
+        lines.append(f"- **Already raised, not verified:** {plural(len(audit['raised']), 'Warning candidate')}")
+    items = [f"{what} ({tag}, {weight})" for what, tag, weight, _detail in audit["items"]]
+    if len(items) <= 1:
+        lines.append(f"- **Not verified:** {items[0] if items else 'nothing'}")
+    else:
+        lines.append("- **Not verified:**")
+        lines += [f"  - {item}" for item in items]
+    return lines
+
+
+def summary_triage_lines(report):
+    """The triage lines as a published summary holds them: two table rows, then the two Assessment paragraphs."""
+    effort, tests, look, ready = triage_lines(report)
+    rows = [f"| {label} | " + line.split(":** ", 1)[1].replace("|", "\\|") + " |"
+            for label, line in (("Review effort", effort), ("Relevant tests", tests)) if line is not None]
+    return rows, [line for line in (ready, look) if line is not None]
+
+
+def summary_body(report, findings_block):
+    """A published summary as publishing.md writes it, with the given lines under ## Findings."""
+    rows, assessment = summary_triage_lines(report)
+    verification = re.search(r"^\*\*Verification:\*\* (.*)$", report, re.M)
+    table = ["| Check | Result |", "| --- | --- |", "| Diff | `gh pr diff 7` |"]
+    if verification:
+        table.append(f"| Candidates | {verification.group(1)} |")
+    return "\n".join(["<!-- code-review-skill:summary -->", "# Code review (round 1): pr 7 at `abc1234`", "",
+                      "## Verification", "", *table, *rows, "", "## Findings", "", findings_block, "",
+                      *summary_audit_lines(parse_audit(report)), "", "## Assessment", "",
+                      "\n\n".join(assessment), ""])
+
+
+def check_summary_triage(body, report):
+    """Errors for a published summary that lacks the report's triage lines or its Audit, or puts them out of place."""
     errors = []
     lines = body.split("\n")
-    expected = [line for line in triage_lines(report) if line is not None]
-    for line in expected:
-        if line not in lines:
-            errors.append(f"summary misses the triage line: {line}")
-    if compact_line not in lines:
-        errors.append("summary misses the audit line")
-    present = [lines.index(line) for line in expected if line in lines]
-    verification = find_line(lines, "**Verification:**")
-    if verification is not None and present and min(present) < verification:
-        errors.append("summary triage lines must follow the verification line")
-    ready = find_line(lines, "**Ready to merge:**")
-    if compact_line in lines and ready is not None and lines.index(compact_line) < ready:
-        errors.append("summary audit line must follow the triage lines")
+    rows, assessment = summary_triage_lines(report)
+    for row in rows:
+        if row not in lines:
+            errors.append(f"summary misses the triage row: {row}")
+    candidates = find_line(lines, "| Candidates | ")
+    present = [lines.index(row) for row in rows if row in lines]
+    if candidates is not None and present and min(present) < candidates:
+        errors.append("summary triage rows must follow the Candidates row")
+    audit = summary_audit_lines(parse_audit(report))
+    start = lines.index("## Audit") if "## Audit" in lines else None
+    if start is None or lines[start:start + len(audit)] != audit:
+        errors.append("summary misses the audit section")
+    if "## Assessment" not in lines:
+        errors.append("summary misses the assessment section")
+    else:
+        at = lines.index("## Assessment")
+        if [line for line in lines[at + 1:] if line and not line.startswith("<!-- code-review-skill:state ")] != assessment:
+            errors.append("summary assessment must hold the Ready to merge line, then the Look first line")
+        if start is not None and start > at:
+            errors.append("summary audit must come before the assessment")
     return errors
 
 
@@ -956,9 +1002,8 @@ def after_first_bullet(text, line):
 
 
 def summary_of(text, headline):
-    """A published summary as publishing.md writes it: the headline in place of the list, then the triage lines."""
-    return ("<!-- code-review-skill:summary -->\n## Code review\n\n## Findings\n\n" + headline + "\n\n"
-            + triage_block(text) + "\n" + compact_audit_line(parse_audit(text)) + "\n")
+    """A published summary as publishing.md writes it: the headline in place of the finding lines."""
+    return summary_body(text, "**Findings:** 0 Critical, 0 Warning, 0 Suggestion. Inline comments: 0.\n\n" + headline)
 
 
 def check_summary_headline(body, report):
@@ -1655,19 +1700,32 @@ class ParserTests(Base):
 
 class SummaryTests(Base):
     def test_summary_carries_triage(self):
-        compact = compact_audit_line(parse_audit(FIXTURE))
-        body = ("<!-- code-review-skill:summary -->\n## Code review\n\n"
-                "**Verification:** 3 Critical/Warning candidates checked, 0 refuted.\n\n"
-                + triage_block(FIXTURE) + "\n" + compact)
-        self.assertEqual(check_summary_triage(body, FIXTURE, compact), [])
+        body = summary_body(FIXTURE, "**Findings:** 0 Critical, 0 Warning, 0 Suggestion. Inline comments: 0.")
+        self.assertEqual(check_summary_triage(body, FIXTURE), [])
 
         ready = line_of(FIXTURE, "Ready to merge")
-        self.assertError(check_summary_triage(body.replace(ready + "\n", ""), FIXTURE, compact),
-                         "summary misses the triage line")
-        self.assertError(check_summary_triage(body.replace(compact, ""), FIXTURE, compact),
-                         "summary misses the audit line")
+        self.assertError(check_summary_triage(body.replace(ready + "\n", ""), FIXTURE),
+                         "summary assessment must hold the Ready to merge line")
+        effort = summary_triage_lines(FIXTURE)[0][0]
+        self.assertError(check_summary_triage(body.replace(effort + "\n", ""), FIXTURE),
+                         "summary misses the triage row")
+        self.assertError(check_summary_triage(body.replace("## Audit\n", "## Coverage\n"), FIXTURE),
+                         "summary misses the audit section")
+        audit = "\n".join(summary_audit_lines(parse_audit(FIXTURE)))
+        moved = body.replace(audit + "\n", "").rstrip("\n") + "\n\n" + audit + "\n"
+        self.assertError(check_summary_triage(moved, FIXTURE), "summary audit must come before the assessment")
         self.assertTrue(inline_has_triage(body))
         self.assertFalse(inline_has_triage("**Issue:** x"))
+
+    def test_summary_audit_nests_several_limits(self):
+        audit = {"reviewed": 59, "changed": 60, "context_count": 29, "clean": ["Security"], "raised": [],
+                 "items": [("`daemon/go.sum`", "not read", "material", ""),
+                           ("Protocol Buffers", "no stack guide", "not material", "")]}
+        self.assertEqual(summary_audit_lines(audit)[-3:], [
+            "- **Not verified:**", "  - `daemon/go.sum` (not read, material)",
+            "  - Protocol Buffers (no stack guide, not material)"])
+        audit["items"] = []
+        self.assertEqual(summary_audit_lines(audit)[-1], "- **Not verified:** nothing")
 
 
 class ExampleOutputTests(Base):
@@ -1722,8 +1780,7 @@ class ExampleOutputTests(Base):
         full = replace_once(example_full(), "`skill:references/observability.md`, ",
                             "`skill:references/observability.md`, `skill:references/publishing.md`, ")
         self.assertEqual(check_report(full), [])
-        compact = compact_audit_line(parse_audit(full))
-        self.assertIn("; 13 files read for context;", compact)
+        self.assertIn("; 13 files read for context;", compact_audit_line(parse_audit(full)))
         intro = EXAMPLE[EXAMPLE.index("## Publishing Dry Run"):EXAMPLE.index("## Dry run — nothing was published")]
         self.assertIn("`skill:references/publishing.md`", intro)
         dry = EXAMPLE[EXAMPLE.index("## Dry run — nothing was published"):]
@@ -1731,7 +1788,7 @@ class ExampleOutputTests(Base):
         summaries = [p["body"] for p in payloads if p["body"].startswith("<!-- code-review-skill:summary -->")]
         self.assertEqual(len(summaries), 1)
         self.assertIn(CRITICAL_VERDICT, summaries[0].split("\n"))
-        self.assertEqual(check_summary_triage(summaries[0], full, compact), [])
+        self.assertEqual(check_summary_triage(summaries[0], full), [])
         for payload in payloads:
             for comment in payload.get("comments", []):
                 self.assertIs(inline_has_triage(comment["body"]), False)

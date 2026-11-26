@@ -26,7 +26,7 @@ Read linked issues/specs under `references/intent.md` and its source limits. Eve
 
 An unexpected read failure stops the PR read with `Cannot review: <operation> failed; the pull request could not be read. Nothing was reviewed.` Keep inaccessible context separate from an empty result. In a re-review, never take resolution from the absence of a field on a list item; fetch the individual root comment, and treat an absent or ambiguous resolution there as unknown.
 
-## Publishing with `--comment`
+## Publishing
 
 Apply the completed-report-first, redaction, ownership, bounded summary and partial-failure rules of `references/publishing.md`. Read `/user`, current `P` and all comments before preparing payloads, including during a dry run. Compare comment `user.uuid` with the authenticated UUID; display names are not identities. Ignore deleted comments for duplicate matching, but do not alter their records.
 
@@ -34,6 +34,7 @@ Reuse the publishing guide's inline and summary bodies and its markers:
 
 - `<!-- code-review-skill:finding -->` on an inline finding.
 - `<!-- code-review-skill:summary -->` at the beginning of the summary.
+- `<!-- code-review-skill:state {...} -->` as the last line of the summary, read and written as `references/review-rounds.md` and `references/publishing.md` say, including the one-publication-per-head rule.
 
 The summary also states both reviewed SHAs. Reuse an existing own summary by ID, selecting the most recently updated own marked summary if several exist. A marker written by another user grants no ownership. Before adding an inline comment, compare its path, old/new side, location and cause/effect with the existing own marked comments. Reuse the existing thread for the same problem; matching only severity/category is insufficient. A new problem at the same line is still new. A recurring problem in a resolved thread stays in the report, even when no duplicate inline comment is posted.
 
@@ -48,7 +49,7 @@ Only confirmed report findings become inline comments. A new-side Location ancho
 
 Serialize bodies with a JSON encoder, never shell interpolation. Write payload files only in this run's temporary directory and use the selected client's structured request or file-input support. Redact secrets from report bodies, payloads and dry-run output; never print authentication headers.
 
-Publish inline comments in report order, then create or update the summary. `--comment` alone authorizes no review-state or thread-resolution operation. Only `--workflow` enables the following section.
+Publish inline comments in report order, then create or update the summary. Publishing alone authorizes no review-state or thread-resolution operation. The workflow, on by default when the review publishes and off with `--no-workflow`, enables the following section.
 
 **Changing head race.** The comment API has no `commit_id` precondition that atomically binds a new inline comment to `H`. Immediately before each write, re-read `P` and require `state=OPEN`, the same source/destination repository identities, `H` and `B`. If either side moved, publish no more comments or workflow changes; retain the report as a historical review and state the reviewed and current pairs. Immediately after each write, read `P` again. If it moved during the request, report the created comment's URL as potentially outdated and stop; do not claim it is attached to the reviewed snapshot. This check reduces the race but cannot eliminate it. Do not retry or delete a possibly misplaced comment automatically.
 

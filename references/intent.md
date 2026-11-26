@@ -43,7 +43,7 @@ Judge a requirement from the behavior of the change, never only from what the ch
 
 Cite code as `` `<path>:<start>-<end>` `` or `` `<path>:<line>` ``: a changed file you reviewed, at lines you read, or a file on **Read for context**. Code you did not review or read never makes a requirement met or not met: a file skipped or left unread under `./references/large-diffs.md`, a file excluded by configuration, a binary file, a file you could not read, and a manifest or a generator that you read in place of the code it describes prove nothing about it.
 
-A requirement that is not met is a finding only when it is also a defect under SKILL.md, raised as a candidate during the checklist pass, or late as the **After Step 2** bullet above says, and kept by Step 2. Otherwise it stays in this section. This section adds no finding, no category and no count, and it never changes the verdict.
+A requirement that is not met is a finding only when it is also a defect under SKILL.md: with the proof that **Severity Levels** in SKILL.md names (an executed reproduction, or a static trace that quotes the requirement's exact text), it is Critical, and without that proof it goes under `## Needs human verification`. It must be raised as a candidate during the checklist pass, or late as the **After Step 2** bullet above says, and kept by Step 2. Otherwise it stays in this section. This section adds no finding, no category and no count, and it never changes the verdict.
 
 ## Scope creep
 
