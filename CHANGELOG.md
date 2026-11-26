@@ -4,6 +4,11 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- **Execution is the default.** Every review, whatever its scope, now runs the tests that cover the change and a targeted reproduction, with a valid control, of each Critical or Warning candidate that verification keeps, plus the merged-tree check for pull requests, all in an isolated scratch worktree as `references/execution.md` says. `--no-execute` keeps the review static, `--execute` only states the default, and a review with `--fix` never executes. The **Relevant tests:** line names what ran and its result. The change's code runs on your machine: pass `--no-execute` for a change you do not trust.
+- **Realistic triggers only for Critical.** A finding is Critical, and blocks, only when its trigger can happen in real use: attacker or untrusted input, or input within what production data, a documented or enforced limit, or normal use can reach. A trigger that needs an input far beyond normal use, with nothing showing such inputs occur, is at most a Warning, and its Evidence says what triggers it and why that is unlikely.
+
 ## [4.1.0] - 2026-11-26
 
 ### Changed
