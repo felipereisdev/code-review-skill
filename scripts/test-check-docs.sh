@@ -1334,6 +1334,18 @@ make_copy "$work/linkalone"
 replace_first "$work/linkalone/SKILL.md" '**A link alone is a `pr` review:**' '**A link alone is an unknown scope:**'
 expect_fail "a pull request link alone that is not a pr review fails" "$work/linkalone" "Step 0 — Scope Selection is missing: **A link alone is a \`pr\` review:**"
 
+make_copy "$work/execoptin"
+replace_first "$work/execoptin/SKILL.md" '**Execution is on by default** in every review, whatever its scope' '**Execution is opt-in** with `--execute`'
+expect_fail "execution that is opt-in again fails" "$work/execoptin" "SKILL.md is missing: **Execution is on by default** in every review, whatever its scope"
+
+make_copy "$work/execnorepro"
+drop_lines "$work/execnorepro/references/execution.md" 'a targeted reproduction, with a valid control, for every Critical or Warning candidate that Step 2 keeps'
+expect_fail "a default run without reproductions fails" "$work/execnorepro" "references/execution.md is missing: a targeted reproduction, with a valid control, for every Critical or Warning candidate that Step 2 keeps"
+
+make_copy "$work/unrealistic"
+drop_lines "$work/unrealistic/SKILL.md" '**Realistic trigger.**'
+expect_fail "a Critical with an unrealistic trigger fails" "$work/unrealistic" "SKILL.md is missing: **Realistic trigger.** A finding is **Critical**, and blocks, only when its trigger can happen in real use"
+
 make_copy "$work/roundslate"
 replace_first "$work/roundslate/references/review-rounds.md" 'A late **Critical** candidate stays a candidate like any other' 'A late **Critical** candidate is dropped like any other'
 expect_fail "a late Critical that is dropped instead of reported fails" "$work/roundslate" "references/review-rounds.md is missing: A late **Critical** candidate stays a candidate like any other"

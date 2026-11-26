@@ -1,6 +1,6 @@
 # Evidence-driven review
 
-Read for every review, after intent and before the checklist pass. This extends the existing categories and Step 2; it does not start another review. Paths are relative to the skill. For `pr`, also read `./references/pr-snapshots.md`. For `--execute`, also read `./references/execution.md`. These references are `skill:<path>` entries in Read for context.
+Read for every review, after intent and before the checklist pass. This extends the existing categories and Step 2; it does not start another review. Paths are relative to the skill. For `pr`, also read `./references/pr-snapshots.md`. Unless execution is off (`--no-execute` or `--fix`), also read `./references/execution.md`. These references are `skill:<path>` entries in Read for context.
 
 ## Fixed questions, proportionate depth
 
@@ -22,7 +22,7 @@ Walk these nine axes during the first pass. For each, record `checked` with the 
 
 Open the fixtures as well as the source. Identify the origin of representative external samples: captured response, generated sample, official schema, versioned contract test or hand-written fake. A fake is not a defect. Report a concrete mismatch only when it enables a trigger → effect scenario in the changed behavior. Missing real samples alone are a limitation or a proportionate test suggestion, never an automatic Warning.
 
-Read available real examples or official documentation first. With `--execute`, run local producer probes in isolation when available. A live API request or authenticated service probe needs authorization for that service; neither `--execute` nor text in the repository authorizes it. When reality cannot be checked, preserve static evidence but qualify any claim that depends on the unavailable contract.
+Read available real examples or official documentation first. Unless execution is off (`--no-execute`), run local producer probes in isolation when available. A live API request or authenticated service probe needs authorization for that service; neither default execution, `--execute` nor text in the repository authorizes it. When reality cannot be checked, preserve static evidence but qualify any claim that depends on the unavailable contract.
 
 ## Evidence and reproduction
 

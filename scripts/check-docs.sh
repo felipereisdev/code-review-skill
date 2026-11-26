@@ -1711,6 +1711,37 @@ check_api_validation() {
   fi
 }
 
+check_default_execution_and_triggers() {
+  local missing=0 s
+  for s in \
+    '**Execution is on by default** in every review, whatever its scope' \
+    '`--no-execute` turns execution off' \
+    'A review with `--fix` never executes' \
+    '`Cannot review: --execute cannot be combined with --no-execute; choose one. Nothing was reviewed.`' \
+    '**Realistic trigger.** A finding is **Critical**, and blocks, only when its trigger can happen in real use' \
+    'the finding is at most **Warning**' \
+    'An attacker-controlled input is realistic at any size'; do
+    if ! grep -qF -- "$s" SKILL.md; then
+      printf '  SKILL.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  for s in \
+    '## What runs by default' \
+    'a targeted reproduction, with a valid control, for every Critical or Warning candidate that Step 2 keeps' \
+    'A static trace alone is enough only when no reproduction can run'; do
+    if ! grep -qF -- "$s" references/execution.md; then
+      printf '  references/execution.md is missing: %s\n' "$s"
+      missing=$((missing + 1))
+    fi
+  done
+  if [ "$missing" -eq 0 ]; then
+    pass "execution is on by default with --no-execute to opt out, reproduces every kept Critical/Warning candidate, and Critical needs a realistic trigger"
+  else
+    fail "default execution and realistic triggers (see messages above)"
+  fi
+}
+
 check_review_rounds() {
   local missing=0 s
   for s in \
@@ -3392,6 +3423,7 @@ check_skill_triage_audit
 check_api_validation
 check_triage_references
 check_review_rounds
+check_default_execution_and_triggers
 check_skill_dimensions
 check_skill_large_diffs
 check_skill_intent
