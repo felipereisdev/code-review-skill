@@ -4,6 +4,12 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- **A new summary comment every round.** From round 2 on, the review posts a new summary comment instead of editing the previous one, so each round's summary stays on the pull request as the record of that round. Editing remains only for an explicitly requested republish on the same head.
+- **The verdict comes first.** The summary opens with the verdict as a highlighted heading (`## 🔴 Ready to merge: No`, `## 🟡 Ready to merge: With fixes` or `## 🟢 Ready to merge: Yes`), its reason and **Look first**, before the findings; the verification table and the Audit move below the findings, and the `## Assessment` section is gone.
+- **The chat shows only the published summary.** A review that publishes still builds the full report, but the chat shows only the summary comment it posts, plus the publishing outcome line: no finding blocks, Summary table, Audit or Intent section, which saves tokens. Reviews that do not publish keep the full report.
+
 ## [4.0.0] - 2026-11-26
 
 ### Upgrading from v3
