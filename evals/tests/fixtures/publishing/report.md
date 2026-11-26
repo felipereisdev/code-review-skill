@@ -77,3 +77,6 @@ test("applyDiscount", () => { ... });
 | **Total** | **3** | **0** | **1** | |
 
 **Verification:** 4 Critical/Warning candidates checked, 0 refuted.
+
+**Look first:** `src/auth.js` (the removed admin role check), `src/invoices.js` (the loop past the last line).
+**Ready to merge:** No — 3 Critical findings must be fixed before merging.

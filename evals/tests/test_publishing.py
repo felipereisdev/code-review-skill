@@ -263,6 +263,7 @@ def summary_sections(lines):
     return where
 
 
+VERDICT_EMOJI = {"No": "🔴", "With fixes": "🟡", "Yes": "🟢"}
 STATE = re.compile(r"^<!-- code-review-skill:state (\{.*\}) -->$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 KEY = re.compile(r"^[a-z0-9][a-z0-9-]{2,59}$")
@@ -326,6 +327,17 @@ def check_summary(body, report, findings, needs, diff, own, inline_count, head=N
         errors.append("summary title missing")
     elif int(title.group(1)) != expected_round:
         errors.append(f"summary title says round {title.group(1)}, expected {expected_round}")
+    ready = re.search(r"^\*\*Ready to merge:\*\* (No|With fixes|Yes) — (.*)$", report, re.M)
+    if ready:
+        heading = "## {} Ready to merge: {}".format(VERDICT_EMOJI[ready.group(1)], ready.group(1))
+        if lines[3:6] != [heading, "", ready.group(2)]:
+            errors.append("summary must open with the highlighted verdict and its reason")
+        look = re.search(r"^\*\*Look first:\*\* .*$", report, re.M)
+        if look and lines[6:8] != ["", look.group(0)]:
+            errors.append("summary must put Look first right under the verdict")
+    order = [h for h in ("## Findings", "## Verification", "## Audit") if h in lines]
+    if [lines.index(h) for h in order] != sorted(lines.index(h) for h in order):
+        errors.append("summary sections must follow the template order")
     round_line = re.search(r"^\*\*Round:\*\* (.*)$", report, re.M)
     if round_line and f"| Round | {round_line.group(1)} |" not in lines:
         errors.append("summary misses the Round row")
@@ -410,21 +422,12 @@ def check_github(pairs, report, diff_text, state):
             item["error"] = f"comment {c.get('path')}:{line} has a start_side that differs from its side"
         items.append(item)
     errors += check_inline(items, findings, diff, own, "github")
-    own_ids = [comment_id(c.get("fullDatabaseId")) for c in state["comments"]
-               if c["viewerDidAuthor"] and c["body"].startswith(SUMMARY_MARKER)]
-
-    if None in own_ids:
-        errors.append("own summary comment without a valid fullDatabaseId")
-    latest = max((i for i in own_ids if i is not None), default=None)
     summaries = [(c, p) for c, p in pairs if GITHUB_CREATE.match(c) or GITHUB_EDIT.match(c)]
     if len(summaries) != 1:
         errors.append(f"expected 1 summary comment, found {len(summaries)}")
     for cmd, payload in summaries:
-        edit = GITHUB_EDIT.match(cmd)
-        if own_ids and (edit is None or int(edit.group(1)) != latest):
-            errors.append(f"summary must edit own comment {latest}")
-        if not own_ids and edit is not None:
-            errors.append("summary must create a new comment")
+        if GITHUB_EDIT.match(cmd):
+            errors.append("summary must create a new comment for this round")
         errors += check_summary(payload.get("body", ""), report, findings, needs, diff, own, len(comments),
                                 state["pr"]["headRefOid"], previous["round"] + 1 if previous else 1)
     return errors
@@ -522,11 +525,8 @@ def check_gitlab(pairs, report, diff_text, state):
     if len(summaries) != 1:
         errors.append(f"expected 1 summary comment, found {len(summaries)}")
     for cmd, payload in summaries:
-        edit = GITLAB_EDIT.match(cmd)
-        if own_ids and (edit is None or int(edit.group(1)) != max(own_ids)):
-            errors.append(f"summary must edit own note {max(own_ids)}")
-        if not own_ids and edit is not None:
-            errors.append("summary must create a new note")
+        if GITLAB_EDIT.match(cmd):
+            errors.append("summary must create a new comment for this round")
         errors += check_summary(payload.get("body", ""), report, findings, needs, diff, own, len(items),
                                 state["mr"]["sha"], previous["round"] + 1 if previous else 1)
     return errors
@@ -540,66 +540,66 @@ GL_DISCUSSION_1 = "--input discussion-1.json\n```\n\n```json"
 # exactly one occurrence of old, or ("tail", old, new), which replaces the text from the last old to the end.
 PARSER_PROBES = [
     ("P01", "github-dry-run.md", None,
-     "198d28c78935f640fd6f8e3e73a3033bd872b6463a45fed49096f00021d4127a", []),
+     "006e19e85cf6a768e8b0224bcb946ea7e6588ed397779c95b30315af59831f6c", []),
     ("P02", "gitlab-dry-run.md", None,
-     "7f2dedd3f0f8acc220892ee1d9d56439fb02356b472e068cea30fb363c74cb90", []),
+     "dd918692375c167d6583992c6dbefdc3a3782b2c952b4843809b85543dd84650", []),
     ("P03", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
-     "986bddb9640991df56c430611881d0497bbc2e83b7e49d9d046363cf2b786035",
+     "7003b69910e7a7e0ae297ccae69dafa3882839bda2cbe5cdeeba8a8077457c9a",
      [("append", "", "\n```sh\ngh pr review 42 --approve\n```\n")]),
     ("P04", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
-     "893f18ff245cc386e44ce7ab49c42be79cf280e659ec9a57cc1c21b6cce3b7a5",
+     "68408744bd8c03765cc4fba3ecd61f8b871090a8a0c7ab01a06827b032c6065d",
      [("append", "", "\n```sh\nglab mr approve 42\n```\n")]),
     ("P05", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
-     "5854b6e2cd27c19b70244ea8cf1fc83cf9e3676d3c7f04a22553c5a45246bb00",
-     [("replace", "### 2. Summary comment (edit 9007199254740993)",
-       "```sh\ngh pr review 42 --approve\n```\n\n### 2. Summary comment (edit 9007199254740993)")]),
+     "2385bcb52c73fb0c4eb6e38ace73860e1094ec0db6c0ce476ba98a0b60c54586",
+     [("replace", "### 2. Summary comment (create)",
+       "```sh\ngh pr review 42 --approve\n```\n\n### 2. Summary comment (create)")]),
     ("P06", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
-     "a377cabc06ede634c5ae06bf1135e49f423eab41bf6d1fc230e239705d9c11bd",
-     [("replace", "### 4. Summary comment (edit 502)",
-       "```sh\nglab mr approve 42\n```\n\n### 4. Summary comment (edit 502)")]),
+     "cad6faed9c87be13e412705871515772e0016f0dd1a218216acef0ce033810a7",
+     [("replace", "### 4. Summary comment (create)",
+       "```sh\nglab mr approve 42\n```\n\n### 4. Summary comment (create)")]),
     ("P07", "github-dry-run.md", "write command without its JSON payload: " + GH_REVIEW_CMD,
-     "8c429db367826a40912122b2d8567f53d4247ed6ba25552d3274acf31b968b63",
+     "87fae4f7725212d43ef92e956beac83151b0981bf3c3b5a91197a4e44a180174",
      [("append", "", "\n```sh\n" + GH_REVIEW_CMD + "\n```\n")]),
-    ("P08", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method PUT",
-     "6e108452ae7987f6c2c801569f3b54d0282087e86d2c7590fe3957ebdcd962b6",
+    ("P08", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST projects/77/merge_requests/42/notes",
+     "11eeed308a8655e3c97210dbd467fb9f342c1835230604931417ddf2e28e680d",
      [("tail", "```json\n", "\n")]),
     ("P09", "github-dry-run.md", "unclosed fence: ```sh",
-     "88502d5265d1896525f171edb4898745b15035b0a39c7957ab868b173720eb6b",
+     "c76ee0eed83e1ce74a10f767fb685b06e10d0330b3490098240f26473392bd80",
      [("append", "", "\n```sh\ngh pr review 42 --approve\n")]),
     ("P10", "gitlab-dry-run.md", "unclosed fence: ```json",
-     "49ed12f790f08b29f0bb8c1acec6002833984ebd3b44f3ae6dfacc3613898faf",
+     "6eaf6069d67a43ea609bc14d3ec06ccb710c9fa83f908ca81f895a9848b4b99f",
      [("append", "", "\n```sh\nglab api --hostname gitlab.com --method POST projects/77/merge_requests/42/discussions "
        + H + " --input discussion-1.json\n```\n\n```json\n{}\n")]),
-    ("P11", "github-dry-run.md", "invalid JSON payload for: gh api --hostname github.com --method PATCH",
-     "87c3b736d5dc8ec680d4a65c8b706976d545c18e8024a9c6afc8d18186276dd3",
+    ("P11", "github-dry-run.md", "invalid JSON payload for: gh api --hostname github.com --method POST repos/acme/billing-api/issues/42/comments",
+     "c713bbf8267b4f7428f3319051b569ee0e60a97dc2b80a80845ca6f291bb9f12",
      [("tail", "```json\n", "```json\n{not-json}\n```\n")]),
     ("P12", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
-     "be9b1bf151fcea0e99898ca4bdc055872e003436bc86fdfa169bc10f275c75dc",
+     "751d926257f4a2714f85c994503a38ae97fdfbd4896f5b7e98e5337da0a8dc53",
      [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n```text\nintervening block\n```\n\n```json")]),
     ("P13", "gitlab-dry-run.md", "JSON payload without a write command",
-     "0cfc830be081209d03dc72604ba1d4e494381f2e38dbe0e1f5b6283bcf4112ab",
+     "4c9a614a28b96eeec1fe6c35435fb47efee0e121f917852b41469715fb84ac49",
      [("append", "", "\n```json\n{}\n```\n")]),
     ("P14", "github-dry-run.md", "unsupported fence: ```bash",
-     "3f8676a0f43091bc5af6591d9def284e656e8ecd95fae3eccc26422df61b97bc",
+     "2ce80d49f5caa44b0e7ca152b1080747af0fd901a2bc42abce45a00944bfa27b",
      [("append", "", "\n```bash\ngh pr review 42 --approve\n```\n")]),
     ("P15", "gitlab-dry-run.md", "unsupported fence: ```shell",
-     "13e669a3f3712ab2152860e0fd4d6962b0619ecf4e025905458b263a300673ea",
+     "81f2c871fe27a67aaf93180d9ef547f4ce5f1350135984d4ac593cab841b3dee",
      [("append", "", "\n```shell\nglab mr approve 42\n```\n")]),
     ("P16", "github-dry-run.md", "unsupported fence: ````sh",
-     "d58ee7aeaa29899fccc40afb87b9481f519b8dc807d4befce569b6e329ba1b00",
+     "5269b4e76bc4f4bd3c7218a66ff91d432eb87448be654124fe6f2ecd0eca2782",
      [("append", "", "\n````sh\ngh pr review 42 --approve\n````\n")]),
     ("P17", "github-dry-run.md", "unclosed fence: ```json",
-     "909c78c20da975d7e459b8b6e6770c5399716a240bc0d95cc475fd2bfcdff95d",
+     "30a9f2d703b27ebe3116d7252ac6b1b2af06c89ebf59f61a9fa59b0a759b11f2",
      [("tail", "\n```\n", "\n``\n")]),
     ("P18", "gitlab-dry-run.md", None,
-     "bfdbd6c080d58319f775d38d0b0b118cf45f61eaf3dd23d88655b9a35966528b",
+     "86940c1f4252da87cc02c89127ca02128df0c001c006939a3966456f5180cbda",
      [("replace", "## Dry run — nothing was published\n\n", "## Dry run — nothing was published\n\n\n\n"),
       ("replace", "\n\n### 2. Discussion on src/auth.js:3", "\n\n\n\n### 2. Discussion on src/auth.js:3")]),
     ("P19", "github-dry-run.md", None,
-     "73a89828670241cbdfd25ab8e3fc0badcd41bba51d47dd1f668ef48996b30223",
+     "7cde2a45e563d7b2a732f9411b1ca794f9bb19ccc47b09ab139c8c58c4a055e8",
      [("tail", "\n```\n", "\n```")]),
     ("P20", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
-     "577651b3543c562816e44ee264989cb0f9a5985c4ddef515b22358d9a28c4958",
+     "aac5ed6d4bd39e0b76fb9c3f4c583a1915a459eb2261fee18ed833c666a5a480",
      [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n### 2. Discussion on src/auth.js:3\n\n```json")]),
 ]
 
@@ -687,55 +687,22 @@ class FixtureTest(unittest.TestCase):
         pairs[0][1]["body"] = pairs[0][1]["body"].replace("```suggestion:-1+0\n", "```suggestion:-0+0\n")
         self.assertError(self.gl_errors(pairs), "suggestion range does not match src/invoices.js:9-10")
 
-    def test_creating_a_second_summary_fails(self):
+    def test_editing_an_earlier_round_summary_fails(self):
         pairs = copy.deepcopy(self.gh)
-        pairs[1] = ("gh api --hostname github.com --method POST repos/acme/billing-api/issues/42/comments "
+        pairs[1] = ("gh api --hostname github.com --method PATCH repos/acme/billing-api/issues/comments/9007199254740993 "
                     + H + " --input summary.json", pairs[1][1])
-        self.assertError(self.gh_errors(pairs), "summary must edit own comment 9007199254740993")
+        self.assertError(self.gh_errors(pairs), "summary must create a new comment for this round")
 
-    def test_github_summary_id_keeps_every_digit(self):
-        pairs = copy.deepcopy(self.gh)
-        pairs[1] = (pairs[1][0].replace("/comments/9007199254740993 ", "/comments/9007199254740992 "), pairs[1][1])
-        self.assertError(self.gh_errors(pairs), "summary must edit own comment 9007199254740993")
-
-    def test_editing_the_spoofed_github_summary_fails(self):
-        pairs = copy.deepcopy(self.gh)
-        pairs[1] = (pairs[1][0].replace("/comments/9007199254740993 ", "/comments/9007199254740995 "), pairs[1][1])
-        self.assertError(self.gh_errors(pairs), "summary must edit own comment 9007199254740993")
-
-    def test_github_summary_id_as_json_integer_is_valid(self):
-        state = copy.deepcopy(self.gh_state)
-        state["comments"][1]["fullDatabaseId"] = 9007199254740993
-        self.assertEqual(self.gh_errors(state=state), [])
-
-    def test_own_github_summary_without_id_never_creates_a_second(self):
-        state = copy.deepcopy(self.gh_state)
-        state["comments"][1]["databaseId"] = state["comments"][1].pop("fullDatabaseId")
-        pairs = copy.deepcopy(self.gh)
-        pairs[1] = ("gh api --hostname github.com --method POST repos/acme/billing-api/issues/42/comments "
-                    + H + " --input summary.json", pairs[1][1])
-        for p in (self.gh, pairs):
-            errors = self.gh_errors(p, state)
-            self.assertError(errors, "own summary comment without a valid fullDatabaseId")
-            self.assertError(errors, "summary must edit own comment None")
-
-    def test_invalid_github_summary_id_fails(self):
-        for value in ("", "0", "-9007199254740993", "09007199254740993", "9.007199254740993e15", "0x20000000000001",
-                      9007199254740993.0, 0, True, None):
-            with self.subTest(value=value):
-                state = copy.deepcopy(self.gh_state)
-                state["comments"][1]["fullDatabaseId"] = value
-                self.assertError(self.gh_errors(state=state), "own summary comment without a valid fullDatabaseId")
-
-    def test_editing_another_authors_summary_fails(self):
+    def test_editing_an_earlier_round_note_fails(self):
         pairs = copy.deepcopy(self.gl)
-        pairs[3] = (pairs[3][0].replace("/notes/502 ", "/notes/501 "), pairs[3][1])
-        self.assertError(self.gl_errors(pairs), "summary must edit own note 502")
+        pairs[3] = ("glab api --hostname gitlab.com --method PUT projects/77/merge_requests/42/notes/502 "
+                    + H + " --input summary.json", pairs[3][1])
+        self.assertError(self.gl_errors(pairs), "summary must create a new comment for this round")
 
     def test_without_own_summary_a_new_one_is_created(self):
         state = copy.deepcopy(self.gh_state)
         state["comments"] = [c for c in state["comments"] if not c["viewerDidAuthor"]]
-        self.assertError(self.gh_errors(state=state), "summary must create a new comment")
+        self.assertEqual(self.gh_errors(state=state), [])
 
     def test_secret_in_payload_fails(self):
         pairs = copy.deepcopy(self.gh)

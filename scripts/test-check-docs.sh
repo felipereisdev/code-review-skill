@@ -1223,8 +1223,8 @@ replace_first "$work/puborder/SKILL.md" 'and follow it in this order: finish the
 expect_fail "publishing without its phase order fails" "$work/puborder" "Pull Request Scope is missing: and follow it in this order: finish the report; read the guide and do the reads it asks for"
 
 make_copy "$work/pubcontext"
-replace_first "$work/pubcontext/SKILL.md" 'before you deliver the report and before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context**' 'after you publish, you may add the publishing guide to **Read for context**'
-expect_fail "a publishing guide left off Read for context fails" "$work/pubcontext" "Pull Request Scope is missing: before you deliver the report and before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context**"
+replace_first "$work/pubcontext/SKILL.md" 'before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context**' 'after you publish, you may add the publishing guide to **Read for context**'
+expect_fail "a publishing guide left off Read for context fails" "$work/pubcontext" "Pull Request Scope is missing: before you build the summary comment, a payload or the dry-run printout, add the publishing guide to **Read for context**"
 
 make_copy "$work/pubcontextlist"
 replace_first "$work/pubcontextlist/SKILL.md" 'when you read it, list it under **Read for context** like any other file of this skill' 'never list it under **Read for context**'
@@ -1351,8 +1351,16 @@ drop_lines "$work/roundsskill/SKILL.md" '**Review rounds.** In every `pr` review
 expect_fail "a pr review that never reads the rounds guide fails" "$work/roundsskill" "SKILL.md is missing: **Review rounds.** In every \`pr\` review"
 
 make_copy "$work/pubnoverdict"
-drop_lines "$work/pubnoverdict/references/publishing.md" '**Ready to merge:** <verdict>'
-expect_fail "a summary comment without the verdict fails" "$work/pubnoverdict" "references/publishing.md is missing: **Ready to merge:** <verdict>"
+drop_lines "$work/pubnoverdict/references/publishing.md" '## <🔴 | 🟡 | 🟢> Ready to merge: <No | With fixes | Yes>'
+expect_fail "a summary comment without the highlighted verdict fails" "$work/pubnoverdict" "references/publishing.md is missing: ## <🔴 | 🟡 | 🟢> Ready to merge: <No | With fixes | Yes>"
+
+make_copy "$work/pubchatfull"
+replace_first "$work/pubchatfull/references/publishing.md" 'Never print the full report in the chat' 'Print the full report in the chat'
+expect_fail "printing the full report in the chat of a published review fails" "$work/pubchatfull" "Publishing is missing: Never print the full report in the chat"
+
+make_copy "$work/pubeditround"
+replace_first "$work/pubeditround/references/publishing.md" 'Every round creates a new summary comment' 'Every round edits the previous summary comment'
+expect_fail "editing the previous round's summary fails" "$work/pubeditround" "Publishing is missing: Every round creates a new summary comment"
 
 make_copy "$work/pubverdictinline"
 replace_first "$work/pubverdictinline/references/publishing.md" 'never in an inline comment' 'and in every inline comment'

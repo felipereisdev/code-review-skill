@@ -982,9 +982,10 @@ require("Pull Request Scope", section("## Pull Request Scope"), (
     "read `./references/publishing.md`",
     "When the review does not publish, never read `./references/publishing.md` and never publish",
     "and follow it in this order: finish the report; read the guide and do the reads it asks for",
-    "before you deliver the report and before you build the summary comment, a payload or the dry-run printout, "
+    "before you build the summary comment, a payload or the dry-run printout, "
     "add the publishing guide to **Read for context**",
-    "When publishing fails, the report in the chat still stands"))
+    "When publishing fails, the summary in the chat still stands",
+    "deliver in the chat only the summary comment, as its **Chat output** says, never the full report"))
 require("Conditional Categories", section("## Conditional Categories"), (
     "`./references/publishing.md`, is not a review category",
     "when you read it, list it under **Read for context** like any other file of this skill",))
@@ -1008,7 +1009,8 @@ require("Publishing", publishing, (
     "--method PUT projects/<project_id>/merge_requests/<iid>/notes/<note_id>",
     '"base_sha"', '"start_sha"', '"head_sha"', '"new_line"', "`old_line`",
     "## Dry run — nothing was published",
-    "`Publishing failed: <command> exited <status>; <what was published>. The report above is complete.`"))
+    "`Publishing failed: <command> exited <status>; <what was published>. The summary above is complete.`",
+    "## Chat output", "Never print the full report in the chat", "**One summary per round.**", "Every round creates a new summary comment"))
 for s in ("gh pr review", "gh pr merge", "gh pr close", "gh pr edit", "gh pr comment",
           "glab mr approve", "glab mr merge", "glab mr close", "glab mr note"):
     if s in publishing:
@@ -1735,7 +1737,7 @@ check_review_rounds() {
     '# Code review (round <n>): <scope> at' \
     '| Round | <round, previous head and changes since then> |' \
     '**One publication per head.**' \
-    '`Publishing skipped: the summary already covers head <first 7 characters of the head>; nothing was published. The report above is complete.`' \
+    '`Publishing skipped: the summary already covers head <first 7 characters of the head>; nothing was published. The summary above is complete.`' \
     '**State line.**' \
     'never with `-->` inside it'; do
     if ! grep -qF -- "$s" references/publishing.md; then
@@ -1763,9 +1765,9 @@ check_review_rounds() {
 check_triage_references() {
   local missing=0 s
   for s in \
-    '**Ready to merge:** <verdict>' \
+    '## <🔴 | 🟡 | 🟢> Ready to merge: <No | With fixes | Yes>' \
+    '**Verdict first.**' \
     '## Audit' \
-    '## Assessment' \
     '| Check | Result |' \
     'Take the four triage lines from the report (SKILL.md Step 3) unchanged' \
     'Write every published body, the summary and every inline comment, in English' \
