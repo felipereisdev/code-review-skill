@@ -15,7 +15,7 @@ An eligible thread has an own root finding and no other user's unresolved action
 
 ## Review-state decision
 
-- **Confirmed blocker remains:** request changes, identifying the blocking findings and the published review URL. Critical findings block; a Warning blocks only when the report's `Blocking` decision demonstrates broken required behavior, a public contract or an integration regression. Suggestions and Medium-confidence candidates never become confirmed blockers by this flag.
+- **Confirmed blocker remains:** request changes, identifying the blocking findings and the published review URL. Only Critical findings block, including a broken requirement or a failing test that SKILL.md proves Critical. Warnings, Suggestions and Medium-confidence candidates never become confirmed blockers by this flag; a Warning can stay open as a nonblocking note.
 - **Only a material limit or unverified candidate remains:** preserve the existing review state and state what still needs verification. Missing access is not proof that the author must change code.
 - **Every earlier blocker is verified fixed, no pending blocker or material verification gap remains, and the current pair was fully reviewed:** withdraw only this account's own request for changes, without approving. A nonblocking note can stay open; identify it as nonblocking.
 - **Withdrawal with no relevant own request, or desired state already current:** no state write. This no-op applies to withdrawing an absent request, not to creating an initial request-changes review when confirmed blockers remain. Never alter another reviewer's request or approval.

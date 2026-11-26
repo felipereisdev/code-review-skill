@@ -26,10 +26,15 @@ Read this file only when the arguments include `--comment` and the scope is `pr`
 **<Severity> — <Category>** · `<path>:<lines>`
 
 **Issue:** <Issue>
+
 **Evidence:** <Evidence>
+
 **Rule:** <citation>
+
 **Also at:** <places>
+
 **Blocking:** <yes | no — reason>
+
 **Fix:** <Fix text before its code block>
 
 <suggestion block, or the Fix code block>
@@ -38,40 +43,72 @@ Read this file only when the arguments include `--comment` and the scope is `pr`
 ```
 
 - `<lines>` is the Location's `start-end` or single line. Leave out the **Rule:** and **Also at:** lines when the finding has none, and the block when its **Fix:** has no code block.
+- Each field is its own paragraph: keep one blank line between the header and every field line, as the template shows. Never write two `**Label:**` lines one under the other: GitLab joins them into one paragraph.
 - The last line, `<!-- code-review-skill:finding -->`, marks the comment as one of this skill's findings for the next run.
 
 ## Summary comment body
 
+The summary comment is a structured Markdown document, never a block of consecutive `**Label:**` lines: GitLab joins such lines into one paragraph, and on GitHub they read as a wall of text. Keep the headings, the table and the blank lines of this template exactly, so it renders the same on GitHub, GitLab and Bitbucket:
+
 ```
 <!-- code-review-skill:summary -->
-## Code review
+# Code review: <scope> at `<first 7 characters of the head commit>`
 
-**Scope:** <scope> (<diff command>) at `<first 7 characters of the head commit>`
-**Snapshot:** <reviewed head and destination SHAs, current/historical status>
-**Review checks:** <evidence basis, execution/integration and cumulative regressions>
+## Verification
+
+| Check | Result |
+| --- | --- |
+| Diff | `<diff command>` |
+| Snapshot | <reviewed head and destination SHAs, current/historical status> |
+| Review checks | <evidence basis, execution/integration and cumulative regressions> |
+| Candidates | <checked> Critical/Warning candidates checked, <refuted> refuted. |
+| Review effort | <effort> |
+| Relevant tests | <tests> |
+
+## Findings
+
 **Findings:** <c> Critical, <w> Warning, <s> Suggestion. Inline comments: <k>.
 
-- <path>:<lines>: <Severity>: <problem> → <fix> (<tag>)
+### Critical
 
-**Needs human verification**
+- `<path>:<lines>`: <problem> → <fix> (<tag>)
 
-- <path>:<lines>: <Severity>: <problem> → <fix>
+### Warning
 
-**Verification:** <checked> Critical/Warning candidates checked, <refuted> refuted.
+- `<path>:<lines>`: <problem> → <fix> (<tag>)
 
-**Review effort:** <effort>
-**Relevant tests:** <tests>
-**Look first:** <files>
+### Suggestion
+
+- `<path>:<lines>`: <problem> → <fix> (<tag>)
+
+## Needs human verification
+
+- `<path>:<lines>`: <Severity>: <problem> → <fix>
+
+## Audit
+
+- **Files reviewed:** <n> of <m> changed files
+- **Read for context:** <k> files
+- **Checked with no findings:** <categories, or no category>
+- **Already raised, not verified:** <r> Warning candidates
+- **Not verified:** <what> (<tag>, <material or not material>)
+
+## Assessment
+
 **Ready to merge:** <verdict>
-**Audit:** <audit>
+
+**Look first:** <files>
 ```
 
-- The counts are those of the Summary table; `<k>` is the number of inline comments this run posts.
-- Write one line per finding under `## Findings`, in report order, in the compact-mode form, ending with its tag: `(inline)`, `(already commented)` or `(not on a diff line)`. When there is none, write the headline that SKILL.md Step 3 selects from its **Ready to merge:** line (the passed sentence only for **Yes**, otherwise the incomplete sentence) instead of the list.
-- Leave out the **Needs human verification** part when that section of the report is empty. Copy the verification line from the report.
-- Copy the four triage lines unchanged from the report (SKILL.md Step 3) after the verification line, and after the **Omitted by configuration:** line when there is one. Then write the report's Audit as the one **Audit:** line of compact mode. These lines go only in the summary comment, never in an inline comment, and the **Secrets** rule applies to them. The **Ready to merge:** line is text: it never approves, requests changes or blocks the pull request.
-- When the report has **Configuration:**, **Excluded by configuration:** or **Omitted by configuration:** lines (see `references/configuration.md`), copy each one unchanged into the summary: the first two right after the **Scope:** line, the last right after the verification line. When the report has the **No findings shown:** line, write it instead of the headline. Only the findings the report shows are published.
-- Keep the body under 60,000 characters: when the list is longer, stop it and add the line `- … <n> more findings in the chat report`.
+- **Language.** Write every published body, the summary and every inline comment, in English, whatever the language of the chat or of the report. Translate the free text of the report; keep code, paths, identifiers, commands, SHAs and quoted error messages exactly as they are. Never mix languages in one body.
+- **Title.** `<scope>` is the scope of the **Scope:** line without its command, such as `pr 42`; the command goes in the **Diff** row.
+- **Verification table.** One row per report line, in this order: **Diff**, then **Snapshot**, then one **Review checks** row per `**Review checks:**` line of the report, then **Candidates** with the text of the report's verification line after its label, then **Review effort** and **Relevant tests** with the text of those triage lines after their labels. When the report has **Configuration:**, **Excluded by configuration:** or **Omitted by configuration:** lines (see `references/configuration.md`), copy each one unchanged into the summary as a row named by its label: the first two right after the **Diff** row, the last right after the **Candidates** row. A cell holds one line: write `\|` for every `|` in its text, and never put a line break inside it.
+- **Findings.** The counts are those of the Summary table; `<k>` is the number of inline comments this run posts. Under the counts line, write one `### <Severity>` heading per severity that has findings, in the order Critical, Warning, Suggestion, and leave out the heading of a severity without findings. Under each heading, write one line per finding under `## Findings` of that severity, in report order, in the compact-mode form without the severity (the heading carries it): the Location in backticks, the problem, `→`, the fix, any `(also at …)` and `(Rule: …)` parts, and last its tag: `(inline)`, `(already commented)` or `(not on a diff line)`. When there is none, write the headline that SKILL.md Step 3 selects from its **Ready to merge:** line (the passed sentence only for **Yes**, otherwise the incomplete sentence) under the counts line instead of the headings. When the report has the **No findings shown:** line, write it instead of the headline. Only the findings the report shows are published.
+- **Needs human verification.** Leave out this section when that section of the report is empty. Its lines keep the severity, because the findings there have no heading of their own.
+- **Audit.** Write the report's Audit as these five list items, with the same content as the one **Audit:** line of compact mode. Leave out the **Already raised, not verified** item outside a `pr` review. In **Not verified**, write `nothing` when there is no limit; with one limit, write it on the item's line; with more, end the item at its label and list each limit in the Audit's order as a nested item, indented by two spaces.
+- **Assessment.** Take the **Ready to merge:** and **Look first:** lines from the report, each as its own paragraph, the verdict first. The **Ready to merge:** line is text: it never approves, requests changes or blocks the pull request.
+- Take the four triage lines from the report (SKILL.md Step 3) unchanged, in the places above: the first two as table rows, the last two under `## Assessment`. These lines and the Audit go only in the summary comment, never in an inline comment, and the **Secrets** rule applies to them.
+- Keep the body under 60,000 characters: when the finding lines are longer, stop them and add the line `- … <n> more findings in the chat report`.
 
 ## GitHub
 

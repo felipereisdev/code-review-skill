@@ -1706,8 +1706,12 @@ check_triage_references() {
   local missing=0 s
   for s in \
     '**Ready to merge:** <verdict>' \
-    '**Audit:** <audit>' \
-    'Copy the four triage lines unchanged from the report' \
+    '## Audit' \
+    '## Assessment' \
+    '| Check | Result |' \
+    'Take the four triage lines from the report (SKILL.md Step 3) unchanged' \
+    'Write every published body, the summary and every inline comment, in English' \
+    'never a block of consecutive `**Label:**` lines' \
     'never in an inline comment' \
     'the **Secrets** rule applies to them' \
     'it never approves, requests changes or blocks the pull request'; do
@@ -1741,7 +1745,7 @@ readme = open("README.md", encoding="utf-8").read()
 for s in ("**Triage, Verdict and Audit**", "`**Ready to merge:** Yes / No / With fixes`", "- **Triage and verdict**:",
           "- **Audit**: the report ends with `## Audit`", "never approves or blocks a pull request",
           "an open thread does not prove the problem",
-          "the triage lines, the `**Ready to merge:**` verdict and the one-line audit",
+          "the triage lines, the `**Ready to merge:**` verdict and the audit",
           "from the line and file counts measured on the diff, never estimated",
           "the skill's own files as `skill:<path>`"):
     if s not in readme:

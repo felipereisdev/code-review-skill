@@ -12,6 +12,13 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- **Summary comment layout.** With `--comment`, the summary comment on the pull request or merge request is now a structured document instead of consecutive `**Label:**` lines, which GitLab joined into one paragraph: a `# Code review: <scope> at <sha>` title, a `## Verification` table (diff, snapshot, review checks, candidates, review effort, relevant tests), `## Findings` with one `### <Severity>` heading per severity, `## Needs human verification`, `## Audit` as a list and a closing `## Assessment` with the `**Ready to merge:**` verdict and `**Look first:**`. Inline comments keep their fields but put a blank line between each of them, so `**Issue:**`, `**Evidence:**`, `**Blocking:**` and `**Fix:**` are separate paragraphs. A script that parsed the old summary or inline bodies must be adapted.
+- **Only Critical blocks.** A Warning never blocks the merge any more: `**Blocking:**` is `yes` exactly for a High-confidence Critical finding, and a report with Warnings and no Critical says `Ready to merge: With fixes`. Verdict row 8 (No for a blocking Warning) is retired; JSON version 2 rejects a document that uses it or marks a Warning as blocking.
+- **Broken requirements and failing tests are Critical.** A broken acceptance criterion, spec or required public contract is Critical when an executed reproduction or a static trace that quotes the requirement's exact text proves it; without that proof it goes to Needs human verification. With `--execute`, a test or suite that fails because of the change is Critical, one finding per cause, never counted again as missing tests.
+- **Published language.** Everything `--comment` publishes, the summary and the inline comments, is written in English, whatever the language of the chat; code, paths, identifiers and quoted errors stay as they are.
+
 ## [3.0.0] - 2026-10-28
 
 ### Upgrading from v2.0.0

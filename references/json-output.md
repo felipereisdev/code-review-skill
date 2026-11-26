@@ -50,7 +50,7 @@ The review object has these keys, in this order:
 
 The document leaves out What Was Done Well and the Summary table: the findings carry every count that the table shows, which counts the findings whose `omitted_by` is `null`.
 
-**Version compatibility.** New reports use version 2 and add `blocking` to every finding. Historical version 1 is read with its original fields, rows 1–7 and critical-only gate; never reinterpret an old Warning as a blocker. The consumer rejects unknown versions and fields. Version 2 adds verdict row 8 (No for a blocking Warning after material limits) and the blocking threshold.
+**Version compatibility.** New reports use version 2 and add `blocking` to every finding. Historical version 1 is read with its original fields, rows 1–7 and critical-only gate; never reinterpret an old Warning as a blocker. The consumer rejects unknown versions and fields. Version 2 adds the blocking threshold. Its former verdict row 8 (No for a blocking Warning) is retired: only a Critical finding blocks, and a document that uses row 8 or marks a Warning as blocking is invalid.
 
 **Finding object.** Each finding has these keys, in this order:
 
@@ -59,7 +59,7 @@ The document leaves out What Was Done Well and the Summary table: the findings c
 | `category` | the category of its heading, a row of the Summary table |
 | `severity` | `"Critical"`, `"Warning"` or `"Suggestion"` |
 | `confidence` | `"High"` under `findings`, `"Medium"` under `needs_verification` |
-| `blocking` | boolean; true only for High-confidence verified blockers; High Critical must be true, Suggestion/Medium must be false. Explain the decision in `evidence`. |
+| `blocking` | boolean; true exactly for a High-confidence Critical finding; false for every Warning, Suggestion and Medium-confidence finding. Explain the decision in `evidence`. |
 | `location` | the **Location:** as written, without backticks: `path:line` or `path:start-end` |
 | `path` | the path of the Location |
 | `side` | `"new"` for lines that the change adds or modifies, `"old"` for removed lines under the deletion-only exception |
@@ -70,7 +70,7 @@ The document leaves out What Was Done Well and the Summary table: the findings c
 | `issue`, `evidence`, `fix` | the text of its **Issue:**, **Evidence:** and **Fix:** lines |
 | `omitted_by` | `null` when the report shows the finding; otherwise the filter of `./references/configuration.md` that omitted it: `"min_severity"`, `"disabled_categories"` or `"max_findings_per_file"` |
 
-- Every blocking finding has `omitted_by` `null`, regardless of severity or filter; it still counts for row 8 and the gate.
+- Every blocking finding has `omitted_by` `null`, regardless of severity or filter; it still counts for row 2 and the gate.
 - `context_lines` also carries the Snapshot and Review checks lines, including evidence basis and execution/re-review records. They remain strings and add no findings or audit keys.
 - A grouped finding is one object: its other places are in `also_at`, never in objects of their own, and no place is listed twice.
 - A Critical finding always has `omitted_by` `null`: no filter omits it, as `./references/configuration.md` says.
@@ -100,7 +100,7 @@ The gate object has three keys:
   2. `"not_requested"` when `fail_on` is `null`.
   3. `"pass"` when the document's status is `"nothing_to_review"`.
   4. `"fail"` when the verdict row is 2, or when the threshold is `"blocking"` and any finding has `blocking: true`, regardless of the verdict row or other limits: a verified blocker is under `## Findings`.
-  5. `"incomplete"` when the verdict row is 1 or 3, and also any pending Critical/Warning candidate or already-raised unverified candidate for the `"blocking"` threshold, even when a nonblocking Warning selects row 4: no changed file was reviewed, the Audit lists a `material` limit, or a candidate still needs verification.
+  5. `"incomplete"` when the verdict row is 1 or 3, and also any pending Critical/Warning candidate or already-raised unverified candidate for the `"blocking"` threshold, even when a Warning selects row 4: no changed file was reviewed, the Audit lists a `material` limit, or a candidate still needs verification.
   6. `"pass"` otherwise.
 - `reason`: with the blocking threshold, use the number of verified blocking findings for fail, the pending/material limitation for incomplete, and `complete review with no verified blocker` for pass. With the critical threshold, use the original reasons: for `"error"`, the `message`; for `"not_requested"`, `no gate was requested`; for `"pass"` on a document with nothing to review, `nothing to review`; for `"fail"`, `1 verified Critical finding` or `<c> verified Critical findings`; for `"incomplete"`, the text after `No — ` of the **Ready to merge:** line; for any other `"pass"`, `complete review with no verified Critical finding`.
 

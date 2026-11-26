@@ -222,6 +222,8 @@ def check_inline(items, findings, diff, own, platform):
             errors.append(f"inline comment header does not match {loc}")
         if FINDING_MARKER not in body:
             errors.append(f"inline comment without the finding marker: {loc}")
+        if re.search(r"^\*\*[^*\n]+:\*\*.*\n\*\*[^*\n]+:\*\*", re.sub(r"```.*?```", "", body, flags=re.S), re.M):
+            errors.append(f"inline comment joins label lines into one paragraph: {loc}")
         outside = re.sub(r"```.*?```", "", body, flags=re.S)
         if re.search(r"^\s*/", outside, re.M):
             errors.append(f"line starts with a slash command: {loc}")
@@ -246,27 +248,54 @@ def check_inline(items, findings, diff, own, platform):
     return errors
 
 
+SEVERITY_ORDER = ("Critical", "Warning", "Suggestion")
+
+
+def summary_sections(lines):
+    """Map each line index to the (## section, ### subsection) headings that hold it."""
+    where, section, sub = [], None, None
+    for line in lines:
+        if line.startswith("## "):
+            section, sub = line[3:], None
+        elif line.startswith("### "):
+            sub = line[4:]
+        where.append((section, sub))
+    return where
+
+
 def check_summary(body, report, findings, needs, diff, own, inline_count):
     errors = []
-    if body.split("\n", 1)[0] != SUMMARY_MARKER:
-        errors.append("summary marker missing")
-    counts = [sum(f["severity"] == s for f in findings) for s in ("Critical", "Warning", "Suggestion")]
-    want = "**Findings:** {} Critical, {} Warning, {} Suggestion. Inline comments: {}.".format(*counts, inline_count)
-    if want not in body:
-        errors.append("summary counts do not match the report")
     lines = body.split("\n")
+    if lines[0] != SUMMARY_MARKER:
+        errors.append("summary marker missing")
+    if len(lines) < 2 or not lines[1].startswith("# Code review: "):
+        errors.append("summary title missing")
+    counts = [sum(f["severity"] == s for f in findings) for s in SEVERITY_ORDER]
+    want = "**Findings:** {} Critical, {} Warning, {} Suggestion. Inline comments: {}.".format(*counts, inline_count)
+    if want not in lines:
+        errors.append("summary counts do not match the report")
+    where = summary_sections(lines)
     for f in findings:
         side = anchor(f, diff)
         tag = "not on a diff line" if side is None else (
             "already commented" if own_commented(f, side, own) else "inline")
-        if not any(line.startswith(f"- {f['loc']}: {f['severity']}:") and line.endswith(f"({tag})") for line in lines):
+        if not any(line.startswith(f"- `{f['loc']}`: ") and line.endswith(f"({tag})")
+                   and where[i] == ("Findings", f["severity"]) for i, line in enumerate(lines)):
             errors.append(f"summary line missing or mis-tagged for {f['loc']}")
+    headings = [line[4:] for i, line in enumerate(lines) if line.startswith("### ") and where[i][0] == "Findings"]
+    present = [s for s in SEVERITY_ORDER if counts[SEVERITY_ORDER.index(s)]]
+    if headings != present:
+        errors.append(f"summary severity headings are {headings}, expected {present}")
     for f in needs:
-        if not any(line.startswith(f"- {f['loc']}: {f['severity']}:") for line in lines):
+        if not any(line.startswith(f"- `{f['loc']}`: {f['severity']}:") and where[i][0] == "Needs human verification"
+                   for i, line in enumerate(lines)):
             errors.append(f"summary misses needs-verification finding {f['loc']}")
-    verification = re.search(r"^\*\*Verification:\*\* .*$", report, re.M)
-    if verification is None or verification.group(0) not in body:
+    verification = re.search(r"^\*\*Verification:\*\* (.*)$", report, re.M)
+    if verification is None or f"| Candidates | {verification.group(1)} |" not in lines:
         errors.append("summary misses the verification line")
+    for i in range(1, len(lines)):
+        if lines[i - 1].startswith("**") and lines[i].startswith("**"):
+            errors.append(f"summary joins label lines into one paragraph: {lines[i]}")
     return errors
 
 
@@ -436,66 +465,66 @@ GL_DISCUSSION_1 = "--input discussion-1.json\n```\n\n```json"
 # exactly one occurrence of old, or ("tail", old, new), which replaces the text from the last old to the end.
 PARSER_PROBES = [
     ("P01", "github-dry-run.md", None,
-     "a7ebaf3c6d850fef6cef04f4f724480701ef7bda274b6ece9c5dd5fe09386708", []),
+     "7029977615c48d8ebd4023ad7f429a25f6dfcfbdff6902586c934a10e1568633", []),
     ("P02", "gitlab-dry-run.md", None,
-     "f4884a6f21d3cecf16681464070c0335f39b5a51bb5d9592f799dbbb485d7394", []),
+     "8ca8c58e3d94d3c43f9607ffe77ea6906bf4b7931d37931dd38d3f42f9f801f0", []),
     ("P03", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
-     "48ad127dadd5340f11f2c7f5b4c71627ee5139ccc7dd15e8be338a30d39ff61b",
+     "7c6003ad071a9c9a593050ea40945bbb2d4665631327287cd1991a5c51ea284f",
      [("append", "", "\n```sh\ngh pr review 42 --approve\n```\n")]),
     ("P04", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
-     "201c22bd0a1c054de78372605425aa47833c326f37f7b497588bed15839394a5",
+     "70dcc65ac3ee71b2363293d072fc2f686c995fbfc6243e672e1897c10285bfd6",
      [("append", "", "\n```sh\nglab mr approve 42\n```\n")]),
     ("P05", "github-dry-run.md", "write command without its JSON payload: gh pr review 42 --approve",
-     "faf833b0ad493f6017b997fd3d3331c51f4024157c2bc219fa5b6459c5945df8",
+     "61826808cbdfb00ab392e8910c20cf21b5715792d7b991264f54a4888c5ad343",
      [("replace", "### 2. Summary comment (edit 9007199254740993)",
        "```sh\ngh pr review 42 --approve\n```\n\n### 2. Summary comment (edit 9007199254740993)")]),
     ("P06", "gitlab-dry-run.md", "write command without its JSON payload: glab mr approve 42",
-     "af02d462c5825324834d5fb21affb33154cccd3ddb8c1d44d5a6c4132410fc19",
+     "bce88a157ca05f06cfaadba07e837e461b11c25e7782ace76b5945902310cb46",
      [("replace", "### 4. Summary comment (edit 502)",
        "```sh\nglab mr approve 42\n```\n\n### 4. Summary comment (edit 502)")]),
     ("P07", "github-dry-run.md", "write command without its JSON payload: " + GH_REVIEW_CMD,
-     "5bf57876c2b6e5c7715697f1714247da3fc2fa5ca5ebfd853d6b264dcd799f78",
+     "c1ac627ce87ac03f1c9075b26b99ab69995069eff59fd62cd32ff94627a8dbf3",
      [("append", "", "\n```sh\n" + GH_REVIEW_CMD + "\n```\n")]),
     ("P08", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method PUT",
-     "97ef276dc4ac538073163f8df19807ac89e725d3cdc5cd2c296399769e573d50",
+     "6e108452ae7987f6c2c801569f3b54d0282087e86d2c7590fe3957ebdcd962b6",
      [("tail", "```json\n", "\n")]),
     ("P09", "github-dry-run.md", "unclosed fence: ```sh",
-     "27f60e341281d79a9bad80bc75efdd9bc36780e5753d0e87700b7eecd4117525",
+     "19931f9caa6707c75f13cd93723b9f9f46be414f043e04fb54e321196bf0d449",
      [("append", "", "\n```sh\ngh pr review 42 --approve\n")]),
     ("P10", "gitlab-dry-run.md", "unclosed fence: ```json",
-     "af8ed806de5f31c69c97ef65ad51d41e250c0f348727b612f8ad3cbc92ecaa82",
+     "80aaa6cfbf835069d45eaa92381af4374d74ea3aabbcf8fe463809ea25e70381",
      [("append", "", "\n```sh\nglab api --hostname gitlab.com --method POST projects/77/merge_requests/42/discussions "
        + H + " --input discussion-1.json\n```\n\n```json\n{}\n")]),
     ("P11", "github-dry-run.md", "invalid JSON payload for: gh api --hostname github.com --method PATCH",
-     "ef9c126dbdc8fedfee2e75fe1527540ab634f41f87d04910b7f49f574bf8d15e",
+     "87c3b736d5dc8ec680d4a65c8b706976d545c18e8024a9c6afc8d18186276dd3",
      [("tail", "```json\n", "```json\n{not-json}\n```\n")]),
     ("P12", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
-     "43269b0d1420a818b203a928d0c00db30dae913b8321ea1c3e7764193a2555ac",
+     "b3709a598fa70bf5bc055b4c6abfa9ea3420da544535d602aed38f4226b74237",
      [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n```text\nintervening block\n```\n\n```json")]),
     ("P13", "gitlab-dry-run.md", "JSON payload without a write command",
-     "fda4a05ef3b38e2828f5a4868da72ae516ca37788941a67752c382bfa530224d",
+     "663cd466f96b009e7ac1f89562420ac76648a9f4287ff6b49bb65e92c98543e5",
      [("append", "", "\n```json\n{}\n```\n")]),
     ("P14", "github-dry-run.md", "unsupported fence: ```bash",
-     "482d72ced8b76c2c873a7186274d42d4dc04975e29c854c83dc6ea72a9bc33bd",
+     "3ef034e3ee99c7c65785a7a75f8ac27114f15a19c864b756b202ca1aa039b4d4",
      [("append", "", "\n```bash\ngh pr review 42 --approve\n```\n")]),
     ("P15", "gitlab-dry-run.md", "unsupported fence: ```shell",
-     "583b17686b227fbda32142a3e38f13b44921a43ab7c8c41e794cd17419381d44",
+     "c62044d17fc6a0bb6575c48ff80bc5c63f9e4e5fc47f74bc0e63fbf8b17beb98",
      [("append", "", "\n```shell\nglab mr approve 42\n```\n")]),
     ("P16", "github-dry-run.md", "unsupported fence: ````sh",
-     "c11810a7a7428323e5a2d3597e076418306c2e0df353617b2e6f7c4e4d91e045",
+     "e90ba19258648a72809dab09fc9d1e46b382f67e683f2cda7fdf7b3b395145cd",
      [("append", "", "\n````sh\ngh pr review 42 --approve\n````\n")]),
     ("P17", "github-dry-run.md", "unclosed fence: ```json",
-     "250530dcded9fba56de8d0f606066f739da18575c76aedd28da0a3182173e9d2",
+     "205d268a718beaba46ad4f42d7e85d61cbdbb2b6178b0f97269262f46b840a6f",
      [("tail", "\n```\n", "\n``\n")]),
     ("P18", "gitlab-dry-run.md", None,
-     "050bad784304f38230043a0a83d49f40b38466eebd48a7ba8f5f4343eba6de84",
+     "868bb0bde4124fd9176fef72e0f0795ee9d435236805bbc5f1d03f58be176297",
      [("replace", "## Dry run — nothing was published\n\n", "## Dry run — nothing was published\n\n\n\n"),
       ("replace", "\n\n### 2. Discussion on src/auth.js:3", "\n\n\n\n### 2. Discussion on src/auth.js:3")]),
     ("P19", "github-dry-run.md", None,
-     "431043421cb871eed582f407e33bf45702a0d1e2fcf711ac2dcc38a21d72d87b",
+     "e44e379fdb01642a4e89c58b3128767cb80bb92dbb3f6220329a1a187d4d6ab3",
      [("tail", "\n```\n", "\n```")]),
     ("P20", "gitlab-dry-run.md", "write command without its JSON payload: glab api --hostname gitlab.com --method POST",
-     "080113dd0cf7c3dcd07186dacd986d77e7aed5a8350f55e07fbabd1a95be1177",
+     "177322035fdb42be97f8ecbe9093c7dc232bcf1a0b4a539ac55a178d9231d5ee",
      [("replace", GL_DISCUSSION_1, "--input discussion-1.json\n```\n\n### 2. Discussion on src/auth.js:3\n\n```json")]),
 ]
 
@@ -691,6 +720,32 @@ class FixtureTest(unittest.TestCase):
         pairs[1][1]["body"] = pairs[1][1]["body"].replace("environment (already commented)", "environment (inline)")
         self.assertError(self.gh_errors(pairs), "summary line missing or mis-tagged for src/config.js:3")
 
+    def test_summary_finding_under_the_wrong_severity_fails(self):
+        pairs = copy.deepcopy(self.gl)
+        body = pairs[-1][1]["body"]
+        line = "- `src/auth.js:3`: the change removes the admin role check from requireAdmin → restore the role check (inline)"
+        pairs[-1][1]["body"] = body.replace(line + "\n", "").replace("### Suggestion\n\n", "### Suggestion\n\n" + line + "\n")
+        self.assertError(self.gl_errors(pairs), "summary line missing or mis-tagged for src/auth.js:3")
+
+    def test_summary_as_consecutive_label_lines_fails(self):
+        """The old layout: label lines with no blank line between them render as one paragraph on GitLab."""
+        pairs = copy.deepcopy(self.gl)
+        body = pairs[-1][1]["body"]
+        pairs[-1][1]["body"] = body.replace("# Code review: pr 42 at `3f1c2a9`\n",
+                                            "# Code review: pr 42 at `3f1c2a9`\n**Scope:** pr 42\n**Snapshot:** x\n")
+        self.assertError(self.gl_errors(pairs), "summary joins label lines into one paragraph")
+
+    def test_inline_comment_as_consecutive_label_lines_fails(self):
+        """The old layout: **Issue:** right above **Evidence:** renders as one paragraph on GitLab."""
+        pairs = copy.deepcopy(self.gl)
+        pairs[1][1]["body"] = pairs[1][1]["body"].replace("\n\n**Evidence:**", "\n**Evidence:**", 1)
+        self.assertError(self.gl_errors(pairs), "inline comment joins label lines into one paragraph")
+
+    def test_summary_without_the_title_fails(self):
+        pairs = copy.deepcopy(self.gh)
+        pairs[1][1]["body"] = pairs[1][1]["body"].replace("# Code review: pr 42", "## Code review")
+        self.assertError(self.gh_errors(pairs), "summary title missing")
+
     def test_parser_probes(self):
         """Corpus U11-I1-parser-coverage-v1: every printed write is parsed and validated, or the printout fails."""
         for probe, name, error, digest, operations in PARSER_PROBES:
@@ -806,7 +861,7 @@ class FixtureTest(unittest.TestCase):
                          "head_sha": GITLAB_HEAD}}]})
         pairs = [p for i, p in enumerate(pairs) if i != 1]
         summary = pairs[-1][1]
-        summary["body"], tagged = re.subn(r"^(- src/auth\.js:3-4: .*) \(inline\)$", r"\1 (already commented)",
+        summary["body"], tagged = re.subn(r"^(- `src/auth\.js:3-4`: .*) \(inline\)$", r"\1 (already commented)",
                                           summary["body"], flags=re.M)
         summary["body"], counted = re.subn(r"Inline comments: 3\.", "Inline comments: 2.", summary["body"])
         self.assertEqual((tagged, counted), (1, 1))
@@ -850,7 +905,7 @@ class FixtureTest(unittest.TestCase):
         pairs[1][1]["position"].update(old_line=4, new_line=4)
         pairs = [p for i, p in enumerate(pairs) if i != 1]
         summary = pairs[-1][1]
-        summary["body"], tagged = re.subn(r"^(- src/auth\.js:3-4: .*) \(inline\)$", r"\1 (already commented)",
+        summary["body"], tagged = re.subn(r"^(- `src/auth\.js:3-4`: .*) \(inline\)$", r"\1 (already commented)",
                                           summary["body"], flags=re.M)
         summary["body"], counted = re.subn(r"Inline comments: 3\.", "Inline comments: 2.", summary["body"])
         self.assertEqual((tagged, counted), (1, 1))

@@ -18,13 +18,13 @@ gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/revie
       "start_side": "RIGHT",
       "line": 10,
       "side": "RIGHT",
-      "body": "**Critical — Potential Bugs** · `src/invoices.js:9-10`\n\n**Issue:** The loop runs while `i <= invoice.lines.length`, one step past the last line.\n**Evidence:** An invoice with 2 lines reaches `i = 2` → `invoice.lines[2]` is `undefined`, reading `.amount` throws a `TypeError`, and every invoice total fails.\n**Fix:** Stop at the last line:\n\n```suggestion\n  for (let i = 0; i < invoice.lines.length; i++) {\n    total += invoice.lines[i].amount;\n```\n\n<!-- code-review-skill:finding -->"
+      "body": "**Critical — Potential Bugs** · `src/invoices.js:9-10`\n\n**Issue:** The loop runs while `i <= invoice.lines.length`, one step past the last line.\n\n**Evidence:** An invoice with 2 lines reaches `i = 2` → `invoice.lines[2]` is `undefined`, reading `.amount` throws a `TypeError`, and every invoice total fails.\n\n**Fix:** Stop at the last line:\n\n```suggestion\n  for (let i = 0; i < invoice.lines.length; i++) {\n    total += invoice.lines[i].amount;\n```\n\n<!-- code-review-skill:finding -->"
     },
     {
       "path": "src/auth.js",
       "line": 3,
       "side": "LEFT",
-      "body": "**Critical — Security** · `src/auth.js:3`\n\n**Issue:** The change removes the admin role check from `requireAdmin`.\n**Evidence:** The removed line 3 answered 403 to a user whose role is not `admin`; without it, any logged-in user who calls an admin route reaches `next()` → non-admins can run admin actions.\n**Fix:** Restore the role check before `next()`.\n\n<!-- code-review-skill:finding -->"
+      "body": "**Critical — Security** · `src/auth.js:3`\n\n**Issue:** The change removes the admin role check from `requireAdmin`.\n\n**Evidence:** The removed line 3 answered 403 to a user whose role is not `admin`; without it, any logged-in user who calls an admin route reaches `next()` → non-admins can run admin actions.\n\n**Fix:** Restore the role check before `next()`.\n\n<!-- code-review-skill:finding -->"
     },
     {
       "path": "src/invoices.js",
@@ -32,7 +32,7 @@ gh api --hostname github.com --method POST repos/acme/billing-api/pulls/42/revie
       "start_side": "RIGHT",
       "line": 17,
       "side": "RIGHT",
-      "body": "**Suggestion — Tests/Coverage** · `src/invoices.js:15-17`\n\n**Issue:** `applyDiscount` has no test.\n**Evidence:** A change that applied the percent twice would still pass the suite → wrong discounts could ship unnoticed. The function is correct today.\n**Fix:** Add a test for it:\n\n```js\ntest(\"applyDiscount\", () => { ... });\n```\n\n<!-- code-review-skill:finding -->"
+      "body": "**Suggestion — Tests/Coverage** · `src/invoices.js:15-17`\n\n**Issue:** `applyDiscount` has no test.\n\n**Evidence:** A change that applied the percent twice would still pass the suite → wrong discounts could ship unnoticed. The function is correct today.\n\n**Fix:** Add a test for it:\n\n```js\ntest(\"applyDiscount\", () => { ... });\n```\n\n<!-- code-review-skill:finding -->"
     }
   ]
 }
@@ -46,6 +46,6 @@ gh api --hostname github.com --method PATCH repos/acme/billing-api/issues/commen
 
 ```json
 {
-  "body": "<!-- code-review-skill:summary -->\n## Code review\n\n**Scope:** pr 42 (gh pr diff 42) at `3f1c2a9`\n**Findings:** 3 Critical, 0 Warning, 1 Suggestion. Inline comments: 3.\n\n- src/config.js:3: Critical: the payments API key `[REDACTED]` is committed in the source → read the key from the environment (already commented)\n- src/invoices.js:9-10: Critical: the loop runs one step past the last line → stop at the last line (inline)\n- src/auth.js:3: Critical: the change removes the admin role check from requireAdmin → restore the role check (inline)\n- src/invoices.js:15-17: Suggestion: applyDiscount has no test → add a test for it (inline)\n\n**Needs human verification**\n\n- src/invoices.js:16: Warning: applyDiscount accepts a percent above 100 → reject percents outside 0-100\n\n**Verification:** 4 Critical/Warning candidates checked, 0 refuted."
+  "body": "<!-- code-review-skill:summary -->\n# Code review: pr 42 at `3f1c2a9`\n\n## Verification\n\n| Check | Result |\n| --- | --- |\n| Diff | `gh pr diff 42` |\n| Candidates | 4 Critical/Warning candidates checked, 0 refuted. |\n\n## Findings\n\n**Findings:** 3 Critical, 0 Warning, 1 Suggestion. Inline comments: 3.\n\n### Critical\n\n- `src/config.js:3`: the payments API key `[REDACTED]` is committed in the source → read the key from the environment (already commented)\n- `src/invoices.js:9-10`: the loop runs one step past the last line → stop at the last line (inline)\n- `src/auth.js:3`: the change removes the admin role check from requireAdmin → restore the role check (inline)\n\n### Suggestion\n\n- `src/invoices.js:15-17`: applyDiscount has no test → add a test for it (inline)\n\n## Needs human verification\n\n- `src/invoices.js:16`: Warning: applyDiscount accepts a percent above 100 → reject percents outside 0-100"
 }
 ```
