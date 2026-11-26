@@ -857,7 +857,7 @@ def summary_body(report, findings_block):
     table = ["| Check | Result |", "| --- | --- |", "| Diff | `gh pr diff 7` |"]
     if verification:
         table.append(f"| Candidates | {verification.group(1)} |")
-    return "\n".join(["<!-- code-review-skill:summary -->", "# Code review: pr 7 at `abc1234`", "",
+    return "\n".join(["<!-- code-review-skill:summary -->", "# Code review (round 1): pr 7 at `abc1234`", "",
                       "## Verification", "", *table, *rows, "", "## Findings", "", findings_block, "",
                       *summary_audit_lines(parse_audit(report)), "", "## Assessment", "",
                       "\n\n".join(assessment), ""])
@@ -883,7 +883,7 @@ def check_summary_triage(body, report):
         errors.append("summary misses the assessment section")
     else:
         at = lines.index("## Assessment")
-        if [line for line in lines[at + 1:] if line] != assessment:
+        if [line for line in lines[at + 1:] if line and not line.startswith("<!-- code-review-skill:state ")] != assessment:
             errors.append("summary assessment must hold the Ready to merge line, then the Look first line")
         if start is not None and start > at:
             errors.append("summary audit must come before the assessment")

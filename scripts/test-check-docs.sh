@@ -645,7 +645,7 @@ replace_first "$work/scopenocommand/example-output.md" '**Scope:** pr 123 (gh pr
 expect_fail "a Scope line without its command fails" "$work/scopenocommand" "example-output.md **Scope:** line is not '**Scope:** <scope> (<command>)'"
 
 make_copy "$work/latescope"
-replace_first "$work/latescope/example-output.md" $'**Scope:** pr 123 (gh pr diff 123)\n\n' ''
+replace_first "$work/latescope/example-output.md" $'**Scope:** pr 123 (gh pr diff 123)\n' ''
 replace_first "$work/latescope/example-output.md" $'### What Was Done Well\n' $'### What Was Done Well\n\n**Scope:** pr 123 (gh pr diff 123)\n'
 expect_fail "a Scope line after What Was Done Well fails" "$work/latescope" "the full-report **Scope:** line must come before ### What Was Done Well"
 
@@ -903,8 +903,8 @@ replace_first "$work/pubnoflag/SKILL.md" '`--comment needs the pr scope; pass pr
 expect_fail "accepting --comment without the pr scope fails" "$work/pubnoflag" "Step 0 — Scope Selection is missing: \`--comment needs the pr scope; pass pr <number|url>\`"
 
 make_copy "$work/pubalways"
-replace_first "$work/pubalways/SKILL.md" 'Without `--comment`, never read `./references/publishing.md` and never publish' 'Always publish'
-expect_fail "publishing without --comment fails" "$work/pubalways" "Pull Request Scope is missing: Without \`--comment\`, never read \`./references/publishing.md\` and never publish"
+replace_first "$work/pubalways/SKILL.md" 'When the review does not publish, never read `./references/publishing.md` and never publish' 'Always publish'
+expect_fail "publishing a review that does not publish fails" "$work/pubalways" "Pull Request Scope is missing: When the review does not publish, never read \`./references/publishing.md\` and never publish"
 
 make_copy "$work/pubsecret"
 drop_lines "$work/pubsecret/references/publishing.md" '[REDACTED]'
@@ -915,11 +915,19 @@ replace_first "$work/pubrepeat/references/publishing.md" 'never post a second on
 expect_fail "posting a second summary comment fails" "$work/pubrepeat" "Publishing is missing: never post a second one"
 
 make_copy "$work/readmenodryrun"
-drop_lines "$work/readmenodryrun/README.md" '/code-review pr 123 --comment --dry-run'
-expect_fail "a README without the dry-run example fails" "$work/readmenodryrun" "README is missing: /code-review pr 123 --comment --dry-run"
+drop_lines "$work/readmenodryrun/README.md" '/code-review pr 123 --dry-run'
+expect_fail "a README without the dry-run example fails" "$work/readmenodryrun" "README is missing: /code-review pr 123 --dry-run"
+
+make_copy "$work/readmenocomment"
+drop_lines "$work/readmenocomment/README.md" '/code-review pr 123 --no-comment'
+expect_fail "a README without the --no-comment example fails" "$work/readmenocomment" "README is missing: /code-review pr 123 --no-comment"
+
+make_copy "$work/nocommentscope"
+replace_first "$work/nocommentscope/SKILL.md" '`--no-comment` turns publishing and the workflow off' '`--no-comment` is ignored'
+expect_fail "a --no-comment that still publishes fails" "$work/nocommentscope" "Step 0 — Scope Selection is missing: \`--no-comment\` turns publishing and the workflow off"
 
 make_copy "$work/readmeneverwrites"
-replace_first "$work/readmeneverwrites/README.md" 'and never writes to the pull request unless you pass `--comment`;' 'and never comments on, approves or changes the pull request;'
+replace_first "$work/readmeneverwrites/README.md" 'and publishes its comments to the pull request unless you pass `--no-comment`;' 'and never comments on, approves or changes the pull request;'
 expect_fail "a README that still denies publishing fails" "$work/readmeneverwrites" "README still says the skill never comments on the pull request"
 
 make_copy "$work/exampleleak"
@@ -983,8 +991,8 @@ replace_first "$work/cfgfallback/references/configuration.md" 'never applied in 
 expect_fail "falling back to the defaults on an invalid configuration fails" "$work/cfgfallback" "Configuration is missing: never applied in part, never replaced by guesses and never replaced by the defaults"
 
 make_copy "$work/cfgpublish"
-replace_first "$work/cfgpublish/references/configuration.md" 'no setting can turn on `--comment`, `--dry-run` or compact mode' 'the `comment` setting turns on `--comment`'
-expect_fail "a setting that turns on publishing fails" "$work/cfgpublish" "Configuration is missing: no setting can turn on \`--comment\`, \`--dry-run\` or compact mode"
+replace_first "$work/cfgpublish/references/configuration.md" 'no setting can turn publishing or the workflow on or off, turn on `--dry-run` or compact mode' 'the `comment` setting turns publishing on or off'
+expect_fail "a setting that turns publishing on or off fails" "$work/cfgpublish" "Configuration is missing: no setting can turn publishing or the workflow on or off, turn on \`--dry-run\` or compact mode"
 
 make_copy "$work/cfgsymlink"
 drop_lines "$work/cfgsymlink/references/configuration.md" 'is a symbolic link; configuration files must be regular files'
@@ -1321,6 +1329,26 @@ expect_fail "suppressing every API claim instead of version-specific or uncertai
 make_copy "$work/apiinjection"
 replace_first "$work/apiinjection/SKILL.md" 'Do not infer that a value bound through the query builder' 'Report a value bound through the query builder as injectable'
 expect_fail "reporting query-builder bindings as injectable fails" "$work/apiinjection" "SKILL.md is missing: Do not infer that a value bound through the query builder"
+
+make_copy "$work/linkalone"
+replace_first "$work/linkalone/SKILL.md" '**A link alone is a `pr` review:**' '**A link alone is an unknown scope:**'
+expect_fail "a pull request link alone that is not a pr review fails" "$work/linkalone" "Step 0 — Scope Selection is missing: **A link alone is a \`pr\` review:**"
+
+make_copy "$work/roundslate"
+replace_first "$work/roundslate/references/review-rounds.md" 'A late **Critical** candidate stays a candidate like any other' 'A late **Critical** candidate is dropped like any other'
+expect_fail "a late Critical that is dropped instead of reported fails" "$work/roundslate" "references/review-rounds.md is missing: A late **Critical** candidate stays a candidate like any other"
+
+make_copy "$work/roundsowner"
+drop_lines "$work/roundsowner/references/review-rounds.md" 'A comment written by another account is never yours'
+expect_fail "reading round state from another account's comment fails" "$work/roundsowner" "references/review-rounds.md is missing: A comment written by another account is never yours"
+
+make_copy "$work/roundsonehead"
+drop_lines "$work/roundsonehead/references/publishing.md" '**One publication per head.**'
+expect_fail "publishing twice on the same head fails" "$work/roundsonehead" "references/publishing.md is missing: **One publication per head.**"
+
+make_copy "$work/roundsskill"
+drop_lines "$work/roundsskill/SKILL.md" '**Review rounds.** In every `pr` review'
+expect_fail "a pr review that never reads the rounds guide fails" "$work/roundsskill" "SKILL.md is missing: **Review rounds.** In every \`pr\` review"
 
 make_copy "$work/pubnoverdict"
 drop_lines "$work/pubnoverdict/references/publishing.md" '**Ready to merge:** <verdict>'

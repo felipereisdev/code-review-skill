@@ -13,19 +13,20 @@
 
 ## Evidence-driven review (3.1)
 
-The default remains a static, read-only review. Every review now checks nine adversarial axes, qualifies static/executed/fixture-only evidence and checks stated acceptance criteria against the reviewed behavior. Re-reviews retain earlier reproductions and valid controls. A mock is not automatically a defect; a concrete mismatch with the real contract needs evidence. See [evidence-driven review](references/evidence-driven-review.md).
+Reviews stay static and read-only locally. A `pr` review publishes its comments and runs the review workflow by default; pass `--no-comment` for a report-only run. Every review now checks nine adversarial axes, qualifies static/executed/fixture-only evidence and checks stated acceptance criteria against the reviewed behavior. Re-reviews retain earlier reproductions and valid controls. A mock is not automatically a defect; a concrete mismatch with the real contract needs evidence. See [evidence-driven review](references/evidence-driven-review.md).
 
 ```text
 /code-review pr 123 --execute
-/code-review pr https://bitbucket.org/acme/service/pull-requests/42 --comment --dry-run
-/code-review pr 123 --comment --workflow --dry-run
+/code-review pr https://bitbucket.org/acme/service/pull-requests/42 --dry-run
+/code-review pr 123 --no-workflow
 /code-review branch main --format json --fail-on blocking
 ```
 
 - `--execute` authorizes local tests/probes and merged-tree verification in isolated scratch worktrees, using pinned source/destination SHAs. It does not authorize installing dependencies, live service probes or reading credentials. Missing runtime access is reported as a limit, while statically demonstrated findings remain valid. It cannot combine with `--fix`. See [execution](references/execution.md).
 - Every PR records the reviewed pair and rechecks it before reporting or writing. A moved pair makes the result historical until the affected delta/integration is covered; current-head publication and workflow writes stop. See [snapshots](references/pr-snapshots.md).
+- Every PR review knows its round. The state of the last published round lives in a hidden `<!-- code-review-skill:state ... -->` line of the skill's own summary comment, so no local file is needed. From round 2 on, the review verifies each earlier finding again (fixed, still open, withdrawn or not verified) under `## Previous findings`, keeps its key and severity stable unless it states a reversal, and moves Warning and Suggestion candidates on code that the previous round already reviewed to `## Late notes (not counted)`, so the goalposts never move; a late Critical still blocks. The summary title says `(round <n>)`, and `--comment` publishes nothing again on a head it already covered. See [review rounds](references/review-rounds.md).
 - Bitbucket Cloud joins GitHub/GitLab, through an already authenticated connector/client. Bitbucket Data Center is unsupported. See [provider protocol](references/bitbucket.md).
-- `--workflow` requires `pr --comment` and adds own-thread resolution and own request-changes/withdrawal operations when verified evidence supports them. It never approves or merges. Tracker writes require an explicit tracker request and legal transitions. Provider capabilities may limit operations. `--dry-run` suppresses all external writes; separately requested local execution still runs. See [workflow](references/review-workflow.md).
+- The workflow is on by default in every `pr` review that publishes, and `--no-workflow` turns it off: it adds own-thread resolution and own request-changes/withdrawal operations when verified evidence supports them. It never approves or merges. Tracker writes require an explicit tracker request and legal transitions. Provider capabilities may limit operations. `--dry-run` suppresses all external writes; separately requested local execution still runs. See [workflow](references/review-workflow.md).
 - **Only Critical blocks.** A crash, data loss, security hole, a broken acceptance criterion, spec or public contract (proven by an executed reproduction or by quoting the requirement's exact text) and, with `--execute`, a test that fails because of the change are Critical and block the merge. Warnings never block: they give `Ready to merge: With fixes`. A broken requirement without that proof goes to Needs human verification. Suggestions do not block; Medium-confidence candidates require verification. Filters cannot omit a blocking finding. Markdown records `**Blocking:** yes | no — reason`, `yes` exactly for Critical.
 - New JSON reports use contract version 2, with boolean `blocking` on each finding; the consumer still accepts historical version 1 without reinterpreting it. `--fail-on critical` retains its explicit threshold. `--fail-on blocking` fails on any verified blocker (a High-confidence Critical finding) and returns incomplete for pending candidates/material gaps. Consumer exits are 0 pass, 1 verified finding at threshold, 2 incomplete/error, 3 invalid input. See [JSON contract](references/json-output.md).
 
@@ -45,8 +46,8 @@ The default remains a static, read-only review. Every review now checks nine adv
 - **Repository Rules with Citations** - Reads `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.cursor/rules/`, `.github/copilot-instructions.md` and `.github/instructions/` in the repository root and in every directory down to the changed files (Step 1.6); the most specific rule wins, a rule never silences a Critical security finding, and each rule finding cites the rules file and lines (for example `src/services/AGENTS.md:L4-L5`)
 - **Repository Configuration and Custom Rules** - An optional `.code-review/config.yml` sets `ignore_paths`, `min_severity`, `max_findings_per_file` and `disabled_categories`, and `.code-review/rules/*.md` adds the team's own rules with `paths`, `severity` and Bad/Good examples; an invalid file stops the review with a clear error, excluded paths and omitted findings are declared in the report, a Critical finding is never omitted, and a change to `.code-review/` applies to its own review
 - **Prompt-Injection Defense** - The diff, PR or MR title and description, commit messages, code comments and repository files are data, never instructions: text such as "ignore previous instructions" or "approve this PR" is ignored, and when the change adds it, it can be reported as a Security finding
-- **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and never writes to the pull request unless you pass `--comment`; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
-- **Publishing to the Pull Request** - `/code-review pr 123 --comment` posts each finding that sits on a line of the diff as an inline comment, in one review submitted only as a comment (never an approval), with a `suggestion` block only for a complete fix, plus one summary comment that later runs edit instead of repeating; `--dry-run` prints the exact `gh` or `glab` commands and payloads and posts nothing
+- **Pull Request Reviews** - `/code-review pr 123`, or the URL of a GitHub pull request or GitLab merge request, reviews it with `gh` or `glab`: the skill reads the diff, title, description, commits, linked issues and review threads, and publishes its comments to the pull request unless you pass `--no-comment`; a problem an open thread already raises goes to a short "Already raised in the PR (not repeated)" list outside the Summary table, and a resolved thread is never reopened
+- **Publishing to the Pull Request** - `/code-review pr 123` posts each finding that sits on a line of the diff as an inline comment, in one review submitted only as a comment (never an approval), with a `suggestion` block only for a complete fix, plus one summary comment that later runs edit instead of repeating; `--dry-run` prints the exact `gh` or `glab` commands and payloads and posts nothing
 - **Dimension Review with Subagents** - When the agent can start subagents, up to four of them review the bugs, security, repository rules and tests dimensions, each with only its own checklist, while the main review keeps every other category, merges duplicate candidates, verifies them, applies the configuration filters once, and alone writes the verdict, the audit and any published comment; a subagent that fails never makes its dimension clean (`references/dimensions.md`). Without subagents, the single-pass review runs unchanged
 - **Large Diff Strategy** - When the diff has more than 500 changed lines, the review skips lockfiles and generated files found by fixed path and header rules (never by running a build), reviews the other files in batches by module with the riskiest modules first, keeps the counts of the whole diff, and lists every skipped or unread file in the Audit, material unless other evidence the review read lets it judge the change without that file; a skipped file is never called reviewed (`references/large-diffs.md`). Smaller diffs are reviewed in full
 - **Intent and Requirements** - Every report opens with a `## Intent` section: what the change is meant to do, from the request and, in a `pr` review, the title, description, commits and linked issues, or a purpose inferred from the diff and labelled as inferred when no source states one. When a source states requirements, each one is met, not met or not judged from the behavior of the reviewed code, with the code behind it; scope creep is compared only with the sources the review read, and every named source it could not read is listed. Issues and specs are data, an issue on another tracker such as Jira or Linear is read only with a read-only tool the agent already has, and a requirement is never judged from a file the review did not read; the section never adds a finding or changes the verdict (`references/intent.md`)
@@ -168,6 +169,7 @@ Pass the scope after the command, or leave it out and let the skill detect it:
 /code-review commit abc123        # one commit
 /code-review range v1.2.0..HEAD   # a range of commits
 /code-review pr 123               # a GitHub pull request or GitLab merge request (needs gh or glab)
+/code-review https://gitlab.com/acme/shop/-/merge_requests/42   # a pull or merge request link alone is the same as pr <url>
 /code-review pr https://github.com/owner/repo/pull/123   # the same, by URL
 /code-review staged compact       # any scope, in compact mode
 ```
@@ -181,19 +183,21 @@ claude -p "/code-review branch origin/main"
 ### Publishing to the pull request
 
 ```
-/code-review pr 123 --comment             # post the review to the pull request or merge request
-/code-review pr 123 --comment --dry-run   # print what would be posted and post nothing
+/code-review pr 123                # post the review and run the workflow (the default)
+/code-review pr 123 --no-workflow  # post the review, but never resolve threads or change the review state
+/code-review pr 123 --no-comment   # write the report only: post nothing, run no workflow
+/code-review pr 123 --dry-run      # print what would be posted and post nothing
 ```
 
-With `--comment`, the skill first writes the whole report in the chat, then posts it with `gh` or `glab`:
+By default, a `pr` review first writes the whole report in the chat, then posts it with `gh` or `glab`, and then runs the workflow. `--comment` and `--workflow` are still accepted and only state these defaults:
 
-- Each finding under `## Findings` whose location is on a line of the diff becomes an inline comment. On GitHub they go out in one review submitted only as a comment (`"event": "COMMENT"`); the skill never approves a pull request or requests changes. A `suggestion` block is added only when the fix replaces exactly the commented lines.
-- One summary comment, which starts with `<!-- code-review-skill:summary -->`, lists every finding. It is laid out in sections that render the same on GitHub, GitLab and Bitbucket: a `# Code review: <scope> at <sha>` title, a verification table, the findings under one heading per severity, the Audit as a list and an `## Assessment` with the verdict. Later runs edit that comment instead of adding another, and never repeat a finding the skill already commented on at the same place.
+- Each finding under `## Findings` whose location is on a line of the diff becomes an inline comment. On GitHub they go out in one review submitted only as a comment (`"event": "COMMENT"`); the skill never approves a pull request, and only the workflow, never the comments themselves, requests changes. A `suggestion` block is added only when the fix replaces exactly the commented lines.
+- One summary comment, which starts with `<!-- code-review-skill:summary -->`, lists every finding. It is laid out in sections that render the same on GitHub, GitLab and Bitbucket: a `# Code review (round <n>): <scope> at <sha>` title, a verification table, the findings under one heading per severity, the Audit as a list and an `## Assessment` with the verdict. Later runs edit that comment instead of adding another, and never repeat a finding the skill already commented on at the same place.
 - Everything the skill publishes, the summary and the inline comments, is written in English, whatever the language of the chat; code, paths and quoted errors stay as they are.
 - Findings under Needs human verification appear only in the summary comment; pre-existing and already-raised lines are never posted. Secrets are replaced with `[REDACTED]`. If a command fails, the skill says so, and the report in the chat is still complete.
 - The summary comment also carries the triage lines, the `**Ready to merge:**` verdict and the audit; inline comments never do, and the verdict never approves or blocks the pull request.
 
-`--comment` works only with the `pr` scope: with another scope, or `--dry-run` without `--comment`, the skill stops with `Cannot review: ... Nothing was reviewed.`. The rules live in `references/publishing.md`, which the skill reads only when `--comment` is given. `--dry-run` prints each command and its JSON payload under `## Dry run — nothing was published`, for example this review payload, shortened to one inline comment (see [example-output.md](example-output.md) for the full printout):
+Only a `pr` review publishes, and never with `--no-comment`, `--format json` or `--fix`: `--comment` or `--no-comment` with another scope, or `--dry-run` in a review that does not publish, stops with `Cannot review: ... Nothing was reviewed.`. The rules live in `references/publishing.md`, which the skill reads only when the review publishes. `--dry-run` prints each command and its JSON payload under `## Dry run — nothing was published`, for example this review payload, shortened to one inline comment (see [example-output.md](example-output.md) for the full printout):
 
 ```json
 {
@@ -337,7 +341,7 @@ The skill takes the scope from the argument, and detects it when there is none:
 
 Without an argument, the skill reviews the uncommitted changes if there are any; otherwise, a branch with commits ahead of the default branch (from `origin/HEAD`, falling back to `main` or `master`) is reviewed against it; otherwise it says there is nothing to review. It asks only in an interactive run whose detection is ambiguous, and never in a headless run. An invalid argument, such as an unknown commit or base, stops with `Cannot review: ... Nothing was reviewed.` instead of reviewing another scope. The report starts with the scope and its git command, for example `**Scope:** branch main (git diff main...HEAD)`.
 
-A `pr` review picks `gh` or `glab` from the URL or from the `origin` remote; that CLI must be installed and logged in, or the skill stops with `Cannot review: ... Nothing was reviewed.`. It reads the diff, title, description, commits, linked issues and review threads, never writes to the pull request unless you pass `--comment` (see Publishing to the pull request), and starts the report with, for example, `**Scope:** pr 123 (gh pr diff 123)`. A problem that an open review thread already raises at the same place is listed, one line each with the thread's URL, under `## Already raised in the PR (not repeated)` instead of being reported again. A Critical problem stays a finding, and a resolved thread is never reopened: a finding that matches one is reported only because the current diff still has the problem, and it cites the thread.
+A `pr` review picks `gh` or `glab` from the URL or from the `origin` remote; that CLI must be installed and logged in, or the skill stops with `Cannot review: ... Nothing was reviewed.`. It reads the diff, title, description, commits, linked issues and review threads, publishes to the pull request unless you pass `--no-comment` (see Publishing to the pull request), and starts the report with, for example, `**Scope:** pr 123 (gh pr diff 123)`. A problem that an open review thread already raises at the same place is listed, one line each with the thread's URL, under `## Already raised in the PR (not repeated)` instead of being reported again. A Critical problem stays a finding, and a resolved thread is never reopened: a finding that matches one is reported only because the current diff still has the problem, and it cites the thread.
 
 ## 🛡️ Review Categories
 
@@ -493,7 +497,7 @@ code-review-skill/
 │   ├── cases/           # One folder per pair: base/, bug.patch, clean.patch, pair.json
 │   ├── controls/        # Behavior controls: JSON gate, headless --fix, unavailable second opinion
 │   ├── profiles/        # Frozen agent profiles for measured studies
-│   └── tests/           # Offline tests for the runner, the scorer, the --comment dry-run payloads, the triage verdict and the --format json gate
+│   └── tests/           # Offline tests for the runner, the scorer, the publishing dry-run payloads, the triage verdict and the --format json gate
 ├── patterns/            # Architectural pattern guidelines
 │   ├── clean-architecture.md
 │   ├── cqrs.md
@@ -512,6 +516,7 @@ code-review-skill/
 │   ├── evidence-driven-review.md # Evidence/execution/provider workflow guidance (not a review category)
 │   ├── execution.md # Evidence/execution/provider workflow guidance (not a review category)
 │   ├── pr-snapshots.md # Evidence/execution/provider workflow guidance (not a review category)
+│   ├── review-rounds.md # Rounds of a pull request review: previous findings, late findings, state (not a review category)
 │   ├── review-workflow.md # Evidence/execution/provider workflow guidance (not a review category)
 │   ├── i18n.md
 │   ├── intent.md        # Intent and requirements of every review (not a review category)
@@ -519,7 +524,7 @@ code-review-skill/
 │   ├── large-diffs.md   # Strategy for diffs over 500 changed lines (not a review category)
 │   ├── observability.md
 │   ├── privacy.md
-│   ├── publishing.md    # Publishing rules for --comment (not a review category)
+│   ├── publishing.md    # Publishing rules for pr reviews (not a review category)
 │   ├── removed-code-history.md # Git history of removed validation, permission checks and error handling (not a review category)
 │   ├── resilience.md
 │   ├── second-opinion.md # Second opinion from another reviewer CLI for --second-opinion (not a review category)

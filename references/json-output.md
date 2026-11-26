@@ -71,7 +71,7 @@ The document leaves out What Was Done Well and the Summary table: the findings c
 | `omitted_by` | `null` when the report shows the finding; otherwise the filter of `./references/configuration.md` that omitted it: `"min_severity"`, `"disabled_categories"` or `"max_findings_per_file"` |
 
 - Every blocking finding has `omitted_by` `null`, regardless of severity or filter; it still counts for row 2 and the gate.
-- `context_lines` also carries the Snapshot and Review checks lines, including evidence basis and execution/re-review records. They remain strings and add no findings or audit keys.
+- `context_lines` also carries the Snapshot, Round and Review checks lines, including evidence basis and execution/re-review records, and, in round 2 or later of a `pr` review, each line of `## Late notes (not counted)` and of `## Previous findings` (see `./references/review-rounds.md`), each as written. They remain strings and add no findings or audit keys.
 - A grouped finding is one object: its other places are in `also_at`, never in objects of their own, and no place is listed twice.
 - A Critical finding always has `omitted_by` `null`: no filter omits it, as `./references/configuration.md` says.
 - A finding that a filter omits keeps every other key as Step 2 left it. The filters decide only what the Markdown report would show; the document keeps every fact that the verdict and the gate count.

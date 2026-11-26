@@ -1,4 +1,5 @@
 **Scope:** pr 42 (gh pr diff 42)
+**Round:** 1 — first review of this pull request.
 
 ### What Was Done Well
 
