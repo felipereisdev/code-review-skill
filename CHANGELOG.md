@@ -4,11 +4,13 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-11-26
+
 ### Changed
 
-- **A new summary comment every round.** From round 2 on, the review posts a new summary comment instead of editing the previous one, so each round's summary stays on the pull request as the record of that round. Editing remains only for an explicitly requested republish on the same head.
-- **The verdict comes first.** The summary opens with the verdict as a highlighted heading (`## 🔴 Ready to merge: No`, `## 🟡 Ready to merge: With fixes` or `## 🟢 Ready to merge: Yes`), its reason and **Look first**, before the findings; the verification table and the Audit move below the findings, and the `## Assessment` section is gone.
-- **The chat shows only the published summary.** A review that publishes still builds the full report, but the chat shows only the summary comment it posts, plus the publishing outcome line: no finding blocks, Summary table, Audit or Intent section, which saves tokens. Reviews that do not publish keep the full report.
+- **A new summary comment every round.** From round 2 on, the review posts a new summary comment instead of editing the previous one, so each round's summary stays on the pull request as the record of that round. Editing remains only for an explicitly requested republish on the same head ([#30](https://github.com/felipereisdev/code-review-skill/pull/30)).
+- **The verdict comes first.** The summary opens with the verdict as a highlighted heading (`## 🔴 Ready to merge: No`, `## 🟡 Ready to merge: With fixes` or `## 🟢 Ready to merge: Yes`), its reason and **Look first**, before the findings; the verification table and the Audit move below the findings, and the `## Assessment` section is gone ([#30](https://github.com/felipereisdev/code-review-skill/pull/30)).
+- **The chat shows only the published summary.** A review that publishes still builds the full report, but the chat shows only the summary comment it posts, plus the publishing outcome line: no finding blocks, Summary table, Audit or Intent section, which saves tokens. Reviews that do not publish keep the full report ([#30](https://github.com/felipereisdev/code-review-skill/pull/30)).
 
 ## [4.0.0] - 2026-11-26
 
@@ -98,7 +100,8 @@ All notable changes to this project are listed here, in the format of [Keep a Ch
 - Review triage, audit and review effort claims reconciled ([#14](https://github.com/felipereisdev/code-review-skill/pull/14)).
 - README counts, the MIT `LICENSE` and the `SKILL.md` frontmatter ([#1](https://github.com/felipereisdev/code-review-skill/pull/1)).
 
-[Unreleased]: https://github.com/felipereisdev/code-review-skill/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/felipereisdev/code-review-skill/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/felipereisdev/code-review-skill/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/felipereisdev/code-review-skill/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/felipereisdev/code-review-skill/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/felipereisdev/code-review-skill/compare/v2.0.0...v3.0.0
