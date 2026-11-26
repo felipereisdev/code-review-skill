@@ -111,7 +111,7 @@ expect_fail "a Low-confidence example finding fails" "$work/lowconf" "example-ou
 
 make_copy "$work/badtotal"
 replace_first "$work/badtotal/example-output.md" '| **Total** | **2** |' '| **Total** | **3** |'
-expect_fail "a Summary total that does not match the findings fails" "$work/badtotal" "Summary Total row is [3, 1, 5]"
+expect_fail "a Summary total that does not match the findings fails" "$work/badtotal" "Summary Total row is [3, 1, 3]"
 
 make_copy "$work/slowpath"
 drop_lines "$work/slowpath/SKILL.md" 'do work or queries that grow with data size'
@@ -438,7 +438,7 @@ replace_first "$work/sizeconsistency/SKILL.md" 'if the project already lives wit
 expect_fail "size findings that skip the consistency check fail" "$work/sizeconsistency" "Code & File Size is missing: if the project already lives with"
 
 make_copy "$work/stalerefactor"
-replace_first "$work/stalerefactor/SKILL.md" 'are candidates for refactoring' 'require refactoring'
+replace_first "$work/stalerefactor/SKILL.md" 'a method or function that the change makes longer than **50 lines**' 'a method or function longer than **50 lines** must require refactoring'
 expect_fail "a size bullet that demands refactoring fails" "$work/stalerefactor" "Code & File Size still says: require refactoring"
 
 make_copy "$work/limitchanged"
